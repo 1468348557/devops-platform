@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}注册 - DevOps Platform{% endblock %}
+
+{% block content %}
+<section class="card">
+    <h1 class="card-title">创建账号</h1>
+    <p class="card-subtitle">请选择角色并提交审核申请，审核通过后即可登录系统。</p>
+
+    <form method="post" class="form">
+        {% csrf_token %}
+        {% for field in form %}
+            <label class="form-label">
+                <span>{{ field.label }}</span>
+                {{ field }}
+                {% if field.errors %}
+                    <span class="form-error">{{ field.errors|striptags }}</span>
+                {% endif %}
+            </label>
+        {% endfor %}
+        {% if form.non_field_errors %}
+            <p class="form-error">{{ form.non_field_errors|striptags }}</p>
+        {% endif %}
+        <button type="submit" class="btn btn-primary">提交注册申请</button>
+    </form>
+
+    <p class="muted">已有账号？<a href="{% url 'login' %}">去登录</a></p>
+</section>
+{% endblock %}

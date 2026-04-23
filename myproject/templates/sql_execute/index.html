@@ -1,0 +1,550 @@
+{% extends "base.html" %}
+
+{% block title %}SQL执行申请 - DevOps Platform{% endblock %}
+
+{% block content %}
+<style>
+  .page { align-items: flex-start; }
+  .card { max-width: 1320px; width: 100%; margin-top: 20px; position: relative; }
+  .nav-bread { font-size: 13px; color: #6b7280; margin-bottom: 16px; }
+  .nav-bread a { color: #1f75cb; text-decoration: none; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+  .field { display: grid; gap: 4px; }
+  .actions { margin: 10px 0 14px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .table-wrap { overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; min-width: 1200px; font-size: 13px; }
+  th, td { border-bottom: 1px solid #e5e7eb; padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #f8fafc; font-weight: 600; }
+  .status-pending { color: #1d4ed8; font-weight: 600; }
+  .status-running { color: #b45309; font-weight: 600; }
+  .status-success { color: #15803d; font-weight: 600; }
+  .status-failed, .status-rejected { color: #b91c1c; font-weight: 600; }
+  .muted { color: #6b7280; font-size: 12px; }
+  .apply-box { margin: 18px 0; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fafafa; }
+  .sql-file-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 6px; max-height: 180px; overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px; background: #fff; }
+  .sql-selected-item { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .sql-path-text {
+    display: inline-block;
+    max-width: 420px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  .btn-text { border: 0; background: transparent; color: #1f75cb; cursor: pointer; padding: 0; font-size: 12px; }
+  .btn-text:hover { text-decoration: underline; }
+  .sql-preview-mask {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    z-index: 999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .sql-preview-modal {
+    width: min(980px, 96vw);
+    max-height: 88vh;
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sql-preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 10px 12px;
+    background: #f8fafc;
+  }
+  .sql-preview-title { margin: 0; font-size: 14px; word-break: break-all; }
+  .sql-preview-content {
+    margin: 0;
+    padding: 12px;
+    overflow: auto;
+    white-space: pre;
+    font-size: 12px;
+    line-height: 1.5;
+    background: #fff;
+    min-height: 260px;
+  }
+  .home-icon-link {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 34px;
+    height: 34px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    color: #1f75cb;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+  }
+  .home-icon-link:hover { background: #f8fafc; border-color: #94a3b8; }
+  .home-icon-link svg { width: 18px; height: 18px; display: block; }
+</style>
+
+<div class="nav-bread"><a href="{% url 'dashboard' %}">工作台</a> / SQL执行申请</div>
+
+<section class="card">
+  <a class="home-icon-link" href="{% url 'dashboard' %}" title="返回主界面" aria-label="返回主界面">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M3 10.5L12 3l9 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path d="M6.75 9.75V21h10.5V9.75" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path d="M10 21v-6h4v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+  </a>
+  <h1 class="card-title">SQL执行申请（MySQL）</h1>
+  <p class="card-subtitle">执行顺序：备份 -> DDL -> 执行 -> 回滚 -> DDL -> 执行（某阶段无文件自动跳过；任一 SQL 报错即失败）。</p>
+
+  {% include "components/messages.html" %}
+
+  <form method="get" class="grid">
+    <label class="field">开始日期
+      <input class="form-input" type="date" name="start_date" value="{{ filters.start_date }}">
+    </label>
+    <label class="field">结束日期
+      <input class="form-input" type="date" name="end_date" value="{{ filters.end_date }}">
+    </label>
+    <label class="field">申请日期（投产征集）
+      <select class="form-input" name="release_date">
+        <option value="">全部</option>
+        {% for d in release_date_options %}
+          <option value="{{ d }}" {% if filters.release_date == d %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field">状态
+      <select class="form-input" name="status">
+        <option value="">全部</option>
+        <option value="pending" {% if filters.status == "pending" %}selected{% endif %}>未审批</option>
+        <option value="success" {% if filters.status == "success" %}selected{% endif %}>执行成功</option>
+        <option value="failed" {% if filters.status == "failed" %}selected{% endif %}>执行失败</option>
+      </select>
+    </label>
+    <label class="field">申请人
+      <input class="form-input" name="applicant" value="{{ filters.applicant }}" placeholder="用户名模糊匹配">
+    </label>
+    <label class="field">目录名称
+      <input class="form-input" name="folder" value="{{ filters.folder }}" placeholder="目录名称模糊匹配">
+    </label>
+    <label class="field">操作
+      <button class="btn btn-primary" type="submit">筛选</button>
+    </label>
+  </form>
+
+  <div class="actions">
+    {% if can_approve %}
+      <button id="btn-sync-repo" class="btn btn-secondary" type="button">同步最新仓库</button>
+    {% endif %}
+    <span id="tip" class="muted">默认展示前后30天申请记录；仓库每10分钟自动同步一次，也可手动同步</span>
+  </div>
+
+  {% if can_apply %}
+  <div class="apply-box">
+    <h3 style="margin:0 0 8px;">发起 SQL 执行申请</h3>
+    <div class="grid">
+      <label class="field">申请日期（投产征集日期）
+        <select id="apply-release-date" class="form-input">
+          <option value="">请选择</option>
+          {% for d in release_date_options %}
+            <option value="{{ d }}" {% if apply_default_release_date == d %}selected{% endif %}>{{ d }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="field">SQL 目录
+        <select id="apply-folder" class="form-input"></select>
+      </label>
+      <label class="field">动作
+        <button id="btn-load-folder" class="btn btn-secondary" type="button">加载目录 SQL</button>
+      </label>
+    </div>
+    <div id="sql-file-list" class="sql-file-grid" style="margin-top:8px;"></div>
+    <div class="actions">
+      <button id="btn-create-request" class="btn btn-primary" type="button">提交执行申请</button>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>申请日期</th>
+          <th>目录</th>
+          <th>勾选SQL</th>
+          <th>申请人</th>
+          <th>申请时间</th>
+          <th>状态</th>
+          <th>进度</th>
+          <th>执行结果</th>
+          <th>执行日志</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in rows %}
+        <tr data-sql-id="{{ row.id }}" data-sql-status="{{ row.status }}">
+          <td>{{ row.id }}</td>
+          <td>{{ row.release_date }}</td>
+          <td><code>{{ row.folder_path }}</code></td>
+          <td>
+            {% for sql_name in row.selected_files %}
+              <div class="sql-selected-item">
+                <code class="sql-path-text" title="{{ sql_name }}">{{ sql_name }}</code>
+                <button
+                  type="button"
+                  class="btn-text btn-view-sql-file"
+                  data-request-id="{{ row.id }}"
+                  data-file-path="{{ sql_name }}"
+                >查看</button>
+              </div>
+            {% empty %}
+              <span class="muted">-</span>
+            {% endfor %}
+          </td>
+          <td>{{ row.requested_by }}</td>
+          <td>{{ row.created_at }}</td>
+          <td class="status-{{ row.status }}">{{ row.status_label }}</td>
+          <td class="muted">{{ row.execution_tip|default:"-" }}</td>
+          <td>{{ row.execution_result|default:"-" }}</td>
+          <td><pre class="muted" style="white-space: pre-wrap; max-height:120px; overflow:auto;">{{ row.execution_log|default:"-" }}</pre></td>
+          <td>
+            {% if can_approve and row.status == "pending" %}
+              <button class="btn btn-primary btn-approve" data-id="{{ row.id }}" type="button">审批并执行</button>
+              <button class="btn btn-secondary btn-reject" data-id="{{ row.id }}" type="button">拒绝</button>
+            {% else %}
+              <span class="muted">-</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="11" class="muted">暂无申请记录</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div id="exec-progress-panel" style="display:none; margin-top:14px; padding:12px; border:1px solid #e5e7eb; border-radius:8px; background:#fafafa;">
+    <strong>执行进度（轮询中）</strong>
+    <p id="exec-progress-tip" class="muted" style="margin:8px 0;"></p>
+    <pre id="exec-progress-log" class="muted" style="white-space:pre-wrap; max-height:280px; overflow:auto; font-size:12px; border:1px solid #e5e7eb; border-radius:8px; padding:10px; background:#fff;"></pre>
+  </div>
+</section>
+
+<div id="sql-preview-mask" class="sql-preview-mask" role="dialog" aria-modal="true" aria-label="SQL文件预览">
+  <div class="sql-preview-modal">
+    <div class="sql-preview-header">
+      <h4 id="sql-preview-title" class="sql-preview-title">SQL 文件预览</h4>
+      <button id="btn-close-sql-preview" type="button" class="btn btn-secondary">关闭</button>
+    </div>
+    <pre id="sql-preview-content" class="sql-preview-content"></pre>
+  </div>
+</div>
+
+<script>
+  const tipEl = document.getElementById("tip");
+  const applyReleaseDateEl = document.getElementById("apply-release-date");
+  const folderSelect = document.getElementById("apply-folder");
+  const fileListEl = document.getElementById("sql-file-list");
+  const csrfToken = "{{ csrf_token }}";
+  const pollingState = { ids: new Set(), timer: null };
+  const REPO_AUTO_SYNC_INTERVAL_MS = 10 * 60 * 1000;
+  const sqlPreviewMaskEl = document.getElementById("sql-preview-mask");
+  const sqlPreviewTitleEl = document.getElementById("sql-preview-title");
+  const sqlPreviewContentEl = document.getElementById("sql-preview-content");
+
+  function showProgressPanel() {
+    const panel = document.getElementById("exec-progress-panel");
+    if (panel) panel.style.display = "block";
+  }
+
+  function terminalStatus(st) {
+    return st === "success" || st === "failed" || st === "rejected";
+  }
+
+  async function runPollingTick() {
+    if (pollingState.ids.size === 0) return;
+    const parts = [];
+    let lastTip = "";
+    for (const id of Array.from(pollingState.ids)) {
+      try {
+        const resp = await fetch(`/sql-execute/api/request/progress/?request_id=${encodeURIComponent(id)}`);
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+          parts.push(`#${id} 拉取失败：${data.error || "未知错误"}`);
+          continue;
+        }
+        const req = data.request || {};
+        lastTip = req.execution_tip || lastTip;
+        parts.push(`#${id} ${req.status_label || ""}\n${req.execution_log || ""}`);
+        if (terminalStatus(req.status)) {
+          pollingState.ids.delete(String(id));
+        }
+      } catch (e) {
+        parts.push(`#${id} 拉取异常`);
+      }
+    }
+    const logEl = document.getElementById("exec-progress-log");
+    const tipEl2 = document.getElementById("exec-progress-tip");
+    if (logEl) logEl.textContent = parts.join("\n\n---\n\n");
+    if (tipEl2) tipEl2.textContent = lastTip || `轮询任务数：${pollingState.ids.size}`;
+    if (pollingState.ids.size === 0 && pollingState.timer) {
+      clearInterval(pollingState.timer);
+      pollingState.timer = null;
+      window.location.reload();
+    }
+  }
+
+  function startPollingRequest(requestId) {
+    const idStr = String(requestId);
+    showProgressPanel();
+    pollingState.ids.add(idStr);
+    if (!pollingState.timer) {
+      pollingState.timer = setInterval(runPollingTick, 1000);
+    }
+    runPollingTick();
+  }
+
+  async function postForm(url, payload) {
+    const fd = new FormData();
+    Object.entries(payload || {}).forEach(([k, v]) => fd.append(k, v == null ? "" : String(v)));
+    const resp = await fetch(url, { method: "POST", headers: { "X-CSRFToken": csrfToken }, body: fd });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw data;
+    return data;
+  }
+
+  async function loadFolders() {
+    if (!folderSelect) return;
+    const releaseDate = applyReleaseDateEl?.value || "";
+    folderSelect.innerHTML = "";
+    if (!releaseDate) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "请先选择申请日期";
+      folderSelect.appendChild(opt);
+      if (fileListEl) fileListEl.innerHTML = "<span class='muted'>请先选择申请日期</span>";
+      return;
+    }
+
+    const resp = await fetch(
+      `/sql-execute/api/repo/folders/?release_date=${encodeURIComponent(releaseDate)}`
+    );
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw data;
+    const folders = data.folders || [];
+    if (folders.length === 0) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "当前申请日期无可用目录";
+      folderSelect.appendChild(opt);
+      if (fileListEl) fileListEl.innerHTML = "<span class='muted'>当前申请日期无可用目录</span>";
+      return;
+    }
+    const emptyOpt = document.createElement("option");
+    emptyOpt.value = "";
+    emptyOpt.textContent = "请选择目录";
+    folderSelect.appendChild(emptyOpt);
+    folders.forEach((folder) => {
+      const opt = document.createElement("option");
+      opt.value = folder;
+      opt.textContent = folder;
+      folderSelect.appendChild(opt);
+    });
+  }
+
+  async function loadFiles() {
+    if (!folderSelect || !fileListEl) return;
+    const folder = folderSelect.value;
+    if (!folder) {
+      fileListEl.innerHTML = "<span class='muted'>请先选择目录</span>";
+      return;
+    }
+    const resp = await fetch(`/sql-execute/api/repo/files/?folder=${encodeURIComponent(folder)}`);
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw data;
+    fileListEl.innerHTML = "";
+    (data.files || []).forEach((name) => {
+      const label = document.createElement("label");
+      label.style.display = "flex";
+      label.style.gap = "6px";
+      label.innerHTML = `<input type="checkbox" class="sql-file-item" value="${name}" checked><code>${name}</code>`;
+      fileListEl.appendChild(label);
+    });
+    if ((data.files || []).length === 0) {
+      fileListEl.innerHTML = "<span class='muted'>目录下暂无 .sql 文件</span>";
+    }
+  }
+
+  function closeSqlPreview() {
+    if (sqlPreviewMaskEl) sqlPreviewMaskEl.style.display = "none";
+  }
+
+  function openSqlPreview() {
+    if (sqlPreviewMaskEl) sqlPreviewMaskEl.style.display = "flex";
+  }
+
+  document.getElementById("btn-load-folder")?.addEventListener("click", async () => {
+    try {
+      await loadFiles();
+      tipEl.textContent = "SQL 文件加载完成";
+    } catch (e) {
+      tipEl.textContent = `加载失败：${e.error || "未知错误"}`;
+    }
+  });
+
+  document.getElementById("btn-create-request")?.addEventListener("click", async () => {
+    try {
+      const releaseDate = applyReleaseDateEl?.value || "";
+      const folder = folderSelect.value;
+      if (!releaseDate) throw { error: "请选择申请日期" };
+      if (!folder) throw { error: "请选择目录" };
+      await postForm("/sql-execute/api/request/create/", {
+        release_date: releaseDate,
+        folder: folder,
+      });
+      tipEl.textContent = "提交成功，刷新页面查看最新状态";
+      window.location.reload();
+    } catch (e) {
+      tipEl.textContent = `提交失败：${e.error || "未知错误"}`;
+    }
+  });
+
+  function formatLocalTime(dateObj) {
+    const pad = (num) => String(num).padStart(2, "0");
+    return `${pad(dateObj.getHours())}:${pad(dateObj.getMinutes())}:${pad(dateObj.getSeconds())}`;
+  }
+
+  async function syncRepo({ manual = false } = {}) {
+    const btn = document.getElementById("btn-sync-repo");
+    if (!btn) return;
+    const keepDisabled = btn.disabled;
+    try {
+      if (manual) {
+        btn.disabled = true;
+      }
+      const data = await postForm("/sql-execute/api/repo/sync/", {});
+      await loadFolders();
+      if (manual) {
+        tipEl.textContent = data.message || "仓库同步完成";
+      } else {
+        tipEl.textContent = `自动同步完成（${formatLocalTime(new Date())}）`;
+      }
+    } catch (e) {
+      tipEl.textContent = `${manual ? "手动同步失败" : "自动同步失败"}：${e.error || "未知错误"}`;
+    } finally {
+      if (manual) {
+        btn.disabled = keepDisabled;
+      }
+    }
+  }
+
+  document.getElementById("btn-sync-repo")?.addEventListener("click", async () => {
+    try {
+      await syncRepo({ manual: true });
+    } catch (e) {
+      tipEl.textContent = `同步失败：${e.error || "未知错误"}`;
+    }
+  });
+
+  applyReleaseDateEl?.addEventListener("change", async () => {
+    try {
+      await loadFolders();
+      if (tipEl) tipEl.textContent = "目录已按申请日期刷新";
+    } catch (e) {
+      if (tipEl) tipEl.textContent = `目录加载失败：${e.error || "未知错误"}`;
+    }
+  });
+
+  document.querySelectorAll(".btn-approve").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      try {
+        btn.disabled = true;
+        const data = await postForm("/sql-execute/api/request/action/", { request_id: btn.dataset.id, action: "approve" });
+        if (data.status === "running" && data.request_id) {
+          tipEl.textContent = "已提交后台执行，正在轮询进度…";
+          startPollingRequest(data.request_id);
+        } else {
+          window.location.reload();
+        }
+      } catch (e) {
+        tipEl.textContent = `审批失败：${e.error || "未知错误"}`;
+        btn.disabled = false;
+      }
+    });
+  });
+
+  document.querySelectorAll(".btn-reject").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      try {
+        await postForm("/sql-execute/api/request/action/", { request_id: btn.dataset.id, action: "reject" });
+        window.location.reload();
+      } catch (e) {
+        tipEl.textContent = `拒绝失败：${e.error || "未知错误"}`;
+      }
+    });
+  });
+
+  document.querySelectorAll(".btn-view-sql-file").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      try {
+        const requestId = btn.dataset.requestId || "";
+        const filePath = btn.dataset.filePath || "";
+        if (!requestId || !filePath) throw { error: "缺少必要参数" };
+        if (sqlPreviewTitleEl) {
+          sqlPreviewTitleEl.textContent = `SQL 文件预览 #${requestId} / ${filePath}`;
+        }
+        if (sqlPreviewContentEl) {
+          sqlPreviewContentEl.textContent = "加载中...";
+        }
+        openSqlPreview();
+        const resp = await fetch(
+          `/sql-execute/api/request/file-preview/?request_id=${encodeURIComponent(requestId)}&file_path=${encodeURIComponent(filePath)}`
+        );
+        const data = await resp.json();
+        if (!resp.ok || !data.success) throw data;
+        if (sqlPreviewContentEl) {
+          sqlPreviewContentEl.textContent = data.content || "";
+        }
+      } catch (e) {
+        if (sqlPreviewContentEl) {
+          sqlPreviewContentEl.textContent = `加载失败：${e.error || "未知错误"}`;
+        }
+      }
+    });
+  });
+
+  document.getElementById("btn-close-sql-preview")?.addEventListener("click", () => {
+    closeSqlPreview();
+  });
+
+  sqlPreviewMaskEl?.addEventListener("click", (evt) => {
+    if (evt.target === sqlPreviewMaskEl) closeSqlPreview();
+  });
+
+  loadFolders().catch((e) => {
+    if (tipEl) tipEl.textContent = `目录加载失败：${e.error || "未知错误"}`;
+  });
+
+  if (document.getElementById("btn-sync-repo")) {
+    window.setInterval(() => {
+      syncRepo({ manual: false });
+    }, REPO_AUTO_SYNC_INTERVAL_MS);
+  }
+
+  document.querySelectorAll("tr[data-sql-status='running']").forEach((tr) => {
+    const id = tr.dataset.sqlId;
+    if (id) startPollingRequest(id);
+  });
+</script>
+{% endblock %}

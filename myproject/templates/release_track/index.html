@@ -1,0 +1,625 @@
+{% extends "base.html" %}
+
+{% block title %}投产追版 - DevOps Platform{% endblock %}
+
+{% block content %}
+<style>
+  .page { align-items: flex-start; }
+  .card { max-width: 1360px; width: 100%; padding: 20px; position: relative; }
+  .nav-bread { font-size: 13px; color: #6b7280; margin-bottom: 16px; }
+  .nav-bread a { color: #1f75cb; text-decoration: none; }
+  .feature-header { margin-bottom: 20px; }
+  .feature-header h1 { margin: 0 0 4px; font-size: 22px; }
+  .feature-header p { margin: 0; color: #6b7280; font-size: 13px; }
+  .home-icon-link {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 34px;
+    height: 34px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    color: #1f75cb;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+  }
+  .home-icon-link:hover { background: #f8fafc; border-color: #94a3b8; }
+  .home-icon-link svg { width: 18px; height: 18px; display: block; }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .field { display: grid; gap: 4px; }
+  .action-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+  .muted { color: #6b7280; font-size: 12px; }
+  .status-running { color: #2563eb; font-weight: 600; }
+  .status-success { color: #16a34a; font-weight: 600; }
+  .status-failed { color: #dc2626; font-weight: 600; }
+  .approval-box { margin-top: 10px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; background: #fafafa; display: none; }
+  .table-wrap { overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
+  .review-box { margin: 8px 0 14px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; background: #fafafa; }
+  .risk-row { background: #fff1f2; }
+  .risk-text { color: #b91c1c; font-weight: 600; }
+  .done-row { background: #f0fdf4; }
+  .done-text { color: #166534; font-weight: 600; }
+  .drawer-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.3); display: none; z-index: 2200; }
+  .drawer-backdrop.show { display: block; }
+  .drawer { position: fixed; top: 0; right: 0; width: min(820px, 92vw); height: 100vh; background: #fff; border-left: 1px solid #e5e7eb; box-shadow: -8px 0 24px rgba(15,23,42,.15); transform: translateX(100%); transition: transform .2s ease; z-index: 2300; display: flex; flex-direction: column; }
+  .drawer.show { transform: translateX(0); }
+  .drawer-header { padding: 12px 14px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; }
+  .drawer-body { padding: 12px 14px; overflow: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 980px; }
+  th, td { border-bottom: 1px solid #e5e7eb; padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #f8fafc; font-weight: 600; }
+  .log-pre { margin:0; padding:10px; border:1px solid #e5e7eb; border-radius:8px; background:#f8fafc; white-space:pre-wrap; word-break:break-word; font-size:12px; max-height: 220px; overflow:auto; }
+</style>
+
+<div class="nav-bread">
+  <a href="{% url 'dashboard' %}">工作台</a> / 投产追版
+</div>
+
+<section class="card">
+  <a class="home-icon-link" href="{% url 'dashboard' %}" title="返回主界面" aria-label="返回主界面">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M3 10.5L12 3l9 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path d="M6.75 9.75V21h10.5V9.75" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path d="M10 21v-6h4v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+  </a>
+  <div class="feature-header">
+    <h1>投产追板</h1>
+    <p>选择投产批次后异步执行追板流程，实时查看阶段进度、仓库状态与最终汇总。</p>
+  </div>
+
+  <div class="form-grid">
+    <label class="field">投产批次
+      <select id="batch-id" class="form-input"></select>
+    </label>
+    <label class="field">Tag 名称（可选覆盖）
+      <input id="tag-name" class="form-input" placeholder="例如 20260421_v1">
+    </label>
+    <label class="field">Merge 信息（可选覆盖）
+      <input id="merge-message" class="form-input" placeholder="例如 20260421投产追板">
+    </label>
+    <label class="field">Tag 信息（可选覆盖）
+      <input id="tag-message" class="form-input" placeholder="例如 20260421投产变更">
+    </label>
+    <label class="field">默认目标分支
+      <input id="default-target-branch" class="form-input" value="master">
+    </label>
+    <label class="field">审批页面（固定）
+      <input class="form-input" value="http://gitlab.spdb.com/zh-1087" readonly>
+    </label>
+  </div>
+
+  <div class="action-row">
+    <button id="btn-drawer" class="btn btn-secondary" type="button">执行窗口</button>
+    <label><input id="dry-run" type="checkbox"> Dry Run（演练）</label>
+    <button id="btn-start" class="btn btn-primary" type="button">启动追板</button>
+    <button id="btn-refresh" class="btn btn-secondary" type="button">刷新进度</button>
+    <span id="selected-count" class="muted">已选项目：0</span>
+    <span id="tip" class="muted">准备就绪</span>
+  </div>
+
+  <div class="review-box">
+    <div class="muted" id="batch-review-title">批次检查：请选择投产批次</div>
+    <div class="table-wrap" style="margin-top: 8px;">
+      <table style="min-width: 760px;">
+        <thead>
+          <tr>
+            <th style="width:36px"><input id="batch-check-all" type="checkbox"></th>
+            <th>工程编码</th>
+            <th>工程名称</th>
+            <th>批次投产分支</th>
+            <th>登记记录数</th>
+            <th>上线结束标记数</th>
+            <th>追板状态</th>
+          </tr>
+        </thead>
+        <tbody id="batch-review-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <pre id="live-log" class="log-pre">暂无执行记录</pre>
+  <div id="approval-box" class="approval-box">
+    <div class="muted" id="approval-text">审批闸口：待命</div>
+    <div class="action-row" style="margin-top: 8px;">
+      <button id="btn-approve" class="btn btn-primary" type="button">审批通过，继续执行</button>
+      <button id="btn-reject" class="btn btn-secondary" type="button">审批驳回，结束任务</button>
+    </div>
+  </div>
+
+  <div class="table-wrap" style="margin-top: 12px;">
+    <table>
+      <thead>
+        <tr>
+          <th>仓库</th>
+          <th>投产分支</th>
+          <th>目标分支</th>
+          <th>阶段</th>
+          <th>状态</th>
+          <th>原因</th>
+          <th>待合并提交</th>
+          <th>MR</th>
+          <th>Tag</th>
+        </tr>
+      </thead>
+      <tbody id="run-body"></tbody>
+    </table>
+  </div>
+</section>
+
+<div id="drawer-backdrop" class="drawer-backdrop"></div>
+<aside id="exec-drawer" class="drawer">
+  <div class="drawer-header">
+    <strong>投产追板执行窗口</strong>
+    <button id="btn-drawer-close" class="btn btn-secondary" type="button">关闭</button>
+  </div>
+  <div class="drawer-body">
+    <div id="drawer-tip" class="muted">暂无执行任务</div>
+    <pre id="drawer-log" class="log-pre" style="margin-top:8px;">暂无执行记录</pre>
+    <div id="drawer-approval-box" class="approval-box" style="margin-top:8px;">
+      <div class="muted" id="drawer-approval-text">审批闸口：待命</div>
+      <div class="action-row" style="margin-top: 8px;">
+        <button id="btn-drawer-approve" class="btn btn-primary" type="button">审批通过，继续执行</button>
+        <button id="btn-drawer-reject" class="btn btn-secondary" type="button">审批驳回，结束任务</button>
+      </div>
+    </div>
+    <div class="table-wrap" style="margin-top: 10px;">
+      <table>
+        <thead>
+          <tr>
+            <th>仓库</th>
+            <th>投产分支</th>
+            <th>目标分支</th>
+            <th>阶段</th>
+            <th>状态</th>
+            <th>原因</th>
+            <th>待合并提交</th>
+            <th>MR</th>
+            <th>Tag</th>
+          </tr>
+        </thead>
+        <tbody id="drawer-run-body"></tbody>
+      </table>
+    </div>
+  </div>
+</aside>
+
+<script>
+  let currentRunId = '';
+  let polling = false;
+  const selectedProjectCodes = new Set();
+
+  function el(id) { return document.getElementById(id); }
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+  function setNodeText(parent, text) {
+    if (!parent) return;
+    parent.textContent = text ?? "";
+  }
+  function appendStatusTip(targetEl, statusClass, status, run) {
+    if (!targetEl) return;
+    targetEl.textContent = "";
+    const badge = document.createElement("span");
+    badge.className = statusClass;
+    badge.textContent = status || "";
+    targetEl.appendChild(badge);
+    targetEl.appendChild(
+      document.createTextNode(` 阶段=${run.phase || ""} ${run.processed || 0}/${run.total || 0}`)
+    );
+  }
+  function safeHttpUrl(raw) {
+    const value = String(raw || "").trim();
+    if (!value) return "";
+    try {
+      const parsed = new URL(value, window.location.origin);
+      if (!["http:", "https:"].includes(parsed.protocol)) return "";
+      return parsed.href;
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function todayYmdCompact() {
+    const now = new Date();
+    return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+  }
+
+  function initDefaultTextInputs() {
+    const ds = todayYmdCompact();
+    const tagName = el('tag-name');
+    const mergeMsg = el('merge-message');
+    const tagMsg = el('tag-message');
+    if (tagName && !tagName.value.trim()) tagName.value = `${ds}_v1`;
+    if (mergeMsg && !mergeMsg.value.trim()) mergeMsg.value = `${ds}投产追板`;
+    if (tagMsg && !tagMsg.value.trim()) tagMsg.value = `${ds}投产变更`;
+  }
+
+  function pickDefaultBatchId(rows) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let best = null;
+    (rows || []).forEach((b) => {
+      const d = new Date(`${b.release_date}T00:00:00`);
+      if (Number.isNaN(d.getTime())) return;
+      if (d <= today && (!best || d > best.date)) {
+        best = { id: String(b.id), date: d };
+      }
+    });
+    if (best) return best.id;
+    return rows && rows.length ? String(rows[0].id) : "";
+  }
+
+  async function requestForm(url, payload) {
+    const fd = new FormData();
+    Object.entries(payload || {}).forEach(([k, v]) => fd.append(k, v == null ? '' : String(v)));
+    const resp = await fetch(url, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' }, body: fd });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw data;
+    return data;
+  }
+
+  function renderBatches(rows) {
+    const select = el('batch-id');
+    select.innerHTML = '';
+    (rows || []).forEach((b) => {
+      const opt = document.createElement('option');
+      opt.value = b.id;
+      opt.textContent = `#${b.id} ${b.release_date} ${b.release_branch}（上线结束标记 ${b.marked_count}）`;
+      select.appendChild(opt);
+    });
+    const defaultId = pickDefaultBatchId(rows || []);
+    if (defaultId) {
+      select.value = defaultId;
+      loadBatchDetail(defaultId);
+    } else {
+      loadBatchDetail('');
+    }
+  }
+
+  function renderBatchDetail(batch, rows) {
+    const title = el('batch-review-title');
+    const body = el('batch-review-body');
+    body.innerHTML = '';
+    if (!batch) {
+      title.textContent = '批次检查：请选择投产批次';
+      return;
+    }
+    title.textContent = `批次检查：#${batch.id} ${batch.release_date} / ${batch.release_branch}`;
+    (rows || []).forEach((r) => {
+      const tr = document.createElement('tr');
+      const markCount = Number(r.deployed_marked_count || 0);
+      const trackCompleted = Boolean(r.track_completed);
+      if (markCount === 0) tr.classList.add('risk-row');
+      if (trackCompleted) tr.classList.add('done-row');
+      if (trackCompleted && selectedProjectCodes.has(r.project_code)) selectedProjectCodes.delete(r.project_code);
+      const checked = (!trackCompleted && selectedProjectCodes.has(r.project_code)) ? 'checked' : '';
+      const disabled = trackCompleted ? 'disabled' : '';
+      const checkTd = document.createElement("td");
+      const checkInput = document.createElement("input");
+      checkInput.type = "checkbox";
+      checkInput.className = "batch-project-check";
+      checkInput.dataset.code = String(r.project_code || "");
+      checkInput.checked = checked === "checked";
+      checkInput.disabled = disabled === "disabled";
+      checkTd.appendChild(checkInput);
+
+      const codeTd = document.createElement("td");
+      const codeNode = document.createElement("code");
+      codeNode.textContent = String(r.project_code || "");
+      codeTd.appendChild(codeNode);
+
+      const nameTd = document.createElement("td");
+      nameTd.textContent = String(r.project_name || "");
+
+      const branchTd = document.createElement("td");
+      const branchNode = document.createElement("code");
+      branchNode.textContent = String(r.release_branch || "");
+      branchTd.appendChild(branchNode);
+
+      const itemCountTd = document.createElement("td");
+      itemCountTd.textContent = String(r.item_count || 0);
+
+      const markTd = document.createElement("td");
+      if (markCount === 0) markTd.classList.add("risk-text");
+      markTd.textContent = markCount === 0 ? "0（待确认）" : String(markCount);
+
+      const statusTd = document.createElement("td");
+      if (trackCompleted) statusTd.classList.add("done-text");
+      statusTd.textContent = trackCompleted ? "已追板完成" : "待追板";
+
+      tr.appendChild(checkTd);
+      tr.appendChild(codeTd);
+      tr.appendChild(nameTd);
+      tr.appendChild(branchTd);
+      tr.appendChild(itemCountTd);
+      tr.appendChild(markTd);
+      tr.appendChild(statusTd);
+      body.appendChild(tr);
+    });
+    body.querySelectorAll('.batch-project-check').forEach((n) => {
+      n.addEventListener('change', (ev) => {
+        const code = ev.target.dataset.code;
+        if (!code) return;
+        if (ev.target.checked) selectedProjectCodes.add(code);
+        else selectedProjectCodes.delete(code);
+        updateSelectedCount();
+      });
+    });
+    const checkAll = el('batch-check-all');
+    if (checkAll) {
+      const selectableRows = (rows || []).filter((r) => !r.track_completed);
+      checkAll.disabled = selectableRows.length === 0;
+      checkAll.checked = selectableRows.length > 0 && selectableRows.every((r) => selectedProjectCodes.has(r.project_code));
+    }
+    updateSelectedCount();
+    if ((rows || []).length === 0) {
+      const tr = document.createElement('tr');
+      const td = document.createElement("td");
+      td.colSpan = 7;
+      td.className = "muted";
+      td.textContent = "该批次暂无工程配置";
+      tr.appendChild(td);
+      body.appendChild(tr);
+    }
+  }
+
+  function updateSelectedCount() {
+    const countEl = el('selected-count');
+    if (countEl) countEl.textContent = `已选项目：${selectedProjectCodes.size}`;
+  }
+
+  async function loadBatchDetail(batchId) {
+    if (!batchId) {
+      renderBatchDetail(null, []);
+      return;
+    }
+    try {
+      const resp = await fetch(`/release-track/api/batch-detail/?batch_id=${encodeURIComponent(batchId)}`);
+      const data = await resp.json();
+      if (!resp.ok || !data.success) throw data;
+      renderBatchDetail(data.batch, data.projects || []);
+    } catch (e) {
+      el('tip').textContent = `批次详情加载失败：${e.error || '未知错误'}`;
+      renderBatchDetail(null, []);
+    }
+  }
+
+  function renderRows(rows, bodyId = 'run-body') {
+    const body = el(bodyId);
+    if (!body) return;
+    body.innerHTML = '';
+    (rows || []).forEach((r) => {
+      const tr = document.createElement('tr');
+      const repoTd = document.createElement("td");
+      repoTd.textContent = String(r.repo || "");
+      const releaseTd = document.createElement("td");
+      const releaseCode = document.createElement("code");
+      releaseCode.textContent = String(r.release_branch || "");
+      releaseTd.appendChild(releaseCode);
+      const targetTd = document.createElement("td");
+      const targetCode = document.createElement("code");
+      targetCode.textContent = String(r.target_branch || "");
+      targetTd.appendChild(targetCode);
+      const stageTd = document.createElement("td");
+      stageTd.textContent = String(r.stage || "");
+      const statusTd = document.createElement("td");
+      statusTd.textContent = String(r.status || "");
+      const reasonTd = document.createElement("td");
+      reasonTd.textContent = String(r.reason || "");
+      const pendingTd = document.createElement("td");
+      pendingTd.textContent = String(r.pending_count || 0);
+      const mrTd = document.createElement("td");
+      const mrUrl = safeHttpUrl(r.mr_url);
+      if (mrUrl) {
+        const anchor = document.createElement("a");
+        anchor.href = mrUrl;
+        anchor.target = "_blank";
+        anchor.rel = "noopener noreferrer";
+        anchor.textContent = "查看MR";
+        mrTd.appendChild(anchor);
+      }
+      const tagTd = document.createElement("td");
+      tagTd.textContent = String(r.tag_result || "");
+      tr.appendChild(repoTd);
+      tr.appendChild(releaseTd);
+      tr.appendChild(targetTd);
+      tr.appendChild(stageTd);
+      tr.appendChild(statusTd);
+      tr.appendChild(reasonTd);
+      tr.appendChild(pendingTd);
+      tr.appendChild(mrTd);
+      tr.appendChild(tagTd);
+      body.appendChild(tr);
+    });
+  }
+
+  function renderRun(run) {
+    if (!run) return;
+    const statusClass = run.status === 'success' ? 'status-success' : (run.status === 'failed' ? 'status-failed' : 'status-running');
+    appendStatusTip(el("tip"), statusClass, String(run.status || ""), run);
+    el('live-log').textContent = `${run.tip || ''}\n成功 ${run.success} / 跳过 ${run.skipped} / 失败 ${run.failed}`.trim();
+    appendStatusTip(el("drawer-tip"), statusClass, String(run.status || ""), run);
+    el('drawer-log').textContent = `${run.tip || ''}\n成功 ${run.success} / 跳过 ${run.skipped} / 失败 ${run.failed}`.trim();
+    const approvalBox = el('approval-box');
+    const approvalText = el('approval-text');
+    const approveBtn = el('btn-approve');
+    const rejectBtn = el('btn-reject');
+    const drawerApprovalBox = el('drawer-approval-box');
+    const drawerApprovalText = el('drawer-approval-text');
+    const drawerApproveBtn = el('btn-drawer-approve');
+    const drawerRejectBtn = el('btn-drawer-reject');
+    const approvalPending = run.phase === 'approval' && run.status === 'running' && run.approval_status === 'pending';
+    const approvalApproved = run.approval_status === 'approved';
+    const approvalRejected = run.approval_status === 'rejected';
+    if (approvalPending || approvalApproved || approvalRejected) {
+      approvalBox.style.display = 'block';
+      drawerApprovalBox.style.display = 'block';
+      if (approvalPending) {
+        approveBtn.style.display = 'inline-block';
+        rejectBtn.style.display = 'inline-block';
+        drawerApproveBtn.style.display = 'inline-block';
+        drawerRejectBtn.style.display = 'inline-block';
+        approvalBox.style.background = '#fafafa';
+        approvalBox.style.borderColor = '#e5e7eb';
+        drawerApprovalBox.style.background = '#fafafa';
+        drawerApprovalBox.style.borderColor = '#e5e7eb';
+        approvalText.textContent = `审批闸口：MR已发送，请在审批页面完成审批后点击“审批通过”继续 ${run.approval_url || ''}`;
+        drawerApprovalText.textContent = `审批闸口：MR已发送，请在审批页面完成审批后点击“审批通过”继续 ${run.approval_url || ''}`;
+      } else if (approvalApproved) {
+        approveBtn.style.display = 'none';
+        rejectBtn.style.display = 'none';
+        drawerApproveBtn.style.display = 'none';
+        drawerRejectBtn.style.display = 'none';
+        approvalBox.style.background = '#ecfdf3';
+        approvalBox.style.borderColor = '#86efac';
+        drawerApprovalBox.style.background = '#ecfdf3';
+        drawerApprovalBox.style.borderColor = '#86efac';
+        approvalText.textContent = `审批已通过：${run.approved_by || '管理员'} ${run.approved_at || ''}`;
+        drawerApprovalText.textContent = `审批已通过：${run.approved_by || '管理员'} ${run.approved_at || ''}`;
+      } else {
+        approveBtn.style.display = 'none';
+        rejectBtn.style.display = 'none';
+        drawerApproveBtn.style.display = 'none';
+        drawerRejectBtn.style.display = 'none';
+        approvalBox.style.background = '#fef2f2';
+        approvalBox.style.borderColor = '#fca5a5';
+        drawerApprovalBox.style.background = '#fef2f2';
+        drawerApprovalBox.style.borderColor = '#fca5a5';
+        approvalText.textContent = `审批已驳回：${run.approved_by || '管理员'} ${run.approved_at || ''}`;
+        drawerApprovalText.textContent = `审批已驳回：${run.approved_by || '管理员'} ${run.approved_at || ''}`;
+      }
+    } else {
+      approvalBox.style.display = 'none';
+      drawerApprovalBox.style.display = 'none';
+    }
+    renderRows(run.rows || [], 'run-body');
+    renderRows(run.rows || [], 'drawer-run-body');
+  }
+
+  async function approveRun(action) {
+    if (!currentRunId) return;
+    try {
+      await requestForm('/release-track/api/run/approve/', { run_id: currentRunId, action });
+      await refreshProgress();
+    } catch (e) {
+      el('tip').textContent = `审批失败：${e.error || '未知错误'}`;
+    }
+  }
+
+  async function loadBatches() {
+    const resp = await fetch('/release-track/api/batches/');
+    const data = await resp.json();
+    if (!data.success) throw data;
+    renderBatches(data.batches || []);
+  }
+
+  async function refreshProgress() {
+    if (!currentRunId) return;
+    const resp = await fetch(`/release-track/api/run/progress/?run_id=${encodeURIComponent(currentRunId)}`);
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw data;
+    renderRun(data.run);
+    return data.run;
+  }
+
+  async function pollRun() {
+    if (polling) return;
+    polling = true;
+    try {
+      let done = false;
+      while (!done) {
+        const run = await refreshProgress();
+        done = run && run.status !== 'running';
+        if (!done) await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    } finally {
+      polling = false;
+      el('btn-start').disabled = false;
+    }
+  }
+
+  async function startRun() {
+    const batchId = el('batch-id').value;
+    if (!batchId) {
+      el('tip').textContent = '请先选择批次';
+      return;
+    }
+    if (selectedProjectCodes.size === 0) {
+      el('tip').textContent = '请先勾选要追板的项目';
+      return;
+    }
+    try {
+      el('btn-start').disabled = true;
+      const data = await requestForm('/release-track/api/run/start/', {
+        batch_id: batchId,
+        tag_name: el('tag-name').value,
+        merge_message: el('merge-message').value,
+        tag_message: el('tag-message').value,
+        default_target_branch: el('default-target-branch').value,
+        dry_run: el('dry-run').checked ? '1' : '0',
+        selected_projects: JSON.stringify(Array.from(selectedProjectCodes)),
+      });
+      currentRunId = data.run_id;
+      el('live-log').textContent = `任务已启动，run_id=${currentRunId}`;
+      await pollRun();
+    } catch (e) {
+      el('tip').textContent = `启动失败：${e.error || '未知错误'}`;
+      el('btn-start').disabled = false;
+    }
+  }
+
+  el('btn-start').addEventListener('click', startRun);
+  el('btn-approve').addEventListener('click', () => approveRun('approve'));
+  el('btn-reject').addEventListener('click', () => approveRun('reject'));
+  el('btn-drawer-approve').addEventListener('click', () => approveRun('approve'));
+  el('btn-drawer-reject').addEventListener('click', () => approveRun('reject'));
+  el('btn-refresh').addEventListener('click', async () => {
+    try {
+      await refreshProgress();
+    } catch (e) {
+      el('tip').textContent = `刷新失败：${e.error || '未知错误'}`;
+    }
+  });
+  el('batch-id').addEventListener('change', (ev) => {
+    selectedProjectCodes.clear();
+    updateSelectedCount();
+    loadBatchDetail(ev.target.value);
+  });
+  el('batch-check-all').addEventListener('change', (ev) => {
+    document.querySelectorAll('.batch-project-check:not([disabled])').forEach((n) => {
+      n.checked = ev.target.checked;
+      const code = n.dataset.code;
+      if (!code) return;
+      if (ev.target.checked) selectedProjectCodes.add(code);
+      else selectedProjectCodes.delete(code);
+    });
+    updateSelectedCount();
+  });
+  el('btn-drawer').addEventListener('click', () => {
+    el('exec-drawer').classList.add('show');
+    el('drawer-backdrop').classList.add('show');
+  });
+  el('btn-drawer-close').addEventListener('click', () => {
+    el('exec-drawer').classList.remove('show');
+    el('drawer-backdrop').classList.remove('show');
+  });
+  el('drawer-backdrop').addEventListener('click', () => {
+    el('exec-drawer').classList.remove('show');
+    el('drawer-backdrop').classList.remove('show');
+  });
+
+  loadBatches().catch((e) => {
+    el('tip').textContent = `批次加载失败：${e.error || '未知错误'}`;
+  });
+  initDefaultTextInputs();
+</script>
+{% endblock %}

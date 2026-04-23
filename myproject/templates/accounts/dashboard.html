@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}工作台 - DevOps Platform{% endblock %}
+
+{% block content %}
+<style>
+  .page {
+    align-items: flex-start;
+    padding-top: 32px;
+    padding-bottom: 40px;
+  }
+  .card {
+    max-width: 1180px;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 26px;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  }
+  .dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+  .dashboard-title-wrap {
+    min-width: 0;
+  }
+  .role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: #eef4ff;
+    color: #1d4ed8;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .action-row {
+    margin: 14px 0 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 14px;
+    margin-top: 10px;
+  }
+  .feature-card {
+    background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+    border: 1px solid #e6ebf3;
+    border-radius: 14px;
+    padding: 16px;
+    text-decoration: none;
+    color: inherit;
+    transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+    display: block;
+    min-height: 138px;
+  }
+  .feature-card:hover {
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1);
+    transform: translateY(-3px);
+    border-color: #bfd4ff;
+  }
+  .feature-card .icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    background: #eef4ff;
+    border: 1px solid #dbe7ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    margin-bottom: 10px;
+  }
+  .feature-card .name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 6px;
+  }
+  .feature-card .desc {
+    font-size: 12px;
+    line-height: 1.45;
+    color: #6b7280;
+    margin: 0;
+  }
+  .empty-tip {
+    margin-top: 12px;
+    padding: 16px;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    color: #6b7280;
+    font-size: 13px;
+  }
+  .logout-link {
+    display: inline-block;
+    margin-top: 20px;
+    color: #6b7280;
+    text-decoration: none;
+    font-size: 13px;
+  }
+  .logout-link:hover { color: #1f75cb; }
+  @media (max-width: 760px) {
+    .card {
+      padding: 18px;
+      border-radius: 12px;
+    }
+    .dashboard-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .dashboard-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<section class="card">
+    {% include "components/messages.html" %}
+
+    <div class="dashboard-header">
+        <div class="dashboard-title-wrap">
+            <h1 class="card-title">欢迎，{{ request.user.username }}</h1>
+            <p class="card-subtitle">
+                {% if request.user.is_superuser %}
+                    当前角色：<strong>超管</strong>
+                {% elif profile and profile.role %}
+                    当前角色：<strong>{{ profile.role.name }}</strong>，
+                    审核状态：<strong>{{ profile.get_approval_status_display }}</strong>
+                {% else %}
+                    当前角色：<strong>未绑定</strong>
+                {% endif %}
+            </p>
+        </div>
+        <span class="role-badge">DevOps Platform</span>
+    </div>
+
+    <div class="action-row">
+        <a class="btn btn-secondary" href="{% url 'my_password' %}">修改我的密码</a>
+    </div>
+
+    {% if can_menu_release_track or can_menu_branch_create or can_menu_release_entry or can_menu_hobo_ledger or can_menu_sql_execute or can_menu_admin_config %}
+    <div class="dashboard-grid">
+        {% if can_menu_release_track %}
+        <a class="feature-card" href="{% url 'release_track:index' %}">
+            <div class="icon">🚀</div>
+            <div class="name">投产追版</div>
+            <p class="desc">批量合并投产分支到目标分支，创建 MR 并打 Tag</p>
+        </a>
+        {% endif %}
+
+        {% if can_menu_branch_create %}
+        <a class="feature-card" href="{% url 'branch_create:index' %}">
+            <div class="icon">🌿</div>
+            <div class="name">查询所有新建分支</div>
+            <p class="desc">汇总投产征集与 HOBO 需求登记台账的新建分支需求</p>
+        </a>
+        {% endif %}
+
+        {% if can_menu_release_entry %}
+        <a class="feature-card" href="{% url 'branch_create:release_entry_page' %}">
+            <div class="icon">🧾</div>
+            <div class="name">投产征集</div>
+            <p class="desc">按投产日期填写信息，缺失项自动标注</p>
+        </a>
+        {% endif %}
+
+        {% if can_menu_hobo_ledger %}
+        <a class="feature-card" href="{% url 'branch_create:hobo_ledger_page' %}">
+            <div class="icon">📋</div>
+            <div class="name">HOBO需求登记</div>
+            <p class="desc">需求类型、工程、分支依赖与关键日期台账</p>
+        </a>
+        {% endif %}
+
+        {% if can_menu_sql_execute %}
+        <a class="feature-card" href="{% url 'sql_execute:index' %}">
+            <div class="icon">🧪</div>
+            <div class="name">SQL执行申请</div>
+            <p class="desc">研发提申请、审批后按顺序执行 MySQL SQL</p>
+        </a>
+        {% endif %}
+
+        {% if can_menu_admin_config %}
+        <a class="feature-card" href="{% url 'admin_config' %}">
+            <div class="icon">⚙️</div>
+            <div class="name">管理员配置</div>
+            <p class="desc">修改个人密码并维护工程名称配置</p>
+        </a>
+        {% endif %}
+
+    </div>
+    {% else %}
+    <div class="empty-tip">
+        {% if profile and profile.approval_status == "pending" %}
+            当前账号待审核，审核通过后才能使用平台功能。
+        {% elif profile and profile.approval_status == "rejected" %}
+            当前账号审核被拒绝，请联系审批人后重新申请。
+        {% else %}
+            当前账号暂无运维功能访问权限。如需开通，请联系管理员。
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <a class="logout-link" href="{% url 'logout' %}">退出登录 →</a>
+</section>
+{% endblock %}

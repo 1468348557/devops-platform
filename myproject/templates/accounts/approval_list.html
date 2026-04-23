@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}账号审核 - DevOps Platform{% endblock %}
+
+{% block content %}
+<style>
+  .page { align-items: flex-start; }
+  .card { max-width: 980px; margin-top: 24px; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+  .table-wrap { overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 760px; }
+  th, td { padding: 10px 12px; border-bottom: 1px solid #eef2f7; text-align: left; vertical-align: top; }
+  th { background: #f8fafc; font-weight: 600; }
+  .ops { color: #1d4ed8; font-weight: 600; }
+  .dev { color: #047857; font-weight: 600; }
+</style>
+
+<section class="card">
+  <h1 class="card-title">账号审核</h1>
+  <p class="card-subtitle">按角色与审批状态审核新账号申请。</p>
+
+  {% if messages %}
+    {% for msg in messages %}
+      <div style="padding:10px 14px;border-radius:6px;margin-bottom:12px;{% if 'error' in msg.tags %}background:#fee2e2;color:#dc2626{% else %}background:#dcfce7;color:#16a34a{% endif %}">
+          {{ msg.message }}
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <form method="get" class="toolbar">
+    <select class="form-input" name="role" style="max-width: 140px;">
+      <option value="">全部角色</option>
+      {% for role in role_choices %}
+        <option value="{{ role.key }}" {% if filters.role == role.key %}selected{% endif %}>{{ role.name }}</option>
+      {% endfor %}
+    </select>
+    <input class="form-input" type="date" name="start_date" value="{{ filters.start_date }}" style="max-width: 180px;">
+    <input class="form-input" type="date" name="end_date" value="{{ filters.end_date }}" style="max-width: 180px;">
+    <button class="btn btn-secondary" type="submit">筛选</button>
+    <a class="btn btn-secondary" href="{% url 'approval_list' %}">重置</a>
+  </form>
+
+  <form method="post" action="{% url 'approval_bulk_action' %}">
+    {% csrf_token %}
+    <div class="toolbar">
+      <button class="btn btn-primary" type="submit" name="action" value="approve">批量通过</button>
+      <button class="btn btn-secondary" type="submit" name="action" value="reject">批量拒绝</button>
+      <input class="form-input" name="reason" placeholder="批量拒绝原因（可选）" style="max-width: 260px;">
+      <span class="muted">勾选后执行批量审核</span>
+    </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+      <tr>
+        <th style="width: 44px;"><input type="checkbox" id="check-all"></th>
+        <th>用户名</th>
+        <th>邮箱</th>
+        <th>角色</th>
+        <th>注册时间</th>
+        <th>审核</th>
+      </tr>
+      </thead>
+      <tbody>
+      {% for profile in pending_profiles %}
+      <tr>
+        <td><input type="checkbox" name="profile_ids" value="{{ profile.id }}" class="row-check"></td>
+        <td>{{ profile.user.username }}</td>
+        <td>{{ profile.user.email }}</td>
+        <td><span class="dev">{{ profile.role.name }}</span></td>
+        <td>{{ profile.user.date_joined|date:"Y-m-d H:i" }}</td>
+        <td>
+          <button class="btn btn-primary" type="submit" formaction="{% url 'approval_action' profile.id %}" name="action" value="approve">通过</button>
+          <button class="btn btn-secondary" type="submit" formaction="{% url 'approval_action' profile.id %}" name="action" value="reject">拒绝</button>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" style="color:#6b7280;">暂无待审核账号</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  </form>
+</section>
+<script>
+  const checkAll = document.getElementById("check-all");
+  if (checkAll) {
+    checkAll.addEventListener("change", function () {
+      document.querySelectorAll(".row-check").forEach((el) => {
+        el.checked = checkAll.checked;
+      });
+    });
+  }
+</script>
+{% endblock %}

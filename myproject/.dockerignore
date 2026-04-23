@@ -1,0 +1,16 @@
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+.env
+.env.*
+!.env.example
+db.sqlite3
+test.sqlite3
+logs
+*.log
+node_modules
+.git
+.gitignore

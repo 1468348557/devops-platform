@@ -1,0 +1,539 @@
+{% extends "base.html" %}
+
+{% block title %}查询所有新建分支 - DevOps Platform{% endblock %}
+
+{% block content %}
+<style>
+  .page { align-items: flex-start; }
+  .card { max-width: 1400px; padding: 20px; position: relative; }
+  .nav-bread { font-size: 13px; color: #6b7280; margin-bottom: 16px; }
+  .nav-bread a { color: #1f75cb; text-decoration: none; }
+  .feature-header { margin-bottom: 20px; }
+  .feature-header h1 { margin: 0 0 4px; font-size: 22px; }
+  .feature-header p { margin: 0; color: #6b7280; font-size: 13px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 12px; }
+  .field { display: grid; gap: 4px; min-width: 180px; }
+  .filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .tabs { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+  .tab-btn { border: 1px solid #d1d5db; border-radius: 6px; background: #fff; padding: 6px 12px; cursor: pointer; }
+  .tab-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+  .home-icon-link {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 34px;
+    height: 34px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    color: #1f75cb;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+  }
+  .home-icon-link:hover { background: #f8fafc; border-color: #94a3b8; }
+  .home-icon-link svg { width: 18px; height: 18px; display: block; }
+  .table-wrap { overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 980px; }
+  th, td { border-bottom: 1px solid #e5e7eb; padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #f8fafc; font-weight: 600; }
+  .status-pending { background: #fee2e2; color: #991b1b; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
+  .status-created { background: #dcfce7; color: #14532d; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
+  .muted { color: #6b7280; font-size: 12px; }
+  .schedule-box { margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 16px; }
+  .schedule-panel { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; background: #fafafa; }
+  .schedule-panel > summary { cursor: pointer; font-weight: 600; margin-bottom: 10px; }
+  .log-modal { position: fixed; inset: 0; background: rgba(15,23,42,.35); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 2100; }
+  .log-modal.show { display: flex; }
+  .log-panel { width: min(980px, 100%); max-height: 85vh; background: #fff; border-radius: 10px; border: 1px solid #e5e7eb; padding: 14px; overflow: auto; }
+  .log-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .log-pre { margin:0; padding:10px; border:1px solid #e5e7eb; border-radius:8px; background:#f8fafc; white-space:pre-wrap; word-break:break-word; font-size:12px; }
+  .live-log-box { margin-top: 10px; }
+  .live-log-title { margin: 0 0 6px; font-size: 13px; color: #334155; }
+  .drawer-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.3); display: none; z-index: 2200; }
+  .drawer-backdrop.show { display: block; }
+  .drawer { position: fixed; top: 0; right: 0; width: min(820px, 92vw); height: 100vh; background: #fff; border-left: 1px solid #e5e7eb; box-shadow: -8px 0 24px rgba(15,23,42,.15); transform: translateX(100%); transition: transform .2s ease; z-index: 2300; display: flex; flex-direction: column; }
+  .drawer.show { transform: translateX(0); }
+  .drawer-header { padding: 12px 14px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; }
+  .drawer-body { padding: 12px 14px; overflow: auto; }
+</style>
+
+<div class="nav-bread">
+  <a href="{% url 'dashboard' %}">工作台</a> / 查询所有新建分支
+</div>
+
+<section class="card">
+  <a class="home-icon-link" href="{% url 'dashboard' %}" title="返回主界面" aria-label="返回主界面">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M3 10.5L12 3l9 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path d="M6.75 9.75V21h10.5V9.75" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path d="M10 21v-6h4v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+  </a>
+  <div class="feature-header">
+    <h1>查询所有新建分支</h1>
+    <p>汇总投产征集与 HOBO 需求登记台账的新建分支需求，支持统一筛选查看。</p>
+  </div>
+
+  <div class="tabs">
+    {% if can_view_hobo %}<button id="tab-hobo" class="tab-btn active" type="button">需求分支（HOBO）</button>{% endif %}
+    {% if can_view_release %}<button id="tab-release" class="tab-btn {% if not can_view_hobo %}active{% endif %}" type="button">投产分支（投产征集）</button>{% endif %}
+    {% if can_view_hobo and can_view_release %}<button id="tab-both" class="tab-btn" type="button">两者</button>{% endif %}
+  </div>
+
+  <div class="filter-grid">
+    <label class="field">开始日期
+      <input id="start-date" class="form-input" type="date">
+    </label>
+    <label class="field">结束日期
+      <input id="end-date" class="form-input" type="date">
+    </label>
+
+    <label class="field" id="field-hobo-description">需求描述（模糊）
+      <input id="hobo-description" class="form-input" placeholder="关键字">
+    </label>
+    <label class="field" id="field-hobo-type">需求类型
+      <select id="hobo-type" class="form-input">
+        <option value="">全部</option>
+        <option value="REQ">REQ</option>
+        <option value="FIX">FIX</option>
+        <option value="PUB">PUB</option>
+      </select>
+    </label>
+    <label class="field" id="field-hobo-project">工程名称（HOBO）
+      <select id="hobo-project-id" class="form-input"><option value="">全部</option></select>
+    </label>
+
+    <label class="field" id="field-release-flow">流程/功能（模糊）
+      <input id="release-flow-name" class="form-input" placeholder="关键字">
+    </label>
+    <label class="field" id="field-release-project">工程名称（投产）
+      <select id="release-project-id" class="form-input">
+        <option value="">全部</option>
+        {% for p in release_project_options %}
+        <option value="{{ p.id }}">{{ p.project_code }}{% if p.project_name and p.project_name != p.project_code %} ({{ p.project_name }}){% endif %}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+  </div>
+
+  <div class="action-row">
+    <button id="btn-preview" class="btn btn-secondary" type="button">查询待创建</button>
+    <button id="btn-reset" class="btn btn-secondary" type="button">重置筛选</button>
+    {% if can_execute_tasks %}
+    <label><input id="check-all" type="checkbox"> 全选当前列表</label>
+    <button id="btn-execute" class="btn btn-primary" type="button">批量创建所选分支</button>
+    {% else %}
+    <span class="muted">当前账号仅支持查看与搜索过滤</span>
+    {% endif %}
+    <span id="tip" class="muted"></span>
+  </div>
+  <div class="live-log-box">
+    <p class="live-log-title">实时执行记录</p>
+    <pre id="live-exec-log" class="log-pre">暂无执行记录</pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:36px"></th>
+          <th>来源</th>
+          <th>分支名称</th>
+          <th>工程名称</th>
+          <th>基准分支</th>
+          <th>描述/流程</th>
+          <th>日期</th>
+          <th>状态</th>
+          <th>错误</th>
+          <th>日志</th>
+        </tr>
+      </thead>
+      <tbody id="task-body"></tbody>
+    </table>
+  </div>
+
+  {% if can_manage_schedule %}
+  <div class="schedule-box">
+    <details class="schedule-panel">
+      <summary>计划任务管理（展开配置）</summary>
+      <div class="filter-grid">
+        <input id="schedule-id" type="hidden">
+        <label class="field">任务名称
+          <input id="schedule-name" class="form-input" placeholder="例如：每小时建分支">
+        </label>
+        <label class="field">Cron表达式
+          <input id="schedule-cron" class="form-input" placeholder="*/30 * * * *">
+        </label>
+        <label class="field">来源
+          <select id="schedule-source" class="form-input">
+            <option value="both">两者</option>
+            <option value="hobo">HOBO</option>
+            <option value="release">投产征集</option>
+          </select>
+        </label>
+        <label class="field">回看天数
+          <input id="schedule-days" class="form-input" type="number" min="1" value="30">
+        </label>
+        <label class="field">启用
+          <select id="schedule-enabled" class="form-input"><option value="1">是</option><option value="0">否</option></select>
+        </label>
+      </div>
+      <div class="action-row">
+        <button id="btn-save-schedule" class="btn btn-secondary" type="button">保存计划</button>
+        <button id="btn-clear-schedule" class="btn btn-secondary" type="button">清空</button>
+        <span id="schedule-tip" class="muted"></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>名称</th><th>Cron</th><th>来源</th><th>回看天数</th><th>启用</th><th>最近执行</th><th>创建人</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="schedule-body"></tbody>
+        </table>
+      </div>
+    </details>
+  </div>
+  {% endif %}
+
+</section>
+
+<div id="log-modal" class="log-modal">
+  <div class="log-panel">
+    <div class="log-header">
+      <strong>任务执行日志</strong>
+      <button id="btn-close-log" class="btn btn-secondary" type="button">关闭</button>
+    </div>
+    <pre id="log-content" class="log-pre">暂无日志</pre>
+  </div>
+</div>
+
+<script>
+  const canExecuteTasks = {% if can_execute_tasks %}true{% else %}false{% endif %};
+  let sourceType = {% if can_view_hobo and can_view_release %}"both"{% elif can_view_hobo %}"hobo"{% elif can_view_release %}"release"{% else %}"both"{% endif %};
+  let currentTasks = [];
+
+  function el(id) { return document.getElementById(id); }
+  function ymd(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
+
+  function setDefaultDateRange() {
+    const now = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 30);
+    el('start-date').value = ymd(start);
+    el('end-date').value = ymd(now);
+  }
+
+  async function requestForm(url, payload) {
+    const fd = new FormData();
+    Object.entries(payload || {}).forEach(([k,v]) => fd.append(k, v == null ? '' : String(v)));
+    const resp = await fetch(url, { method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}'}, body: fd });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw data;
+    return data;
+  }
+
+  function applySourceUI() {
+    const hoboVisible = sourceType === 'hobo' || sourceType === 'both';
+    const releaseVisible = sourceType === 'release' || sourceType === 'both';
+    ['field-hobo-description','field-hobo-type','field-hobo-project'].forEach(id => el(id).style.display = hoboVisible ? 'grid' : 'none');
+    ['field-release-flow','field-release-project'].forEach(id => el(id).style.display = releaseVisible ? 'grid' : 'none');
+    ['tab-hobo','tab-release','tab-both'].forEach(id => { if (el(id)) el(id).classList.remove('active'); });
+    const currentTab = el(`tab-${sourceType}`);
+    if (currentTab) currentTab.classList.add('active');
+  }
+
+  function escapeHtml(v) {
+    const d = document.createElement('div');
+    d.textContent = v == null ? '' : String(v);
+    return d.innerHTML;
+  }
+
+  function sourceTypeLabel(value) {
+    const raw = (value || '').toString().toLowerCase();
+    if (raw === 'hobo') return '需求分支';
+    if (raw === 'release') return '投产征集';
+    if (raw === 'both') return '两者';
+    return value || '';
+  }
+
+  function renderTasks(tasks) {
+    currentTasks = tasks || [];
+    const body = el('task-body');
+    body.innerHTML = '';
+    currentTasks.forEach((t, idx) => {
+      const tr = document.createElement('tr');
+      const statusHtml = t.status === 'created' ? '<span class="status-created">已创建</span>' : '<span class="status-pending">未创建</span>';
+      const checkCell = canExecuteTasks
+        ? `<input type="checkbox" class="task-check" data-idx="${idx}">`
+        : '';
+      tr.innerHTML = `
+        <td>${checkCell}</td>
+        <td>${escapeHtml(sourceTypeLabel(t.source_type))}</td>
+        <td><code>${escapeHtml(t.new_branch)}</code></td>
+        <td>${escapeHtml(t.project_name || t.project_code)}</td>
+        <td>${escapeHtml(t.base_branch || 'master')}</td>
+        <td>${escapeHtml(t.title || '')}</td>
+        <td>${escapeHtml(t.date || '')}</td>
+        <td>${statusHtml}</td>
+        <td>${escapeHtml(t.error || '')}</td>
+        <td><button class="btn btn-secondary btn-log" type="button" data-idx="${idx}">查看日志</button></td>
+      `;
+      body.appendChild(tr);
+    });
+    body.querySelectorAll('.btn-log').forEach((btn) => btn.addEventListener('click', () => {
+      const t = currentTasks[Number(btn.dataset.idx)];
+      const text = (t && t.log ? t.log : (t && t.error ? t.error : '暂无日志'));
+      el('log-content').textContent = text;
+      el('log-modal').classList.add('show');
+    }));
+    el('tip').textContent = `共 ${currentTasks.length} 条任务`;
+  }
+
+  function renderLiveExecLog(rows, tip) {
+    if (!rows || rows.length === 0) {
+      el('live-exec-log').textContent = tip || '暂无执行记录';
+      return;
+    }
+    const lines = rows.map((r, idx) => {
+      return `[${idx + 1}] [${r.status}] ${sourceTypeLabel(r.source_type)}#${r.source_id} ${r.project_code} ${r.new_branch} ${r.message}`;
+    });
+    el('live-exec-log').textContent = `${tip || ''}\n${lines.join('\n')}`.trim();
+  }
+
+  async function loadHoboProjectOptions() {
+    try {
+      const resp = await fetch('/branch-create/hobo-ledger/api/projects/');
+      const data = await resp.json();
+      if (!data.success) return;
+      const select = el('hobo-project-id');
+      data.projects.forEach((p) => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.project_name && p.project_name !== p.project_code ? `${p.project_code} (${p.project_name})` : p.project_code;
+        select.appendChild(opt);
+      });
+    } catch (_) {}
+  }
+
+  async function previewTasks() {
+    try {
+      const data = await requestForm('/branch-create/api/branch-tasks/preview/', {
+        source_type: sourceType,
+        start_date: el('start-date').value,
+        end_date: el('end-date').value,
+        hobo_description: el('hobo-description').value,
+        hobo_requirement_type: el('hobo-type').value,
+        hobo_project_id: el('hobo-project-id').value,
+        release_flow_name: el('release-flow-name').value,
+        release_project_id: el('release-project-id').value,
+      });
+      renderTasks(data.tasks || []);
+      const autoMarked = Number(data.auto_marked_count || 0);
+      if (autoMarked > 0) {
+        el('tip').textContent = `共 ${(data.tasks || []).length} 条任务；已自动标记 ${autoMarked} 条（远端分支已存在）`;
+      }
+    } catch (e) {
+      el('tip').textContent = `查询失败：${e.error || '未知错误'}`;
+    }
+  }
+
+  async function executeSelected() {
+    const checks = Array.from(document.querySelectorAll('.task-check:checked'));
+    if (checks.length === 0) {
+      el('tip').textContent = '请先勾选任务';
+      return;
+    }
+    const tasks = checks.map((c) => currentTasks[Number(c.dataset.idx)]).filter(Boolean);
+    try {
+      el('btn-execute').disabled = true;
+      el('tip').textContent = '正在启动执行任务...';
+      renderLiveExecLog([], '正在启动执行任务...');
+      const resp = await fetch('/branch-create/api/branch-tasks/execute/start/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+        body: JSON.stringify({ tasks }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.success) throw data;
+
+      const runId = data.run_id;
+      if (!runId) throw { error: '未获取到执行任务 ID' };
+      let finished = false;
+      while (!finished) {
+        const pResp = await fetch(`/branch-create/api/branch-tasks/execute/progress/?run_id=${encodeURIComponent(runId)}`);
+        const pData = await pResp.json();
+        if (!pResp.ok || !pData.success) throw pData;
+        const run = pData.run || {};
+        el('tip').textContent = run.tip || `执行中 ${run.processed || 0}/${run.total || 0}`;
+        renderLiveExecLog(run.rows || [], run.tip || '');
+        if (run.status === 'running') {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          continue;
+        }
+        finished = true;
+        if (run.status === 'failed' && run.error) {
+          el('tip').textContent = `执行失败：${run.error}`;
+        }
+      }
+      await previewTasks();
+    } catch (e) {
+      el('tip').textContent = `执行失败：${e.error || '未知错误'}`;
+    } finally {
+      el('btn-execute').disabled = false;
+    }
+  }
+
+  {% if can_manage_schedule %}
+  function renderSchedules(rows) {
+    const body = el('schedule-body');
+    body.innerHTML = '';
+    (rows || []).forEach((s) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(s.name)}</td>
+        <td><code>${escapeHtml(s.cron_expr)}</code></td>
+        <td>${escapeHtml(sourceTypeLabel(s.source_type))}</td>
+        <td>${escapeHtml(s.days_back)}</td>
+        <td>${s.enabled ? '是' : '否'}</td>
+        <td>${escapeHtml(s.last_run_at || '-')}</td>
+        <td>${escapeHtml(s.created_by)}</td>
+        <td>
+          <button class="btn btn-secondary btn-edit-s" data-id="${s.id}">编辑</button>
+          <button class="btn btn-secondary btn-run-s" data-id="${s.id}">执行</button>
+          <button class="btn btn-secondary btn-del-s" data-id="${s.id}">删除</button>
+        </td>
+      `;
+      body.appendChild(tr);
+    });
+
+    body.querySelectorAll('.btn-edit-s').forEach((btn) => btn.addEventListener('click', () => {
+      const s = (rows || []).find((i) => i.id === Number(btn.dataset.id));
+      if (!s) return;
+      el('schedule-id').value = s.id;
+      el('schedule-name').value = s.name;
+      el('schedule-cron').value = s.cron_expr;
+      el('schedule-source').value = s.source_type;
+      el('schedule-days').value = s.days_back;
+      el('schedule-enabled').value = s.enabled ? '1' : '0';
+    }));
+    body.querySelectorAll('.btn-run-s').forEach((btn) => btn.addEventListener('click', async () => {
+      try {
+        const data = await requestForm('/branch-create/api/schedules/run/', { schedule_id: btn.dataset.id });
+        el('schedule-tip').textContent = `执行完成：${data.run.summary}`;
+        await loadSchedules();
+      } catch (e) {
+        el('schedule-tip').textContent = `执行失败：${e.error || '未知错误'}`;
+      }
+    }));
+    body.querySelectorAll('.btn-del-s').forEach((btn) => btn.addEventListener('click', async () => {
+      if (!confirm('确认删除该计划任务吗？')) return;
+      try {
+        await requestForm('/branch-create/api/schedules/delete/', { schedule_id: btn.dataset.id });
+        await loadSchedules();
+      } catch (e) {
+        el('schedule-tip').textContent = `删除失败：${e.error || '未知错误'}`;
+      }
+    }));
+  }
+
+  async function loadSchedules() {
+    try {
+      const resp = await fetch('/branch-create/api/schedules/');
+      const data = await resp.json();
+      if (!data.success) throw data;
+      renderSchedules(data.schedules || []);
+    } catch (e) {
+      el('schedule-tip').textContent = `加载失败：${e.error || '未知错误'}`;
+    }
+  }
+  {% endif %}
+
+  document.getElementById('btn-preview').addEventListener('click', previewTasks);
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    setDefaultDateRange();
+    el('hobo-description').value = '';
+    el('hobo-type').value = '';
+    el('hobo-project-id').value = '';
+    el('release-flow-name').value = '';
+    el('release-project-id').value = '';
+  });
+  if (el('btn-execute')) {
+    document.getElementById('btn-execute').addEventListener('click', executeSelected);
+  }
+  if (el('check-all')) {
+    document.getElementById('check-all').addEventListener('change', (ev) => {
+      document.querySelectorAll('.task-check').forEach((n) => { n.checked = ev.target.checked; });
+    });
+  }
+
+  if (el('tab-hobo')) el('tab-hobo').addEventListener('click', async () => {
+    sourceType = 'hobo';
+    applySourceUI();
+    await previewTasks();
+  });
+  if (el('tab-release')) el('tab-release').addEventListener('click', async () => {
+    sourceType = 'release';
+    applySourceUI();
+    await previewTasks();
+  });
+  if (el('tab-both')) el('tab-both').addEventListener('click', async () => {
+    sourceType = 'both';
+    applySourceUI();
+    await previewTasks();
+  });
+  el('btn-close-log').addEventListener('click', () => el('log-modal').classList.remove('show'));
+  el('log-modal').addEventListener('click', (ev) => { if (ev.target.id === 'log-modal') el('log-modal').classList.remove('show'); });
+
+  {% if can_manage_schedule %}
+  document.getElementById('btn-save-schedule').addEventListener('click', async () => {
+    try {
+      await requestForm('/branch-create/api/schedules/save/', {
+        schedule_id: el('schedule-id').value,
+        name: el('schedule-name').value,
+        cron_expr: el('schedule-cron').value,
+        source_type: el('schedule-source').value,
+        days_back: el('schedule-days').value,
+        enabled: el('schedule-enabled').value,
+      });
+      el('schedule-tip').textContent = '保存成功';
+      document.getElementById('btn-clear-schedule').click();
+      await loadSchedules();
+    } catch (e) {
+      el('schedule-tip').textContent = `保存失败：${e.error || '未知错误'}`;
+    }
+  });
+  document.getElementById('btn-clear-schedule').addEventListener('click', () => {
+    el('schedule-id').value = '';
+    el('schedule-name').value = '';
+    el('schedule-cron').value = '';
+    el('schedule-source').value = 'both';
+    el('schedule-days').value = '30';
+    el('schedule-enabled').value = '1';
+  });
+  {% endif %}
+
+  setDefaultDateRange();
+  applySourceUI();
+  loadHoboProjectOptions();
+  previewTasks();
+  {% if can_manage_schedule %}loadSchedules();{% endif %}
+</script>
+{% endblock %}

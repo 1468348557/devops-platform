@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}登录 - DevOps Platform{% endblock %}
+
+{% block content %}
+<section class="card">
+    <h1 class="card-title">登录到 DevOps Platform</h1>
+    <p class="card-subtitle">账号需审核通过后才能使用</p>
+
+    <form method="post" class="form">
+        {% csrf_token %}
+        {% for field in form %}
+            <label class="form-label">
+                <span>{{ field.label }}</span>
+                {{ field }}
+                {% if field.errors %}
+                    <span class="form-error">{{ field.errors|striptags }}</span>
+                {% endif %}
+            </label>
+        {% endfor %}
+        {% if form.non_field_errors %}
+            <p class="form-error">{{ form.non_field_errors|striptags }}</p>
+        {% endif %}
+        <button type="submit" class="btn btn-primary">登录</button>
+    </form>
+
+    <p class="muted">还没有账号？<a href="{% url 'register' %}">立即注册</a></p>
+</section>
+{% endblock %}

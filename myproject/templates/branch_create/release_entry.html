@@ -1,0 +1,1430 @@
+{% extends "base.html" %}
+
+{% block title %}投产征集 - DevOps Platform{% endblock %}
+
+{% block content %}
+<style>
+  .page { align-items: flex-start; }
+  .card { max-width: 1280px; margin-top: 24px; position: relative; }
+  .layout { display: grid; gap: 16px; }
+  .section-title { margin: 0 0 12px; font-size: 18px; }
+  .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .field { display: grid; gap: 6px; font-size: 13px; }
+  .muted { color: #6b7280; font-size: 12px; }
+  .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .table-wrap { overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1024px; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid #eef2f7; text-align: left; vertical-align: top; }
+  th { background: #f8fafc; font-weight: 600; }
+  .tag { display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
+  .tag-miss { background: #fee2e2; color: #991b1b; }
+  .tag-ok { background: #dcfce7; color: #14532d; }
+  .status-pending-branch { background: #fee2e2; color: #991b1b; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
+  .status-created-branch { background: #dcfce7; color: #14532d; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
+  .status { font-weight: 600; }
+  .gap-top { margin-top: 10px; }
+  .danger { color: #b91c1c; }
+  .success { color: #166534; }
+  .notice { padding: 8px 10px; border-radius: 8px; background: #f8fafc; font-size: 13px; }
+  .hidden { display: none !important; }
+  .home-icon-link {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 34px;
+    height: 34px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    color: #1f75cb;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+  }
+  .home-icon-link:hover { background: #f8fafc; border-color: #94a3b8; }
+  .home-icon-link svg { width: 18px; height: 18px; display: block; }
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 2000;
+  }
+  .modal-panel {
+    width: min(1200px, 100%);
+    max-height: 88vh;
+    overflow: auto;
+    background: #f8fafc;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    padding: 16px;
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+  }
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 8px 12px;
+    font-size: 13px;
+  }
+  .detail-grid dt { color: #6b7280; margin: 0; }
+  .detail-grid dd { margin: 0; word-break: break-word; }
+  .close-btn {
+    border: 0;
+    background: transparent;
+    font-size: 20px;
+    cursor: pointer;
+    color: #6b7280;
+  }
+  .project-list-textarea {
+    width: 100%;
+    min-height: 300px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 13px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    resize: vertical;
+    box-sizing: border-box;
+    background: #fff;
+  }
+  .entry-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .entry-form-grid .field {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 8px;
+  }
+  .form-section {
+    margin-bottom: 12px;
+    padding: 12px;
+    border: 1px solid #dbe3ef;
+    border-radius: 10px;
+    background: #f3f6fb;
+  }
+  .form-section-title {
+    margin: 0 0 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #334155;
+  }
+  .column-panel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 50;
+    width: min(560px, 86vw);
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+    padding: 10px;
+  }
+  .column-panel-title {
+    font-size: 13px;
+    color: #475569;
+    margin: 0 0 8px;
+  }
+  .column-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 10px;
+    margin-bottom: 8px;
+    font-size: 12px;
+  }
+  .column-grid label {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    white-space: normal;
+    line-height: 1.35;
+    word-break: break-word;
+  }
+  #column-config-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .column-group {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 8px;
+    background: #f8fafc;
+  }
+  .column-group-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #334155;
+    margin: 0 0 6px;
+  }
+  .column-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-end;
+  }
+  .btn-column-emphasis {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 6px 14px rgba(29, 78, 216, 0.25);
+  }
+  .btn-column-emphasis:hover {
+    background: #1e40af;
+    border-color: #1e40af;
+    color: #fff;
+  }
+  .relative { position: relative; }
+  @media (max-width: 960px) {
+    .entry-form-grid {
+      grid-template-columns: 1fr;
+    }
+    #column-config-grid {
+      grid-template-columns: 1fr;
+    }
+    .column-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<section class="card layout">
+  <a class="home-icon-link" href="{% url 'dashboard' %}" title="返回主界面" aria-label="返回主界面">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M3 10.5L12 3l9 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path d="M6.75 9.75V21h10.5V9.75" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path d="M10 21v-6h4v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+  </a>
+  <h1 class="section-title">投产征集</h1>
+  <div class="notice">规则：可查看全部记录；研发仅可修改本人记录；运维仅可修改“投产状态、REL是否已部署”；需求分支由系统自动生成。</div>
+
+  {% if can_manage_batch %}
+  <div>
+    <h2 class="section-title">管理员：创建投产批次</h2>
+    <div class="grid-3">
+      <label class="field">投产日期
+        <input id="new-batch-date" class="form-input" type="date">
+      </label>
+      <label class="field">分支类型
+        <select id="new-batch-type" class="form-input">
+          <option value="release">release</option>
+          <option value="hotfix">hotfix</option>
+        </select>
+      </label>
+      <label class="field">投产分支（自动生成）
+        <input id="new-batch-branch-preview" class="form-input" readonly>
+      </label>
+    </div>
+    <div class="gap-top">
+      <button id="btn-create-batch" class="btn btn-secondary">创建批次</button>
+      <span id="batch-msg" class="muted"></span>
+    </div>
+  </div>
+  {% endif %}
+
+  <div>
+    <h2 class="section-title">选择批次</h2>
+    <div class="toolbar">
+      <select id="batch-select" class="form-input" style="max-width: 360px;"></select>
+      <button id="btn-refresh" class="btn btn-secondary">刷新</button>
+      {% if can_manage_batch %}
+      <button id="btn-delete-batch" class="btn btn-secondary">删除当前批次</button>
+      {% endif %}
+      <span id="tip" class="muted"></span>
+    </div>
+  </div>
+
+  <div>
+    <h2 class="section-title">填写 / 编辑记录</h2>
+    <div class="toolbar">
+      <button id="btn-open-form" class="btn btn-primary">填写记录</button>
+      <span class="muted">点击后弹出悬浮页面填写</span>
+    </div>
+  </div>
+
+  <div id="entry-modal" class="modal-backdrop hidden">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <h3>填写 / 编辑记录</h3>
+        <button id="btn-close-form" class="close-btn" type="button">×</button>
+      </div>
+      <div class="form-section">
+        <h4 class="form-section-title">基础信息</h4>
+        <div class="grid-3 entry-form-grid">
+          <label class="field">工程名称
+            <select id="project-id" class="form-input"></select>
+          </label>
+          <label class="field">流程/功能名称
+            <input id="flow-name" class="form-input">
+          </label>
+          <label class="field">业务种类
+            <input id="biz-category" class="form-input" placeholder="必填">
+          </label>
+          <label class="field">需求分支
+            <input id="requirement-branch" class="form-input" placeholder="例如：REQ-20260420-0001">
+          </label>
+          <label class="field">投产分支（自动生成）
+            <input id="release-branch" class="form-input" readonly>
+          </label>
+          <label class="field">科技联系人
+            <input id="tech-owner" class="form-input">
+          </label>
+          <label class="field">业务联系人
+            <input id="biz-owner" class="form-input">
+          </label>
+          <label class="field">公共组件配合（分支）
+            <input id="common-component-branch" class="form-input">
+          </label>
+          <label class="field">流程定义名称
+            <input id="flow-definition-name" class="form-input">
+          </label>
+          <label class="field">实施单元编号（非必填）
+            <input id="implementation-unit-no" class="form-input" placeholder="选填，例如：UNIT-001">
+          </label>
+          <label class="field">备注（非必填）
+            <input id="remark" class="form-input" placeholder="选填，最多 255 字">
+          </label>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h4 class="form-section-title">检查项</h4>
+        <div class="grid-3 entry-form-grid">
+          <label class="field">参数投产
+            <select id="need-param-release" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
+          </label>
+          <label class="field">业务参数确认
+            <select id="param-confirmed" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
+          </label>
+          <label class="field">涉及菜单
+            <select id="need-menu" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
+          </label>
+          <label class="field">菜单已添加
+            <select id="menu-added" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
+          </label>
+          <label class="field">涉及 DIFS
+            <select id="need-difs" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
+          </label>
+          <label class="field">涉及流程图
+            <select id="need-flowchart" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
+          </label>
+          <label class="field">流程图已检查
+            <select id="flowchart-checked" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
+          </label>
+          <label class="field">涉及事件平台
+            <select id="need-event-platform" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
+          </label>
+          <label class="field">涉及统一任务池
+            <select id="need-task-pool" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
+          </label>
+          <label class="field">涉及 BPMP
+            <select id="need-bpmp" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
+          </label>
+          <label class="field">涉及影像
+            <select id="need-image" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
+          </label>
+          <label class="field">涉及 ESF
+            <select id="need-esf" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
+          </label>
+          <label class="field">涉及交易申调
+            <select id="need-trade-tuning" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
+          </label>
+          <label class="field">涉及投产验证
+            <select id="need-release-verify" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
+          </label>
+          <label class="field">REL 测试状态（研发填写）
+            <select id="rel-test-status" class="form-input">
+              <option value="">未填写</option>
+              <option value="是">是</option>
+              <option value="否">否</option>
+            </select>
+          </label>
+          {% if can_edit_ops_fields %}
+          <label class="field">REL 是否已部署（运维填写）
+            <select id="rel-deployed" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
+          </label>
+          <label class="field">投产状态（运维填写）
+            <select id="deploy-status" class="form-input">
+              <option value="">未填写</option>
+              <option value="是">是</option>
+              <option value="否">否</option>
+            </select>
+          </label>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="toolbar gap-top">
+        <button id="btn-quote-last" class="btn btn-secondary" type="button">引用上次填写</button>
+        <button id="btn-submit-modal" class="btn btn-primary">提交</button>
+        <button id="btn-reset" class="btn btn-secondary">清空表单</button>
+        <button id="btn-cancel-form" class="btn btn-secondary" type="button">关闭</button>
+        <span id="form-tip" class="muted"></span>
+      </div>
+    </div>
+  </div>
+
+  <div id="detail-modal" class="modal-backdrop hidden">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <h3>记录详情</h3>
+        <button id="btn-close-detail" class="close-btn" type="button">×</button>
+      </div>
+      <dl id="detail-body" class="detail-grid"></dl>
+      <div class="toolbar gap-top">
+        <button id="btn-cancel-detail" class="btn btn-secondary" type="button">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <h2 class="section-title">当前批次记录</h2>
+    <div class="toolbar gap-top">
+      <button id="btn-show-project-lines" class="btn btn-secondary" type="button">本次投产工程</button>
+      <label class="field">流程/功能名称（模糊）
+        <input id="search-flow-name" class="form-input" placeholder="输入关键字">
+      </label>
+      <label class="field">工程名称
+        <select id="search-project-id" class="form-input">
+          <option value="">全部工程</option>
+        </select>
+      </label>
+      <button id="btn-search-items" class="btn btn-secondary" type="button">搜索</button>
+      <button id="btn-reset-search" class="btn btn-secondary" type="button">重置</button>
+      <div class="relative">
+        <button id="btn-column-config" class="btn btn-column-emphasis" type="button">自定义列（显示项）</button>
+        <div id="column-config-panel" class="column-panel hidden">
+          <p class="column-panel-title">填写记录中的字段都可勾选展示（操作列固定保留）</p>
+          <div id="column-config-grid" class="column-grid"></div>
+          <div class="column-actions">
+            <button id="btn-column-reset" class="btn btn-secondary" type="button">恢复默认</button>
+            <button id="btn-column-close" class="btn btn-secondary" type="button">关闭</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+        <tr id="item-head-row"></tr>
+        </thead>
+        <tbody id="item-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="project-lines-modal" class="modal-backdrop hidden">
+    <div class="modal-panel" style="width: min(760px, 100%);">
+      <div class="modal-header">
+        <h3>本次投产工程（去重）</h3>
+        <button id="btn-close-project-lines" class="close-btn" type="button">×</button>
+      </div>
+      <textarea id="project-lines-text" class="project-list-textarea" readonly></textarea>
+      <div class="toolbar gap-top">
+        <button id="btn-copy-project-lines" class="btn btn-primary" type="button">复制全部</button>
+        <button id="btn-cancel-project-lines" class="btn btn-secondary" type="button">关闭</button>
+        <span id="project-lines-tip" class="muted"></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  const csrfToken = "{{ csrf_token }}";
+  const isStaff = {{ is_staff_user|yesno:"true,false" }};
+  const isSuperuser = {{ is_superuser_user|yesno:"true,false" }};
+  const canEditOpsFields = {{ can_edit_ops_fields|yesno:"true,false" }};
+  const currentRole = "{{ current_role|escapejs }}";
+  const canCreateDevRecord = {{ can_create_dev_record|yesno:"true,false" }};
+  const currentUsername = "{{ request.user.username|escapejs }}";
+  const fields = [
+    "project-id","requirement-branch","release-branch","flow-name","biz-category","tech-owner","biz-owner","common-component-branch","flow-definition-name",
+    "implementation-unit-no","remark",
+    "need-param-release","param-confirmed","need-menu","menu-added","need-difs","need-flowchart","flowchart-checked",
+    "need-event-platform","need-task-pool","need-bpmp","need-image","need-esf","need-trade-tuning","need-release-verify",
+    "rel-deployed","deploy-status","rel-test-status"
+  ];
+  const missingLabelMap = {
+    flow_name: "流程/功能名称", biz_category: "业务种类", project: "工程名称", tech_owner: "科技联系人", biz_owner: "业务联系人",
+    need_param_release: "是否涉及参数投产", param_confirmed: "参数已经确认(技术+业务)",
+    need_menu: "是否涉及菜单", menu_added: "菜单已添加", need_difs: "是否涉及DIFS",
+    need_flowchart: "是否涉及流程图", flowchart_checked: "流程图是否已检查", flow_definition_name: "流程定义名称",
+    need_event_platform: "是否涉及事件平台", need_task_pool: "是否涉及统一任务池", need_bpmp: "是否涉及BPMP",
+    need_image: "是否涉及影像", need_esf: "是否涉及ESF", need_trade_tuning: "是否涉及交易申调",
+    need_release_verify: "是否涉及投产验证",
+    requirement_branch: "需求分支",
+    rel_test_status: "REL测试状态"
+  };
+
+  let currentBatch = null;
+  let currentBatchProjects = [];
+  let currentBatchItems = [];
+  let editingItemId = null;
+  let viewOnlyMode = false;
+  let submitAction = "submit";
+  const columnPrefKey = `release_entry_columns:${currentUsername}`;
+  const defaultColumnIds = [
+    "flow_name","biz_category","project_name","release_branch","branch_status","rel_test_status",
+    "rel_deployed","deploy_status","developer","completion",
+  ];
+  const fixedColumnIds = ["actions"];
+  const checkItemColumnIds = new Set([
+    "need_param_release","param_confirmed","need_menu","menu_added","need_difs","need_flowchart",
+    "flowchart_checked","need_event_platform","need_task_pool","need_bpmp","need_image","need_esf",
+    "need_trade_tuning","need_release_verify","rel_test_status",
+  ]);
+  const columnDefs = [
+    { id: "flow_name", label: "流程/功能", render: (item) => escapeHtml(item.flow_name || "-") },
+    { id: "biz_category", label: "业务种类", render: (item) => escapeHtml(item.biz_category || "-") },
+    { id: "project_name", label: "工程名称", render: (item) => escapeHtml(item.project?.name || "-") },
+    { id: "release_branch", label: "投产分支", render: (item) => escapeHtml(item.release_branch || "-") },
+    {
+      id: "branch_status",
+      label: "分支创建状态",
+      render: (item) => {
+        const safeBranchError = escapeHtml(item.branch_create_error || "");
+        const branchStatusHtml = item.branch_created
+          ? `<span class="status-created-branch">已创建</span>`
+          : `<span class="status-pending-branch">未创建</span>`;
+        return `${branchStatusHtml}${safeBranchError ? `<div class="muted danger">${safeBranchError}</div>` : ""}`;
+      },
+    },
+    { id: "rel_test_status", label: "REL测试状态", render: (item) => escapeHtml(item.rel_test_status || "-") },
+    { id: "rel_deployed", label: "REL是否已部署", render: (item) => item.rel_deployed === null || item.rel_deployed === undefined ? "-" : (item.rel_deployed ? "是" : "否") },
+    { id: "deploy_status", label: "投产状态", render: (item) => escapeHtml(item.deploy_status || "-") },
+    { id: "developer", label: "填写人", render: (item) => escapeHtml(item.developer || "-") },
+    {
+      id: "completion",
+      label: "填写信息完整度",
+      render: (item) => {
+        const miss = item.missing_fields.map((f) => missingLabelMap[f] || f).join("、");
+        const completionText = item.incomplete_count > 0 ? `未完成（${item.incomplete_count}项未填写）` : "完整";
+        const safeMiss = escapeHtml(miss);
+        const safeCompletion = escapeHtml(completionText);
+        return item.incomplete_count > 0
+          ? `<span class="tag tag-miss">${safeCompletion}</span><div class="muted">${safeMiss}</div>`
+          : `<span class="tag tag-ok">${safeCompletion}</span>`;
+      },
+    },
+    { id: "requirement_branch", label: "需求分支", render: (item) => escapeHtml(item.requirement_branch || "-") },
+    { id: "tech_owner", label: "科技联系人", render: (item) => escapeHtml(item.tech_owner || "-") },
+    { id: "biz_owner", label: "业务联系人", render: (item) => escapeHtml(item.biz_owner || "-") },
+    { id: "common_component_branch", label: "公共组件配合（分支）", render: (item) => escapeHtml(item.common_component_branch || "-") },
+    { id: "flow_definition_name", label: "流程定义名称", render: (item) => escapeHtml(item.flow_definition_name || "-") },
+    { id: "implementation_unit_no", label: "实施单元编号", render: (item) => escapeHtml(item.implementation_unit_no || "-") },
+    { id: "remark", label: "备注", render: (item) => escapeHtml(item.remark || "-") },
+    { id: "need_param_release", label: "参数投产", render: (item) => escapeHtml(normalizeBool(item.need_param_release) || "-") },
+    { id: "param_confirmed", label: "业务参数确认", render: (item) => escapeHtml(normalizeBool(item.param_confirmed) || "-") },
+    { id: "need_menu", label: "涉及菜单", render: (item) => escapeHtml(normalizeBool(item.need_menu) || "-") },
+    { id: "menu_added", label: "菜单已添加", render: (item) => escapeHtml(normalizeBool(item.menu_added) || "-") },
+    { id: "need_difs", label: "涉及 DIFS", render: (item) => escapeHtml(normalizeBool(item.need_difs) || "-") },
+    { id: "need_flowchart", label: "涉及流程图", render: (item) => escapeHtml(normalizeBool(item.need_flowchart) || "-") },
+    { id: "flowchart_checked", label: "流程图已检查", render: (item) => escapeHtml(normalizeBool(item.flowchart_checked) || "-") },
+    { id: "need_event_platform", label: "涉及事件平台", render: (item) => escapeHtml(normalizeBool(item.need_event_platform) || "-") },
+    { id: "need_task_pool", label: "涉及统一任务池", render: (item) => escapeHtml(normalizeBool(item.need_task_pool) || "-") },
+    { id: "need_bpmp", label: "涉及 BPMP", render: (item) => escapeHtml(normalizeBool(item.need_bpmp) || "-") },
+    { id: "need_image", label: "涉及影像", render: (item) => escapeHtml(normalizeBool(item.need_image) || "-") },
+    { id: "need_esf", label: "涉及 ESF", render: (item) => escapeHtml(normalizeBool(item.need_esf) || "-") },
+    { id: "need_trade_tuning", label: "涉及交易申调", render: (item) => escapeHtml(normalizeBool(item.need_trade_tuning) || "-") },
+    { id: "need_release_verify", label: "涉及投产验证", render: (item) => escapeHtml(normalizeBool(item.need_release_verify) || "-") },
+    {
+      id: "actions",
+      label: "操作",
+      fixed: true,
+      render: (item) => `
+        ${item.editable ? `<button class="btn btn-secondary btn-edit" data-id="${item.id}">编辑</button>` : ``}
+        <button class="btn btn-secondary btn-view" data-id="${item.id}">查看</button>
+        ${item.can_delete ? `<button class="btn btn-secondary btn-delete" data-id="${item.id}">删除</button>` : ``}
+      `,
+    },
+  ];
+  let visibleColumnIds = [...defaultColumnIds];
+
+  function el(id) { return document.getElementById(id); }
+  function getColumnDef(id) { return columnDefs.find((c) => c.id === id); }
+  function loadColumnPrefs() {
+    const raw = localStorage.getItem(columnPrefKey);
+    if (!raw) return [...defaultColumnIds];
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [...defaultColumnIds];
+      const validIds = parsed.filter((id) => !!getColumnDef(id) && !fixedColumnIds.includes(id));
+      return validIds.length > 0 ? validIds : [...defaultColumnIds];
+    } catch (_) {
+      return [...defaultColumnIds];
+    }
+  }
+  function saveColumnPrefs() {
+    localStorage.setItem(columnPrefKey, JSON.stringify(visibleColumnIds));
+  }
+  function getActiveColumns() {
+    const dynamicCols = visibleColumnIds.map((id) => getColumnDef(id)).filter(Boolean);
+    const fixedCols = fixedColumnIds.map((id) => getColumnDef(id)).filter(Boolean);
+    return [...dynamicCols, ...fixedCols];
+  }
+  function renderTableHeader() {
+    const head = el("item-head-row");
+    const cols = getActiveColumns();
+    head.innerHTML = cols.map((col) => `<th>${escapeHtml(col.label)}</th>`).join("");
+  }
+  function renderColumnConfigPanel() {
+    const grid = el("column-config-grid");
+    const defs = columnDefs.filter((c) => !c.fixed && c.id !== "actions");
+    const basicDefs = defs.filter((col) => !checkItemColumnIds.has(col.id));
+    const checkDefs = defs.filter((col) => checkItemColumnIds.has(col.id));
+    const renderGroup = (title, groupDefs) => `
+      <div class="column-group">
+        <p class="column-group-title">${escapeHtml(title)}</p>
+        <div class="column-grid">
+          ${groupDefs.map((col) => `
+            <label>
+              <input type="checkbox" class="column-choice" value="${col.id}" ${visibleColumnIds.includes(col.id) ? "checked" : ""}>
+              <span>${escapeHtml(col.label)}</span>
+            </label>
+          `).join("")}
+        </div>
+      </div>
+    `;
+    grid.innerHTML = `
+      ${renderGroup("基础信息相关列", basicDefs)}
+      ${renderGroup("检查项相关列", checkDefs)}
+    `;
+    grid.querySelectorAll(".column-choice").forEach((node) => {
+      node.addEventListener("change", () => {
+        const selected = Array.from(grid.querySelectorAll(".column-choice:checked")).map((n) => n.value);
+        if (selected.length === 0) {
+          node.checked = true;
+          setTip("至少保留一个可配置列", true);
+          return;
+        }
+        visibleColumnIds = selected;
+        saveColumnPrefs();
+        renderTableHeader();
+        renderItems(currentBatchItems);
+      });
+    });
+  }
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+  function getDraftKey() {
+    if (!currentBatch) return null;
+    return `release_entry_draft:${currentUsername}:batch:${currentBatch.id}`;
+  }
+
+  function collectDraftState() {
+    const state = {};
+    fields.forEach((id) => {
+      const node = el(id);
+      if (node) state[id] = node.value;
+    });
+    state.editingItemId = editingItemId;
+    return state;
+  }
+
+  function applyDraftState(state) {
+    if (!state || typeof state !== "object") return;
+    fields.forEach((id) => {
+      const node = el(id);
+      if (node && state[id] !== undefined) node.value = state[id];
+    });
+    editingItemId = state.editingItemId || null;
+  }
+
+  function saveDraftToLocal() {
+    const key = getDraftKey();
+    if (!key) return;
+    localStorage.setItem(key, JSON.stringify(collectDraftState()));
+  }
+
+  function restoreDraftFromLocal() {
+    const key = getDraftKey();
+    if (!key) return;
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    try {
+      const state = JSON.parse(raw);
+      applyDraftState(state);
+      setFormTip("已恢复本地草稿，可继续编辑。", true);
+    } catch (_) {
+      localStorage.removeItem(key);
+    }
+  }
+
+  function clearDraftFromLocal() {
+    const key = getDraftKey();
+    if (!key) return;
+    localStorage.removeItem(key);
+  }
+
+  function setTip(message, danger = false) {
+    const tip = el("tip");
+    tip.textContent = message || "";
+    tip.className = danger ? "muted danger" : "muted";
+  }
+
+  function setFormTip(message, success = false) {
+    const tip = el("form-tip");
+    tip.textContent = message || "";
+    tip.className = success ? "muted success" : "muted danger";
+  }
+
+  function setProjectLinesTip(message, success = false) {
+    const tip = el("project-lines-tip");
+    tip.textContent = message || "";
+    tip.className = success ? "muted success" : "muted danger";
+  }
+
+  function openFormModal() {
+    el("entry-modal").classList.remove("hidden");
+  }
+
+  function closeFormModal() {
+    el("entry-modal").classList.add("hidden");
+  }
+  function openDetailModal() { el("detail-modal").classList.remove("hidden"); }
+  function closeDetailModal() { el("detail-modal").classList.add("hidden"); }
+  function openProjectLinesModal() { el("project-lines-modal").classList.remove("hidden"); }
+  function closeProjectLinesModal() { el("project-lines-modal").classList.add("hidden"); }
+
+  async function request(url, method, payload) {
+    const formData = new FormData();
+    if (payload) Object.entries(payload).forEach(([k, v]) => formData.append(k, v ?? ""));
+    const resp = await fetch(url, {
+      method,
+      headers: { "X-CSRFToken": csrfToken },
+      body: method === "GET" ? null : formData
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw data;
+    return data;
+  }
+
+  function normalizeBool(value) {
+    if (value === null || value === undefined || value === "") return "";
+    return value ? "是" : "否";
+  }
+
+  function denormalizeBool(value) {
+    if (value === "") return "";
+    return value === "是" ? "是" : "否";
+  }
+
+  function fillProjectOptions() {
+    const select = el("project-id");
+    const searchSelect = el("search-project-id");
+    select.innerHTML = "";
+    searchSelect.innerHTML = `<option value="">全部工程</option>`;
+    currentBatchProjects.forEach((p) => {
+      const opt = document.createElement("option");
+      opt.value = p.id;
+      opt.textContent =
+        p.project_name && p.project_name !== p.project_code
+          ? `${p.project_code} (${p.project_name})`
+          : p.project_code;
+      select.appendChild(opt);
+      const opt2 = document.createElement("option");
+      opt2.value = p.id;
+      opt2.textContent = opt.textContent;
+      searchSelect.appendChild(opt2);
+    });
+  }
+
+  function clearForm() {
+    editingItemId = null;
+    viewOnlyMode = false;
+    submitAction = "submit";
+    fields.forEach((id) => {
+      const node = el(id);
+      if (node) node.value = "";
+    });
+    if (currentBatchProjects.length > 0) {
+      el("project-id").value = String(currentBatchProjects[0].id);
+    }
+    el("release-branch").value = currentBatch ? currentBatch.release_branch : "";
+    const submitBtn = el("btn-submit-modal");
+    if (submitBtn) submitBtn.textContent = "提交";
+    setFormTip("");
+    clearDraftFromLocal();
+  }
+
+  function clearFormForProjectSwitch() {
+    const selectedProjectId = el("project-id").value;
+    editingItemId = null;
+    viewOnlyMode = false;
+    submitAction = "submit";
+    fields.forEach((id) => {
+      if (id === "project-id" || id === "release-branch") return;
+      const node = el(id);
+      if (node) node.value = "";
+    });
+    if (selectedProjectId) {
+      el("project-id").value = String(selectedProjectId);
+    }
+    el("release-branch").value = currentBatch ? currentBatch.release_branch : "";
+    applyFieldPermission(null, false);
+    clearDraftFromLocal();
+    saveDraftToLocal();
+    setFormTip("已按工程切换清空表单。", true);
+  }
+
+  function fillFormByItem(item, forceViewOnly = false) {
+    editingItemId = item.id;
+    el("project-id").value = String(item.project.id);
+    el("requirement-branch").value = item.requirement_branch || "";
+    el("release-branch").value = item.release_branch || (currentBatch ? currentBatch.release_branch : "");
+    el("flow-name").value = item.flow_name || "";
+    el("biz-category").value = item.biz_category || "";
+    el("tech-owner").value = item.tech_owner || "";
+    el("biz-owner").value = item.biz_owner || "";
+    el("common-component-branch").value = item.common_component_branch || "";
+    el("flow-definition-name").value = item.flow_definition_name || "";
+    el("implementation-unit-no").value = item.implementation_unit_no || "";
+    el("remark").value = item.remark || "";
+    el("need-param-release").value = normalizeBool(item.need_param_release);
+    el("param-confirmed").value = normalizeBool(item.param_confirmed);
+    el("need-menu").value = normalizeBool(item.need_menu);
+    el("menu-added").value = normalizeBool(item.menu_added);
+    el("need-difs").value = normalizeBool(item.need_difs);
+    el("need-flowchart").value = normalizeBool(item.need_flowchart);
+    el("flowchart-checked").value = normalizeBool(item.flowchart_checked);
+    el("need-event-platform").value = normalizeBool(item.need_event_platform);
+    el("need-task-pool").value = normalizeBool(item.need_task_pool);
+    el("need-bpmp").value = normalizeBool(item.need_bpmp);
+    el("need-image").value = normalizeBool(item.need_image);
+    el("need-esf").value = normalizeBool(item.need_esf);
+    el("need-trade-tuning").value = normalizeBool(item.need_trade_tuning);
+    el("need-release-verify").value = normalizeBool(item.need_release_verify);
+    el("rel-test-status").value = item.rel_test_status || "";
+    if (canEditOpsFields) {
+      el("rel-deployed").value = normalizeBool(item.rel_deployed);
+      el("deploy-status").value = item.deploy_status || "";
+    }
+    viewOnlyMode = forceViewOnly;
+    applyFieldPermission(item, forceViewOnly);
+    setFormTip(`正在编辑：${item.requirement_branch}`);
+  }
+
+  function applyLastItemToForm(item) {
+    if (!item) return;
+    const setValue = (id, value) => {
+      const node = el(id);
+      if (!node || node.disabled) return;
+      node.value = value ?? "";
+    };
+
+    setValue("flow-name", item.flow_name || "");
+    setValue("biz-category", item.biz_category || "");
+    setValue("tech-owner", item.tech_owner || "");
+    setValue("biz-owner", item.biz_owner || "");
+    setValue("common-component-branch", item.common_component_branch || "");
+    setValue("flow-definition-name", item.flow_definition_name || "");
+    setValue("implementation-unit-no", item.implementation_unit_no || "");
+    setValue("remark", item.remark || "");
+    setValue("need-param-release", normalizeBool(item.need_param_release));
+    setValue("param-confirmed", normalizeBool(item.param_confirmed));
+    setValue("need-menu", normalizeBool(item.need_menu));
+    setValue("menu-added", normalizeBool(item.menu_added));
+    setValue("need-difs", normalizeBool(item.need_difs));
+    setValue("need-flowchart", normalizeBool(item.need_flowchart));
+    setValue("flowchart-checked", normalizeBool(item.flowchart_checked));
+    setValue("need-event-platform", normalizeBool(item.need_event_platform));
+    setValue("need-task-pool", normalizeBool(item.need_task_pool));
+    setValue("need-bpmp", normalizeBool(item.need_bpmp));
+    setValue("need-image", normalizeBool(item.need_image));
+    setValue("need-esf", normalizeBool(item.need_esf));
+    setValue("need-trade-tuning", normalizeBool(item.need_trade_tuning));
+    setValue("need-release-verify", normalizeBool(item.need_release_verify));
+    setValue("rel-test-status", item.rel_test_status || "");
+    saveDraftToLocal();
+  }
+
+  function applyFieldPermission(item, forceViewOnly = false) {
+    const canEditDev = item ? !!item.can_edit_dev_fields : canCreateDevRecord;
+    const canEditOps = item ? !!item.can_edit_ops_fields : isSuperuser;
+
+    const devIds = [
+      "project-id","requirement-branch","flow-name","biz-category","tech-owner","biz-owner",
+      "common-component-branch","flow-definition-name","remark","need-param-release","param-confirmed",
+      "implementation-unit-no",
+      "need-menu","menu-added","need-difs","need-flowchart","flowchart-checked","need-event-platform",
+      "need-task-pool","need-bpmp","need-image","need-esf","need-trade-tuning","need-release-verify",
+      "rel-test-status"
+    ];
+    const opsIds = ["rel-deployed","deploy-status"];
+
+    const allFieldIds = [...new Set([...devIds, ...opsIds, "release-branch"])];
+    if (forceViewOnly) {
+      allFieldIds.forEach((id) => {
+        const node = el(id);
+        if (node) node.disabled = true;
+      });
+      const submitBtn = el("btn-submit-modal");
+      const quoteBtn = el("btn-quote-last");
+      submitAction = "view";
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "提交";
+      }
+      if (quoteBtn) quoteBtn.disabled = true;
+      return;
+    }
+
+    devIds.forEach((id) => {
+      const node = el(id);
+      if (node) node.disabled = !canEditDev;
+    });
+    opsIds.forEach((id) => {
+      const node = el(id);
+      if (node) node.disabled = !canEditOps;
+    });
+
+    const submitBtn = el("btn-submit-modal");
+    const quoteBtn = el("btn-quote-last");
+    submitAction = canEditDev ? "submit" : (canEditOps ? "save" : "forbidden");
+    if (submitBtn) {
+      submitBtn.disabled = !(canEditDev || canEditOps);
+      submitBtn.textContent = canEditDev ? "提交" : "保存";
+    }
+    if (quoteBtn) quoteBtn.disabled = !canEditDev;
+  }
+
+  function renderItems(items) {
+    currentBatchItems = Array.isArray(items) ? items : [];
+    renderTableHeader();
+    const body = el("item-body");
+    body.innerHTML = "";
+    currentBatchItems.forEach((item) => {
+      const tr = document.createElement("tr");
+      const rowCols = getActiveColumns();
+      tr.innerHTML = rowCols.map((col) => `<td>${col.render(item)}</td>`).join("");
+      body.appendChild(tr);
+    });
+
+    body.querySelectorAll(".btn-edit").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = currentBatchItems.find((i) => i.id === Number(btn.dataset.id));
+        if (target) {
+          fillFormByItem(target, false);
+          openFormModal();
+        }
+      });
+    });
+
+    body.querySelectorAll(".btn-view").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const target = currentBatchItems.find((i) => i.id === Number(btn.dataset.id));
+        if (target) {
+          renderDetail(target);
+          openDetailModal();
+        }
+      });
+    });
+
+    body.querySelectorAll(".btn-delete").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("确定删除这条记录吗？删除后不可恢复。")) return;
+        try {
+          await request("/branch-create/release-entry/api/items/delete/", "POST", { item_id: btn.dataset.id });
+          setTip("删除成功");
+          if (editingItemId === Number(btn.dataset.id)) {
+            clearForm();
+            closeFormModal();
+          }
+          await loadItems();
+        } catch (e) {
+          setTip(`删除失败：${e.error || "未知错误"}`, true);
+        }
+      });
+    });
+  }
+
+  function dash(v) {
+    const text = v === undefined || v === null ? "" : String(v).trim();
+    return text || "—";
+  }
+
+  function renderDetail(item) {
+    const detailBody = el("detail-body");
+    const rows = [
+      ["流程/功能名称", item.flow_name],
+      ["业务种类", item.biz_category],
+      ["工程名称", item.project ? item.project.name : ""],
+      ["需求分支", item.requirement_branch],
+      ["投产分支", item.release_branch],
+      ["科技联系人", item.tech_owner],
+      ["业务联系人", item.biz_owner],
+      ["公共组件配合（分支）", item.common_component_branch],
+      ["流程定义名称", item.flow_definition_name],
+      ["实施单元编号", item.implementation_unit_no],
+      ["备注", item.remark],
+      ["参数投产", normalizeBool(item.need_param_release)],
+      ["业务参数确认", normalizeBool(item.param_confirmed)],
+      ["涉及菜单", normalizeBool(item.need_menu)],
+      ["菜单已添加", normalizeBool(item.menu_added)],
+      ["涉及 DIFS", normalizeBool(item.need_difs)],
+      ["涉及流程图", normalizeBool(item.need_flowchart)],
+      ["流程图已检查", normalizeBool(item.flowchart_checked)],
+      ["涉及事件平台", normalizeBool(item.need_event_platform)],
+      ["涉及统一任务池", normalizeBool(item.need_task_pool)],
+      ["涉及 BPMP", normalizeBool(item.need_bpmp)],
+      ["涉及影像", normalizeBool(item.need_image)],
+      ["涉及 ESF", normalizeBool(item.need_esf)],
+      ["涉及交易申调", normalizeBool(item.need_trade_tuning)],
+      ["涉及投产验证", normalizeBool(item.need_release_verify)],
+      ["REL测试状态", item.rel_test_status],
+      ["REL是否已部署", item.rel_deployed === null || item.rel_deployed === undefined ? "" : (item.rel_deployed ? "是" : "否")],
+      ["投产状态", item.deploy_status],
+      ["分支创建状态", item.branch_created ? "已创建" : "未创建"],
+      ["创建失败原因", item.branch_create_error],
+      ["填写人", item.developer],
+    ];
+    detailBody.innerHTML = "";
+    rows.forEach(([k, v]) => {
+      const dt = document.createElement("dt");
+      dt.textContent = k;
+      const dd = document.createElement("dd");
+      dd.textContent = dash(v);
+      detailBody.appendChild(dt);
+      detailBody.appendChild(dd);
+    });
+  }
+
+  async function loadItems() {
+    if (!currentBatch) return;
+    try {
+      const query = new URLSearchParams({
+        batch_id: String(currentBatch.id),
+        flow_name: el("search-flow-name").value || "",
+        project_id: el("search-project-id").value || "",
+      });
+      const resp = await fetch(`/branch-create/release-entry/api/items/?${query.toString()}`);
+      const data = await resp.json();
+      if (!data.success) throw data;
+      renderItems(data.items);
+    } catch (e) {
+      setTip(`加载记录失败：${e.error || "未知错误"}`, true);
+    }
+  }
+
+  async function loadBatchProjectLines() {
+    if (!currentBatch) {
+      throw new Error("请先选择批次");
+    }
+    const query = new URLSearchParams({ batch_id: String(currentBatch.id) });
+    const resp = await fetch(`/branch-create/release-entry/api/items/?${query.toString()}`);
+    const data = await resp.json();
+    if (!resp.ok || !data.success) {
+      throw new Error(data.error || "加载失败");
+    }
+    const names = [];
+    const seen = new Set();
+    (data.items || []).forEach((item) => {
+      const name = (item.project?.name || "").trim();
+      if (!name || seen.has(name)) return;
+      seen.add(name);
+      names.push(name);
+    });
+    return names;
+  }
+
+  async function loadBatches() {
+    try {
+      const data = await request("/branch-create/release-entry/api/batches/", "GET");
+      const select = el("batch-select");
+      select.innerHTML = "";
+      data.batches.forEach((b) => {
+        const opt = document.createElement("option");
+        opt.value = b.id;
+        opt.textContent = `${b.release_date} | ${b.release_branch} | ${b.status}`;
+        select.appendChild(opt);
+      });
+      if (data.batches.length === 0) {
+        setTip("暂无批次，请管理员先创建。");
+        currentBatch = null;
+        currentBatchProjects = [];
+        fillProjectOptions();
+        renderItems([]);
+        return;
+      }
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, "0");
+      const dd = String(today.getDate()).padStart(2, "0");
+      const todayStr = `${yyyy}-${mm}-${dd}`;
+
+      const todayTs = Date.parse(`${todayStr}T00:00:00`);
+      const futureOrTodayBatches = data.batches
+        .map((b) => ({ batch: b, ts: Date.parse(`${b.release_date}T00:00:00`) }))
+        .filter((x) => !Number.isNaN(x.ts) && x.ts >= todayTs)
+        .sort((a, b) => a.ts - b.ts);
+      if (futureOrTodayBatches.length > 0) {
+        currentBatch = futureOrTodayBatches[0].batch;
+      } else {
+        const sortedPastBatches = data.batches
+          .map((b) => ({ batch: b, ts: Date.parse(`${b.release_date}T00:00:00`) }))
+          .filter((x) => !Number.isNaN(x.ts))
+          .sort((a, b) => b.ts - a.ts);
+        currentBatch = sortedPastBatches.length > 0 ? sortedPastBatches[0].batch : data.batches[0];
+      }
+      select.value = String(currentBatch.id);
+      currentBatchProjects = currentBatch.projects.filter((p) => p.enabled);
+      fillProjectOptions();
+      clearForm();
+      restoreDraftFromLocal();
+      await loadItems();
+      if (futureOrTodayBatches.length > 0) {
+        setTip("已默认选中今天及其之后最近批次");
+      } else {
+        setTip("未找到今天及其之后批次，已自动选择最新历史批次");
+      }
+    } catch (e) {
+      setTip(`加载批次失败：${e.error || "未知错误"}`, true);
+    }
+  }
+
+  el("batch-select").addEventListener("change", async (ev) => {
+    const id = Number(ev.target.value);
+    const data = await request("/branch-create/release-entry/api/batches/", "GET");
+    currentBatch = data.batches.find((b) => b.id === id) || null;
+    currentBatchProjects = currentBatch ? currentBatch.projects.filter((p) => p.enabled) : [];
+    fillProjectOptions();
+    clearForm();
+    restoreDraftFromLocal();
+    await loadItems();
+  });
+
+  el("btn-refresh").addEventListener("click", loadBatches);
+  el("btn-column-config").addEventListener("click", () => {
+    el("column-config-panel").classList.toggle("hidden");
+    if (!el("column-config-panel").classList.contains("hidden")) {
+      renderColumnConfigPanel();
+    }
+  });
+  el("btn-column-close").addEventListener("click", () => {
+    el("column-config-panel").classList.add("hidden");
+  });
+  el("btn-column-reset").addEventListener("click", () => {
+    visibleColumnIds = [...defaultColumnIds];
+    saveColumnPrefs();
+    renderColumnConfigPanel();
+    renderTableHeader();
+    renderItems(currentBatchItems);
+  });
+  document.addEventListener("click", (event) => {
+    const panel = el("column-config-panel");
+    const trigger = el("btn-column-config");
+    if (panel.classList.contains("hidden")) return;
+    if (panel.contains(event.target) || trigger.contains(event.target)) return;
+    panel.classList.add("hidden");
+  });
+  el("btn-search-items").addEventListener("click", loadItems);
+  el("btn-reset-search").addEventListener("click", async () => {
+    el("search-flow-name").value = "";
+    el("search-project-id").value = "";
+    await loadItems();
+  });
+  el("btn-reset").addEventListener("click", () => {
+    if (!confirm("确定要清空当前表单内容吗？")) return;
+    clearForm();
+  });
+  {% if can_manage_batch %}
+  el("btn-delete-batch").addEventListener("click", async () => {
+    if (!currentBatch) {
+      setTip("当前没有可删除批次", true);
+      return;
+    }
+    const ok = confirm(
+      `确定删除批次 ${currentBatch.release_date} / ${currentBatch.release_branch} 吗？\n` +
+      "删除后该批次下所有记录将一并删除，且不可恢复。"
+    );
+    if (!ok) return;
+    try {
+      await request("/branch-create/release-entry/api/batches/delete/", "POST", {
+        batch_id: currentBatch.id,
+      });
+      setTip("批次删除成功");
+      await loadBatches();
+    } catch (e) {
+      setTip(`删除失败：${e.error || "未知错误"}`, true);
+    }
+  });
+  {% endif %}
+  el("btn-open-form").addEventListener("click", () => {
+    if (!currentBatch) {
+      setTip("请先选择批次", true);
+      return;
+    }
+    if (!canCreateDevRecord && !isSuperuser) {
+      setFormTip("当前角色不能新增研发记录。");
+      return;
+    }
+    clearForm();
+    openFormModal();
+    viewOnlyMode = false;
+    applyFieldPermission(null, false);
+  });
+  el("project-id").addEventListener("change", () => {
+    if (el("entry-modal").classList.contains("hidden")) return;
+    clearFormForProjectSwitch();
+  });
+  el("btn-quote-last").addEventListener("click", async () => {
+    const projectId = el("project-id").value;
+    if (!projectId) {
+      setFormTip("请先选择工程");
+      return;
+    }
+    try {
+      const query = new URLSearchParams({
+        project_id: String(projectId),
+        batch_id: currentBatch ? String(currentBatch.id) : "",
+        exclude_item_id: editingItemId ? String(editingItemId) : "",
+      });
+      const resp = await fetch(`/branch-create/release-entry/api/items/last-by-project/?${query.toString()}`);
+      const data = await resp.json();
+      if (!resp.ok || !data.success) throw data;
+      if (!data.item) {
+        setFormTip("该工程暂无可引用的历史记录");
+        return;
+      }
+      applyLastItemToForm(data.item);
+      const sourceText = data.source?.project_code || "当前工程";
+      const sourceBatchDate = data.source?.batch_release_date || "";
+      const sourceBatchBranch = data.source?.batch_release_branch || "";
+      const sourceBatchText =
+        sourceBatchDate || sourceBatchBranch
+          ? `（来源批次：${sourceBatchDate}${sourceBatchBranch ? ` / ${sourceBatchBranch}` : ""}）`
+          : "";
+      setFormTip(`已引用 ${sourceText} 上次填写内容${sourceBatchText}`, true);
+    } catch (e) {
+      setFormTip(`引用失败：${e.error || "未知错误"}`);
+    }
+  });
+  el("btn-close-form").addEventListener("click", closeFormModal);
+  el("btn-cancel-form").addEventListener("click", closeFormModal);
+  el("entry-modal").addEventListener("click", (event) => {
+    if (event.target.id === "entry-modal") closeFormModal();
+  });
+  el("btn-close-detail").addEventListener("click", closeDetailModal);
+  el("btn-cancel-detail").addEventListener("click", closeDetailModal);
+  el("detail-modal").addEventListener("click", (event) => {
+    if (event.target.id === "detail-modal") closeDetailModal();
+  });
+  el("btn-show-project-lines").addEventListener("click", async () => {
+    setProjectLinesTip("");
+    const textarea = el("project-lines-text");
+    textarea.value = "";
+    try {
+      const names = await loadBatchProjectLines();
+      textarea.value = names.length > 0 ? names.join("\n") : "";
+      if (names.length === 0) {
+        setProjectLinesTip("当前批次暂无工程记录");
+      } else {
+        setProjectLinesTip(`共 ${names.length} 个工程（已去重）`, true);
+      }
+      openProjectLinesModal();
+      textarea.focus();
+      textarea.select();
+    } catch (e) {
+      setTip(`加载本次投产工程失败：${e.message || "未知错误"}`, true);
+    }
+  });
+  el("btn-copy-project-lines").addEventListener("click", async () => {
+    const textarea = el("project-lines-text");
+    if (!textarea.value.trim()) {
+      setProjectLinesTip("暂无可复制内容");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(textarea.value);
+      setProjectLinesTip("复制成功", true);
+    } catch (_) {
+      textarea.focus();
+      textarea.select();
+      setProjectLinesTip("自动复制失败，请手动 Ctrl/Cmd + C");
+    }
+  });
+  el("btn-close-project-lines").addEventListener("click", closeProjectLinesModal);
+  el("btn-cancel-project-lines").addEventListener("click", closeProjectLinesModal);
+  el("project-lines-modal").addEventListener("click", (event) => {
+    if (event.target.id === "project-lines-modal") closeProjectLinesModal();
+  });
+
+  fields.forEach((id) => {
+    const node = el(id);
+    if (!node) return;
+    node.addEventListener("input", saveDraftToLocal);
+    node.addEventListener("change", saveDraftToLocal);
+  });
+
+  async function saveCurrentRecord(closeAfterSave = true) {
+    if (!currentBatch) {
+      setFormTip("请先选择批次");
+      return null;
+    }
+    if (viewOnlyMode) {
+      setFormTip("查看模式下不可保存");
+      return null;
+    }
+    const payload = {
+      batch_id: currentBatch.id,
+      project_id: el("project-id").value,
+      requirement_branch: el("requirement-branch").value,
+      release_branch: el("release-branch").value,
+      flow_name: el("flow-name").value,
+      biz_category: el("biz-category").value,
+      tech_owner: el("tech-owner").value,
+      biz_owner: el("biz-owner").value,
+      common_component_branch: el("common-component-branch").value,
+      flow_definition_name: el("flow-definition-name").value,
+      implementation_unit_no: el("implementation-unit-no").value,
+      remark: el("remark").value,
+      need_param_release: denormalizeBool(el("need-param-release").value),
+      param_confirmed: denormalizeBool(el("param-confirmed").value),
+      need_menu: denormalizeBool(el("need-menu").value),
+      menu_added: denormalizeBool(el("menu-added").value),
+      need_difs: denormalizeBool(el("need-difs").value),
+      need_flowchart: denormalizeBool(el("need-flowchart").value),
+      flowchart_checked: denormalizeBool(el("flowchart-checked").value),
+      need_event_platform: denormalizeBool(el("need-event-platform").value),
+      need_task_pool: denormalizeBool(el("need-task-pool").value),
+      need_bpmp: denormalizeBool(el("need-bpmp").value),
+      need_image: denormalizeBool(el("need-image").value),
+      need_esf: denormalizeBool(el("need-esf").value),
+      need_trade_tuning: denormalizeBool(el("need-trade-tuning").value),
+      need_release_verify: denormalizeBool(el("need-release-verify").value),
+      rel_test_status: el("rel-test-status").value
+    };
+    if (canEditOpsFields) {
+      payload.rel_deployed = denormalizeBool(el("rel-deployed").value);
+      payload.deploy_status = el("deploy-status").value;
+      payload.rel_test_status = el("rel-test-status").value;
+    }
+
+    try {
+      let itemData = null;
+      if (editingItemId) {
+        payload.item_id = editingItemId;
+        const resp = await request("/branch-create/release-entry/api/items/update/", "POST", payload);
+        itemData = resp.item;
+        setFormTip("更新成功", true);
+      } else {
+        const resp = await request("/branch-create/release-entry/api/items/create/", "POST", payload);
+        itemData = resp.item;
+        editingItemId = itemData?.id || null;
+        setFormTip("保存成功", true);
+      }
+      clearDraftFromLocal();
+      if (closeAfterSave) {
+        clearForm();
+        closeFormModal();
+      }
+      await loadItems();
+      return itemData;
+    } catch (e) {
+      const miss = (e.missing_fields || []).map((f) => missingLabelMap[f] || f).join("、");
+      setFormTip(`保存失败：${e.error || "未知错误"} ${miss ? `（${miss}）` : ""}`);
+      return null;
+    }
+  }
+
+  el("btn-submit-modal").addEventListener("click", async () => {
+    if (viewOnlyMode) {
+      setFormTip("查看模式下不可提交");
+      return;
+    }
+    if (submitAction === "save") {
+      const savedItem = await saveCurrentRecord(true);
+      if (savedItem) {
+        setTip("保存成功");
+      }
+      return;
+    }
+    if (submitAction !== "submit") {
+      setFormTip("当前无提交权限");
+      return;
+    }
+    const savedItem = await saveCurrentRecord(false);
+    if (!savedItem || !savedItem.id) return;
+    editingItemId = savedItem.id;
+    try {
+      await request("/branch-create/release-entry/api/items/submit/", "POST", { item_id: editingItemId });
+      setFormTip("提交成功", true);
+      clearDraftFromLocal();
+      clearForm();
+      closeFormModal();
+      await loadItems();
+    } catch (e) {
+      const miss = (e.missing_fields || []).map((f) => missingLabelMap[f] || f).join("、");
+      if (e.missing_fields && e.missing_fields.length > 0) {
+        setFormTip(`信息未填写完整，已保存草稿：${miss}`);
+        await loadItems();
+      } else {
+        setFormTip(`提交失败：${e.error || "未知错误"} ${miss ? `（${miss}）` : ""}`);
+      }
+    }
+  });
+
+  {% if can_manage_batch %}
+  function updateBranchPreview() {
+    const dateVal = el("new-batch-date").value;
+    const typeVal = el("new-batch-type").value || "release";
+    if (!dateVal) {
+      el("new-batch-branch-preview").value = "";
+      return;
+    }
+    el("new-batch-branch-preview").value = `${typeVal}-${dateVal.replaceAll("-", "")}`;
+  }
+
+  el("new-batch-date").addEventListener("change", updateBranchPreview);
+  el("new-batch-type").addEventListener("change", updateBranchPreview);
+
+  el("btn-create-batch").addEventListener("click", async () => {
+    const msg = el("batch-msg");
+    try {
+      const payload = {
+        release_date: el("new-batch-date").value,
+        release_type: el("new-batch-type").value
+      };
+      await request("/branch-create/release-entry/api/batches/create/", "POST", payload);
+      msg.textContent = "批次创建成功";
+      msg.className = "muted success";
+      await loadBatches();
+    } catch (e) {
+      msg.textContent = `创建失败：${e.error || "未知错误"}`;
+      msg.className = "muted danger";
+    }
+  });
+  updateBranchPreview();
+  {% endif %}
+
+  visibleColumnIds = loadColumnPrefs();
+  renderTableHeader();
+  loadBatches();
+</script>
+{% endblock %}

@@ -1,0 +1,636 @@
+{% extends "base.html" %}
+
+{% block title %}管理员配置 - DevOps Platform{% endblock %}
+
+{% block content %}
+<style>
+  .page { align-items: flex-start; padding-top: 28px; padding-bottom: 40px; }
+  .card { max-width: 1180px; margin-top: 0; border-radius: 14px; border: 1px solid #e5e7eb; position: relative; }
+  .nav-bread { font-size: 13px; color: #6b7280; margin-bottom: 14px; }
+  .nav-bread a { color: #1f75cb; text-decoration: none; }
+  .section {
+    margin-bottom: 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #fcfdff;
+    padding: 16px;
+  }
+  .section h2 { margin: 0; font-size: 17px; }
+  .section-desc { margin: 6px 0 12px; color: #6b7280; font-size: 13px; }
+  .simple-form { max-width: 560px; display: grid; gap: 12px; }
+  .config-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px 14px;
+  }
+  .accordion-stack { display: grid; gap: 10px; }
+  .config-accordion {
+    border: 1px solid #dbe2ea;
+    border-radius: 10px;
+    background: #fff;
+    overflow: hidden;
+  }
+  .config-accordion > summary {
+    list-style: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+    padding: 12px 14px;
+    background: #f8fafc;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .config-accordion > summary::-webkit-details-marker { display: none; }
+  .config-accordion > summary::after {
+    content: "展开";
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 500;
+  }
+  .config-accordion[open] > summary::after { content: "收起"; }
+  .config-accordion.has-error {
+    border-color: #fecaca;
+  }
+  .config-accordion.has-error > summary {
+    background: #fff1f2;
+    color: #b91c1c;
+  }
+  .config-accordion.has-error > summary::after {
+    color: #b91c1c;
+  }
+  .accordion-body { padding: 14px; background: #fff; }
+  .accordion-hint { margin: 0 0 10px; color: #6b7280; font-size: 12px; }
+  .span-full { grid-column: 1 / -1; }
+  .check-row { display:flex; align-items:center; gap:8px; color:#334155; font-size:14px; }
+  .inline-actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .tips-box {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 12px;
+  }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; }
+  .table-wrap { overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 760px; }
+  th, td { border-bottom: 1px solid #eef2f7; padding: 10px 12px; text-align: left; vertical-align: middle; }
+  th { background: #f8fafc; font-weight: 600; }
+  .table-title { margin: 0 0 8px; font-size: 15px; color: #0f172a; }
+  .hidden { display: none !important; }
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 2000;
+  }
+  .modal-panel {
+    width: min(1080px, 100%);
+    max-height: 88vh;
+    overflow: auto;
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    padding: 16px;
+  }
+  .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .close-btn { border:0; background:transparent; font-size:20px; cursor:pointer; color:#6b7280; }
+  .secret-meta { margin: 6px 0 0; color: #6b7280; font-size: 12px; display: flex; align-items: center; gap: 8px; }
+  .btn-link { border: 0; background: transparent; color: #2563eb; cursor: pointer; padding: 0; font-size: 12px; }
+  .home-icon-link {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 34px;
+    height: 34px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    color: #1f75cb;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+  }
+  .home-icon-link:hover { background: #f8fafc; border-color: #94a3b8; }
+  .home-icon-link svg { width: 18px; height: 18px; display: block; }
+  @media (max-width: 760px) {
+    .card { padding: 18px; }
+    .section { padding: 14px; }
+    .grid-3 { grid-template-columns: 1fr; }
+  }
+</style>
+
+<section class="card">
+  <a class="home-icon-link" href="{% url 'dashboard' %}" title="返回主界面" aria-label="返回主界面">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M3 10.5L12 3l9 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path d="M6.75 9.75V21h10.5V9.75" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path d="M10 21v-6h4v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+  </a>
+  <div class="nav-bread"><a href="{% url 'dashboard' %}">工作台</a> / 管理员配置</div>
+  <h1 class="card-title">管理员配置</h1>
+  <p class="card-subtitle">集中维护账号、工程与 Git/SQL 配置。建议先配置 Git/PAT，再进行投产相关操作。</p>
+
+  {% include "components/messages.html" %}
+
+  <div class="section">
+    <h2>修改我的密码</h2>
+    <p class="section-desc">仅修改当前登录账号密码，修改后会保持当前登录态。</p>
+    <form method="post" class="simple-form">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="change_password">
+      {% for field in password_form %}
+        <label class="form-label">
+          <span>{{ field.label }}</span>
+          {{ field }}
+          {% if field.errors %}
+            <span class="form-error">{{ field.errors|striptags }}</span>
+          {% endif %}
+        </label>
+      {% endfor %}
+      <button class="btn btn-primary" type="submit">更新密码</button>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>工程名称配置</h2>
+    <p class="section-desc">在弹窗中批量维护工程编码、注释与启用状态，确认后一次性保存。</p>
+    <div class="inline-actions">
+      <button id="btn-open-project-modal" type="button" class="btn btn-primary">打开工程配置</button>
+      <span class="muted">支持批量新增与统一编辑。</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Git / SQL 连接配置</h2>
+    <p class="section-desc">用于分支、投产追版和 SQL 执行功能。敏感信息支持“留空不变”与“手动清空”。</p>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save_git_config">
+      <div class="accordion-stack">
+        <details class="config-accordion" open>
+          <summary>基础连接配置</summary>
+          <div class="accordion-body">
+            <p class="accordion-hint">这些字段决定 Git 平台地址和本地工作目录，建议先完整配置。</p>
+            <div class="config-form-grid">
+              <label class="form-label">
+                <span>Git 地址（支持域名或完整 URL）</span>
+                <input class="form-input" name="git_base_url" value="{{ git_config.git_base_url }}" placeholder="https://gitlab.example.com" data-required="1">
+              </label>
+              <label class="form-label">
+                <span>Group / 命名空间</span>
+                <input class="form-input" name="git_group" value="{{ git_config.git_group }}" placeholder="your-group" data-required="1">
+              </label>
+              <label class="form-label span-full">
+                <span>本地工作目录（容器内目录）</span>
+                <input class="form-input" name="work_base_dir" value="{{ git_config.work_base_dir }}" placeholder="/workspace/repos" data-required="1">
+              </label>
+            </div>
+          </div>
+        </details>
+
+        <details class="config-accordion" open>
+          <summary>认证信息（PAT / 用户名密码）</summary>
+          <div class="accordion-body">
+            <p class="accordion-hint">认证优先级：PAT &gt; 用户名/密码。建议优先配置 PAT。</p>
+            <div class="config-form-grid">
+              <label class="form-label">
+                <span>Git 用户名（可选）</span>
+                <input class="form-input" name="git_username" value="{{ git_config.git_username }}" placeholder="git username">
+              </label>
+              <label class="form-label">
+                <span>Git 密码（留空保持不变）</span>
+                <input class="form-input" type="password" name="git_password" placeholder="请输入新密码（留空保持不变）">
+                <p class="secret-meta">
+                  <span>当前状态：{% if git_password_masked %}已设置{% else %}未设置{% endif %}</span>
+                  {% if git_password_masked %}
+                    <button
+                      type="button"
+                      class="btn-link btn-toggle-mask"
+                      data-target-id="git-password-mask"
+                      data-expand-text="显示掩码值"
+                      data-collapse-text="隐藏掩码值"
+                    >显示掩码值</button>
+                    <span id="git-password-mask" class="hidden">掩码值：{{ git_password_masked }}</span>
+                  {% endif %}
+                </p>
+              </label>
+              <label class="form-label span-full">
+                <span>GitLab 个人访问令牌 PAT（留空保持不变）</span>
+                <input class="form-input" type="password" name="git_pat" placeholder="请输入新 PAT（留空保持不变）">
+                <p class="secret-meta">
+                  <span>当前状态：{% if git_pat_masked %}已设置{% else %}未设置{% endif %}</span>
+                  {% if git_pat_masked %}
+                    <button
+                      type="button"
+                      class="btn-link btn-toggle-mask"
+                      data-target-id="git-pat-mask"
+                      data-expand-text="显示掩码值"
+                      data-collapse-text="隐藏掩码值"
+                    >显示掩码值</button>
+                    <span id="git-pat-mask" class="hidden">掩码值：{{ git_pat_masked }}</span>
+                  {% endif %}
+                </p>
+              </label>
+              <label class="check-row">
+                <input type="checkbox" name="clear_git_password">
+                <span>清空已保存的 Git 密码</span>
+              </label>
+              <label class="check-row">
+                <input type="checkbox" name="clear_git_pat">
+                <span>清空已保存的 PAT</span>
+              </label>
+            </div>
+          </div>
+        </details>
+
+        <details class="config-accordion">
+          <summary>SQL 仓库与数据库配置</summary>
+          <div class="accordion-body">
+            <p class="accordion-hint">用于 SQL 执行申请流程，SQL 密码同样支持留空不变或手动清空。</p>
+            <div class="config-form-grid">
+              <label class="form-label span-full">
+                <span>SQL 执行仓库本地路径（可选）</span>
+                <input class="form-input" name="sql_repo_path" value="{{ git_config.sql_repo_path }}" placeholder="/workspace/sql-repo">
+              </label>
+              <label class="form-label span-full">
+                <span>SQL 仓库 Clone URL（可选，用于首次克隆）</span>
+                <input class="form-input" name="sql_repo_clone_url" value="{{ git_config.sql_repo_clone_url }}" placeholder="https://gitlab.example.com/group/sql-repo.git">
+              </label>
+              <label class="form-label">
+                <span>MySQL Host（可选）</span>
+                <input class="form-input" name="sql_db_host" value="{{ git_config.sql_db_host }}" placeholder="127.0.0.1">
+              </label>
+              <label class="form-label">
+                <span>MySQL Port（可选）</span>
+                <input class="form-input" name="sql_db_port" value="{{ git_config.sql_db_port }}" placeholder="3306">
+              </label>
+              <label class="form-label">
+                <span>MySQL Database（可选）</span>
+                <input class="form-input" name="sql_db_name" value="{{ git_config.sql_db_name }}" placeholder="db_name">
+              </label>
+              <label class="form-label">
+                <span>MySQL User（可选）</span>
+                <input class="form-input" name="sql_db_user" value="{{ git_config.sql_db_user }}" placeholder="db_user">
+              </label>
+              <label class="form-label span-full">
+                <span>MySQL Password（留空保持不变）</span>
+                <input class="form-input" type="password" name="sql_db_password" placeholder="请输入新密码（留空保持不变）">
+                <p class="secret-meta">
+                  <span>当前状态：{% if sql_db_password_masked %}已设置{% else %}未设置{% endif %}</span>
+                  {% if sql_db_password_masked %}
+                    <button
+                      type="button"
+                      class="btn-link btn-toggle-mask"
+                      data-target-id="sql-db-password-mask"
+                      data-expand-text="显示掩码值"
+                      data-collapse-text="隐藏掩码值"
+                    >显示掩码值</button>
+                    <span id="sql-db-password-mask" class="hidden">掩码值：{{ sql_db_password_masked }}</span>
+                  {% endif %}
+                </p>
+              </label>
+              <label class="check-row">
+                <input type="checkbox" name="clear_sql_db_password">
+                <span>清空已保存的 MySQL 密码</span>
+              </label>
+            </div>
+          </div>
+        </details>
+      </div>
+      <div style="margin-top: 12px;">
+        <button class="btn btn-primary" type="submit">保存 Git / SQL 配置</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>角色权限范围</h2>
+    <p class="section-desc">权限配置已拆分为独立页面，避免与管理员配置内容混在一起。</p>
+    <div class="inline-actions">
+      <a class="btn btn-primary" href="{% url 'role_permissions_config' %}">打开权限配置页面</a>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>账号管理（其他账号）</h2>
+    <p class="section-desc">审核新账号申请，并维护已注册账号角色/密码。你自己的账号不在此处展示。</p>
+    <h3 class="table-title">待审核账号</h3>
+    <div class="table-wrap" style="margin-bottom: 14px;">
+      <table>
+        <thead>
+        <tr>
+          <th>用户名</th>
+          <th>邮箱</th>
+          <th>申请角色</th>
+          <th>注册时间</th>
+          <th>审核</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for profile in pending_profiles %}
+          <tr>
+            <td>{{ profile.user.username }}</td>
+            <td>{{ profile.user.email|default:"-" }}</td>
+            <td>{% if profile.role %}{{ profile.role.name }}{% else %}-{% endif %}</td>
+            <td>{{ profile.user.date_joined|date:"Y-m-d H:i" }}</td>
+            <td>
+              <form method="post" action="{% url 'approval_action' profile.id %}" style="display:inline-block; margin-right:6px;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="approve">
+                <button class="btn btn-primary" type="submit">通过</button>
+              </form>
+              <form method="post" action="{% url 'approval_action' profile.id %}" style="display:inline-block;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="reject">
+                <input class="form-input" style="max-width:140px; display:inline-block;" name="reason" placeholder="拒绝原因">
+                <button class="btn btn-secondary" type="submit">拒绝</button>
+              </form>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" style="color:#6b7280;">暂无待审核账号</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="table-title">已注册账号</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+        <tr>
+          <th>用户名</th>
+          <th>邮箱</th>
+          <th>当前角色</th>
+          <th>新角色</th>
+          <th>重置密码</th>
+          <th>操作</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for u in managed_users %}
+          <tr>
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="update_user_account">
+              <input type="hidden" name="target_user_id" value="{{ u.id }}">
+              <td>{{ u.username }}</td>
+              <td>{{ u.email|default:"-" }}</td>
+              <td>
+                {% if u.is_superuser %}
+                  超管
+                {% elif u.profile %}
+                  {% if u.profile.role %}{{ u.profile.role.name }}{% else %}未设置{% endif %}
+                {% else %}
+                  未设置
+                {% endif %}
+              </td>
+              <td>
+                {% if u.is_superuser %}
+                  <span class="muted">超管角色不可修改</span>
+                {% else %}
+                  <select class="form-input" name="new_role_id" style="min-width: 140px;">
+                    {% for role in available_roles %}
+                      <option value="{{ role.id }}" {% if u.profile and u.profile.role_id == role.id %}selected{% endif %}>{{ role.name }}</option>
+                    {% endfor %}
+                  </select>
+                {% endif %}
+              </td>
+              <td><input class="form-input" type="password" name="new_password" placeholder="不填则不修改"></td>
+              <td><button class="btn btn-secondary" type="submit">保存</button></td>
+            </form>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6" style="color:#6b7280;">暂无其他账号</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="tips-box" style="margin-top:10px;">说明：只能管理其他账号；非超管不能修改超管账号。</div>
+  </div>
+
+  <div id="project-config-modal" class="modal-backdrop hidden">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <h2 style="margin:0;font-size:18px;">工程配置（悬浮编辑）</h2>
+        <button id="btn-close-project-modal" type="button" class="close-btn">×</button>
+      </div>
+
+      <div class="grid-3" style="margin-bottom: 12px;">
+        <label class="field">工程编码（可批量）
+          <input id="new-project-codes" class="form-input" placeholder="多个编码用逗号分隔">
+        </label>
+        <label class="field">注释
+          <input id="new-project-name" class="form-input" placeholder="可空">
+        </label>
+        <label class="field" style="display:flex; align-items:center; gap:6px;">
+          <input id="new-project-enabled" type="checkbox" checked>
+          <span>启用</span>
+        </label>
+      </div>
+      <button id="btn-add-project-row" type="button" class="btn btn-secondary" style="margin-bottom: 12px;">添加到列表</button>
+
+      <form id="project-config-form" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="bulk_save_projects">
+        <input type="hidden" name="projects_payload" id="projects-payload">
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+            <tr>
+              <th>工程编码</th>
+              <th>注释</th>
+              <th>启用</th>
+              <th>操作</th>
+            </tr>
+            </thead>
+            <tbody id="project-config-body">
+            {% for p in projects %}
+              <tr data-project-id="{{ p.id }}">
+                <td><input class="form-input row-project-code" value="{{ p.project_code }}"></td>
+                <td><input class="form-input row-project-name" value="{{ p.project_name }}" placeholder="注释（可空）"></td>
+                <td><input class="row-project-enabled" type="checkbox" {% if p.enabled %}checked{% endif %}></td>
+                <td><button class="btn btn-secondary btn-remove-row" type="button">删除</button></td>
+              </tr>
+            {% empty %}
+              <tr data-empty-row="1">
+                <td colspan="4" style="color:#6b7280;">暂无工程配置，请先添加。</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div style="margin-top: 12px;">
+          <button class="btn btn-primary" type="submit">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+<script>
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function validateGitConfigAccordions() {
+    const sections = document.querySelectorAll(".config-accordion");
+    let firstInvalidInput = null;
+    let invalidSectionCount = 0;
+    sections.forEach((section) => {
+      section.classList.remove("has-error");
+      const requiredInputs = section.querySelectorAll("[data-required='1']");
+      let sectionInvalid = false;
+      requiredInputs.forEach((input) => {
+        const value = (input.value || "").trim();
+        if (!value) {
+          sectionInvalid = true;
+          if (!firstInvalidInput) firstInvalidInput = input;
+        }
+      });
+      if (sectionInvalid) {
+        invalidSectionCount += 1;
+        section.classList.add("has-error");
+        section.open = true;
+      }
+    });
+    return { valid: invalidSectionCount === 0, firstInvalidInput };
+  }
+
+  function parseCodes(raw) {
+    return raw.replaceAll("，", ",").split(",").map((x) => x.trim()).filter(Boolean);
+  }
+
+  function removeEmptyRow() {
+    const body = document.getElementById("project-config-body");
+    const empty = body.querySelector("tr[data-empty-row='1']");
+    if (empty) empty.remove();
+  }
+
+  function appendRow(projectId, code, name, enabled) {
+    const body = document.getElementById("project-config-body");
+    const tr = document.createElement("tr");
+    if (projectId) tr.dataset.projectId = projectId;
+    tr.innerHTML = `
+      <td><input class="form-input row-project-code" value="${escapeHtml(code || "")}"></td>
+      <td><input class="form-input row-project-name" value="${escapeHtml(name || "")}" placeholder="注释（可空）"></td>
+      <td><input class="row-project-enabled" type="checkbox" ${enabled ? "checked" : ""}></td>
+      <td><button class="btn btn-secondary btn-remove-row" type="button">删除</button></td>
+    `;
+    body.appendChild(tr);
+  }
+
+  function bindRemoveButtons() {
+    document.querySelectorAll(".btn-remove-row").forEach((btn) => {
+      btn.onclick = function () {
+        const tr = btn.closest("tr");
+        tr.remove();
+        const body = document.getElementById("project-config-body");
+        if (!body.querySelector("tr")) {
+          const emptyRow = document.createElement("tr");
+          emptyRow.dataset.emptyRow = "1";
+          const emptyCell = document.createElement("td");
+          emptyCell.colSpan = 4;
+          emptyCell.style.color = "#6b7280";
+          emptyCell.textContent = "暂无工程配置，请先添加。";
+          emptyRow.appendChild(emptyCell);
+          body.appendChild(emptyRow);
+        }
+      };
+    });
+  }
+
+  const modal = document.getElementById("project-config-modal");
+  document.getElementById("btn-open-project-modal").addEventListener("click", () => {
+    modal.classList.remove("hidden");
+  });
+  document.getElementById("btn-close-project-modal").addEventListener("click", () => {
+    modal.classList.add("hidden");
+  });
+  modal.addEventListener("click", (event) => {
+    if (event.target.id === "project-config-modal") {
+      modal.classList.add("hidden");
+    }
+  });
+
+  document.getElementById("btn-add-project-row").addEventListener("click", () => {
+    const codesRaw = document.getElementById("new-project-codes").value;
+    const comment = document.getElementById("new-project-name").value;
+    const enabled = document.getElementById("new-project-enabled").checked;
+    const codes = parseCodes(codesRaw);
+    if (codes.length === 0) return;
+    removeEmptyRow();
+    codes.forEach((code) => appendRow("", code, comment, enabled));
+    bindRemoveButtons();
+    document.getElementById("new-project-codes").value = "";
+    document.getElementById("new-project-name").value = "";
+  });
+
+  document.getElementById("project-config-form").addEventListener("submit", (event) => {
+    const rows = [];
+    document.querySelectorAll("#project-config-body tr").forEach((tr) => {
+      if (tr.dataset.emptyRow === "1") return;
+      const code = tr.querySelector(".row-project-code")?.value?.trim() || "";
+      const name = tr.querySelector(".row-project-name")?.value?.trim() || "";
+      const enabled = !!tr.querySelector(".row-project-enabled")?.checked;
+      if (!code) return;
+      rows.push({
+        project_id: tr.dataset.projectId || "",
+        project_code: code,
+        project_name: name,
+        enabled: enabled,
+      });
+    });
+    if (rows.length === 0) {
+      event.preventDefault();
+      alert("请至少保留一条工程配置。");
+      return;
+    }
+    document.getElementById("projects-payload").value = JSON.stringify(rows);
+  });
+
+  bindRemoveButtons();
+
+  document.querySelectorAll(".btn-toggle-mask").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = document.getElementById(btn.dataset.targetId || "");
+      if (!target) return;
+      const isHidden = target.classList.contains("hidden");
+      if (isHidden) {
+        target.classList.remove("hidden");
+        btn.textContent = btn.dataset.collapseText || "隐藏掩码值";
+      } else {
+        target.classList.add("hidden");
+        btn.textContent = btn.dataset.expandText || "显示掩码值";
+      }
+    });
+  });
+
+  const gitConfigForm = document.querySelector("form input[name='action'][value='save_git_config']")?.closest("form");
+  if (gitConfigForm) {
+    gitConfigForm.addEventListener("submit", (event) => {
+      const result = validateGitConfigAccordions();
+      if (!result.valid) {
+        event.preventDefault();
+        alert("请先补全必填项（Git 地址、Group、工作目录）。已为你展开并高亮对应分区。");
+        if (result.firstInvalidInput) result.firstInvalidInput.focus();
+      }
+    });
+  }
+</script>
+{% endblock %}

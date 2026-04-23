@@ -1,0 +1,53 @@
+services:
+  web:
+    build:
+      context: ./myproject
+      dockerfile: Dockerfile
+    image: devops-platform-web:1.0.0
+    container_name: devops-web
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DJANGO_ENV: ${DJANGO_ENV:-production}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-127.0.0.1,localhost}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-devops_platform}
+      MYSQL_USER: ${MYSQL_USER:-devops}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+    ports:
+      - "${WEB_PORT:-8000}:8000"
+    volumes:
+      - web_logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1',8000)); s.close()\""]
+      interval: 20s
+      timeout: 5s
+      retries: 6
+
+  mysql:
+    image: mysql:8.4
+    container_name: devops-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-devops_platform}
+      MYSQL_USER: ${MYSQL_USER:-devops}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  mysql_data:
+  web_logs:
