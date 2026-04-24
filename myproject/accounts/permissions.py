@@ -33,6 +33,7 @@ ACTION_FIELD_MAP = {
     "sql_repo_sync": "action_sql_repo_sync",
     "sql_request_apply": "action_sql_request_apply",
     "sql_request_approve": "action_sql_request_approve",
+    "sql_request_auto_approve": "action_sql_request_auto_approve",
     "sql_request_edit_others": "action_sql_request_edit_others",
 }
 

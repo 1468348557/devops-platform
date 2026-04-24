@@ -180,6 +180,7 @@ def _build_role_policy_view_model(role: RoleDefinition, policy: RolePermissionPo
             "action_sql_repo_sync": policy.action_sql_repo_sync,
             "action_sql_request_apply": policy.action_sql_request_apply,
             "action_sql_request_approve": policy.action_sql_request_approve,
+            "action_sql_request_auto_approve": policy.action_sql_request_auto_approve,
             "action_sql_request_edit_others": policy.action_sql_request_edit_others,
         },
         "data_scope_fields": {
@@ -583,6 +584,11 @@ def admin_config(request):
             sql_db_name = request.POST.get("sql_db_name", "").strip()
             sql_db_user = request.POST.get("sql_db_user", "").strip()
             sql_db_password = request.POST.get("sql_db_password", "")
+            sql_keyword_ddl = request.POST.get("sql_keyword_ddl", "").strip()
+            sql_keyword_backup = request.POST.get("sql_keyword_backup", "").strip()
+            sql_keyword_execute = request.POST.get("sql_keyword_execute", "").strip()
+            sql_keyword_rollback = request.POST.get("sql_keyword_rollback", "").strip()
+            sql_auto_approve_order = request.POST.get("sql_auto_approve_order", "").strip()
             clear_git_password = request.POST.get("clear_git_password", "").strip() in {
                 "on",
                 "1",
@@ -625,6 +631,13 @@ def admin_config(request):
             git_config.sql_db_port = int(sql_db_port_raw or 3306)
             git_config.sql_db_name = sql_db_name
             git_config.sql_db_user = sql_db_user
+            git_config.sql_keyword_ddl = sql_keyword_ddl or "ddl"
+            git_config.sql_keyword_backup = sql_keyword_backup or "backup,bak,备份"
+            git_config.sql_keyword_execute = sql_keyword_execute or "execute,执行"
+            git_config.sql_keyword_rollback = sql_keyword_rollback or "rollback,回滚"
+            git_config.sql_auto_approve_order = (
+                sql_auto_approve_order or "backup,ddl,execute,rollback"
+            )
             git_config.updated_by = request.user
 
             if clear_git_password:

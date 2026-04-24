@@ -9,30 +9,234 @@
   .nav-bread { font-size: 13px; color: #6b7280; margin-bottom: 16px; }
   .nav-bread a { color: #1f75cb; text-decoration: none; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+  .filter-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    align-items: end;
+  }
+  .filter-grid .field {
+    min-width: 0;
+  }
+  .filter-grid .field.field-action {
+    align-self: end;
+  }
   .field { display: grid; gap: 4px; }
   .actions { margin: 10px 0 14px; display: flex; gap: 10px; flex-wrap: wrap; }
-  .table-wrap { overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
-  table { width: 100%; border-collapse: collapse; min-width: 1200px; font-size: 13px; }
+  .table-wrap {
+    overflow: auto;
+    max-height: 560px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+  }
+  table { width: 100%; border-collapse: collapse; min-width: 1160px; font-size: 13px; table-layout: fixed; }
   th, td { border-bottom: 1px solid #e5e7eb; padding: 8px 10px; text-align: left; vertical-align: top; }
-  th { background: #f8fafc; font-weight: 600; }
+  th { background: #f8fafc; font-weight: 600; position: sticky; top: 0; z-index: 1; }
   .status-pending { color: #1d4ed8; font-weight: 600; }
   .status-running { color: #b45309; font-weight: 600; }
   .status-success { color: #15803d; font-weight: 600; }
   .status-failed, .status-rejected { color: #b91c1c; font-weight: 600; }
   .muted { color: #6b7280; font-size: 12px; }
   .apply-box { margin: 18px 0; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fafafa; }
-  .sql-file-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 6px; max-height: 180px; overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px; background: #fff; }
-  .sql-selected-item { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .sql-file-grid { display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px; background: #fff; }
+  .sql-file-grid { max-height: 280px; overflow-y: auto; }
+  .sql-file-row { display: flex; align-items: center; gap: 8px; width: 100%; }
+  .sql-file-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sql-selected-item { display: block; margin-bottom: 4px; }
+  .sql-order-badge {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    align-items: center;
+    justify-content: center;
+    background: #e5e7eb;
+    color: #111827;
+    font-size: 11px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
   .sql-path-text {
     display: inline-block;
-    max-width: 420px;
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     vertical-align: middle;
   }
+  .sql-link {
+    border: 0;
+    background: transparent;
+    color: #1f75cb;
+    cursor: pointer;
+    padding: 0;
+    font-size: 12px;
+    font-family: inherit;
+  }
+  .sql-link:hover { text-decoration: underline; }
   .btn-text { border: 0; background: transparent; color: #1f75cb; cursor: pointer; padding: 0; font-size: 12px; }
   .btn-text:hover { text-decoration: underline; }
+  .col-id { width: 5%; }
+  .col-release-date { width: 8%; }
+  .col-selected-sql { width: 28%; }
+  .col-user { width: 7%; }
+  .col-created-at { width: 10%; }
+  .col-status { width: 6%; }
+  .col-progress { width: 8%; }
+  .col-result { width: 8%; }
+  .col-log { width: 10%; }
+  .col-actions { width: 10%; }
+  .td-wrap { word-break: break-word; }
+  .exec-result-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+  }
+  .exec-result-status { font-weight: 600; font-size: 12px; }
+  .sql-exec-result-modal {
+    width: min(1000px, 96vw);
+    max-height: 88vh;
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sql-exec-summary {
+    padding: 10px 12px;
+    background: #f1f5f9;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 13px;
+  }
+  .sql-exec-summary strong { color: #0f172a; }
+  .sql-exec-result-body {
+    display: flex;
+    min-height: 300px;
+    max-height: calc(88vh - 120px);
+  }
+  .sql-exec-file-list {
+    width: 232px;
+    min-width: 200px;
+    border-right: 1px solid #e5e7eb;
+    overflow: auto;
+    background: #f8fafc;
+    padding: 8px;
+  }
+  .sql-exec-file-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: 0;
+    background: transparent;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #1f2937;
+    line-height: 1.35;
+  }
+  .sql-exec-file-item:hover { background: #e2e8f0; }
+  .sql-exec-file-item.is-active { background: #1f75cb; color: #fff; }
+  .sql-exec-file-item .file-main { display: block; font-weight: 500; }
+  .sql-exec-file-item .file-sub { display: block; font-size: 11px; opacity: 0.88; margin-top: 3px; }
+  .sql-exec-file-item.is-active .file-sub { color: #e0f2fe; opacity: 1; }
+  .sql-exec-detail-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .sql-exec-detail {
+    flex: 1;
+    overflow: auto;
+    padding: 12px 14px 8px;
+    font-size: 12px;
+  }
+  .sql-exec-orphan {
+    margin-top: 8px;
+    padding: 10px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+    background: #fffbeb;
+    font-size: 12px;
+  }
+  .sql-exec-orphan h5 { margin: 0 0 6px; font-size: 12px; color: #92400e; }
+  .sql-exec-raw-log {
+    margin: 8px 0 0;
+    padding: 10px;
+    max-height: 200px;
+    overflow: auto;
+    white-space: pre-wrap;
+    font-size: 11px;
+    line-height: 1.5;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+  }
+  .sql-g-block { margin-bottom: 16px; }
+  .sql-g-banner {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: #4f46e5;
+    font-size: 11px;
+    margin: 0 0 10px;
+    word-break: break-all;
+  }
+  .sql-g-line {
+    display: flex;
+    gap: 6px;
+    margin: 3px 0;
+    padding-left: 2px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .sql-g-k { color: #0d9488; min-width: 4.5em; flex-shrink: 0; }
+  .sql-g-v { color: #0f172a; white-space: pre-wrap; word-break: break-word; flex: 1; }
+  .sql-g-v.is-error, .sql-g-line.is-error .sql-g-v { color: #b91c1c; }
+  .status-cell, .status-header { white-space: nowrap; }
+  .sql-file-toolbar {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: #6b7280;
+  }
+  .sql-file-toolbar-right {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sql-file-pager-btn {
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #fff;
+    padding: 4px 8px;
+    color: #1f2937;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .sql-file-pager-btn:disabled {
+    color: #9ca3af;
+    border-color: #e5e7eb;
+    cursor: not-allowed;
+    background: #f9fafb;
+  }
+  .action-cell { white-space: nowrap; }
+  .action-stack { display: inline-flex; flex-direction: column; gap: 6px; width: 100%; }
+  .btn-op {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 6px 10px;
+    background: #fff;
+    color: #1f2937;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1.2;
+  }
+  .btn-op:hover { background: #f8fafc; }
+  .btn-op.primary { background: #1f75cb; border-color: #1f75cb; color: #fff; }
+  .btn-op.primary:hover { background: #1862aa; }
+  .btn-op.warn { background: #b91c1c; border-color: #b91c1c; color: #fff; }
+  .btn-op.warn:hover { background: #991b1b; }
   .sql-preview-mask {
     position: fixed;
     inset: 0;
@@ -73,6 +277,125 @@
     background: #fff;
     min-height: 260px;
   }
+  .order-confirm-mask {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .order-confirm-modal {
+    width: min(720px, 96vw);
+    max-height: 88vh;
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .order-confirm-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 10px 12px;
+    background: #f8fafc;
+  }
+  .order-confirm-title { margin: 0; font-size: 14px; }
+  .order-confirm-body { padding: 12px; overflow: auto; }
+  .order-confirm-note { margin: 0 0 10px; font-size: 12px; color: #6b7280; }
+  .order-confirm-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .order-confirm-toolbar .form-input {
+    min-width: 260px;
+  }
+  .order-confirm-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .order-confirm-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    padding: 8px 10px;
+    cursor: grab;
+  }
+  .order-confirm-item.dragging {
+    opacity: 0.6;
+    border-color: #1f75cb;
+    background: #eff6ff;
+  }
+  .order-confirm-index {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    background: #e5e7eb;
+    color: #111827;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .order-confirm-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .order-confirm-remove {
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #fff;
+    color: #b91c1c;
+    font-size: 12px;
+    padding: 4px 8px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .order-confirm-remove:hover { background: #fef2f2; border-color: #fca5a5; }
+  .order-confirm-add {
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #fff;
+    color: #1f75cb;
+    font-size: 12px;
+    padding: 4px 8px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .order-confirm-add:hover { background: #eff6ff; border-color: #93c5fd; }
+  .order-confirm-move {
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #fff;
+    color: #374151;
+    font-size: 12px;
+    padding: 4px 8px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .order-confirm-move:hover { background: #f8fafc; border-color: #94a3b8; }
+  .order-confirm-footer {
+    border-top: 1px solid #e5e7eb;
+    padding: 10px 12px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    background: #fff;
+  }
   .home-icon-link {
     position: absolute;
     top: 14px;
@@ -92,8 +415,6 @@
   .home-icon-link svg { width: 18px; height: 18px; display: block; }
 </style>
 
-<div class="nav-bread"><a href="{% url 'dashboard' %}">工作台</a> / SQL执行申请</div>
-
 <section class="card">
   <a class="home-icon-link" href="{% url 'dashboard' %}" title="返回主界面" aria-label="返回主界面">
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -102,19 +423,19 @@
       <path d="M10 21v-6h4v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
     </svg>
   </a>
-  <h1 class="card-title">SQL执行申请（MySQL）</h1>
-  <p class="card-subtitle">执行顺序：备份 -> DDL -> 执行 -> 回滚 -> DDL -> 执行（某阶段无文件自动跳过；任一 SQL 报错即失败）。</p>
+  <h1 class="card-title">SQL执行申请</h1>
+  <p class="card-subtitle">执行顺序：审批通过后按申请人确认的文件顺序逐个执行（默认按文件名排序；任一 SQL 报错即失败）。</p>
 
   {% include "components/messages.html" %}
 
-  <form method="get" class="grid">
+  <form method="get" class="grid filter-grid">
     <label class="field">开始日期
       <input class="form-input" type="date" name="start_date" value="{{ filters.start_date }}">
     </label>
     <label class="field">结束日期
       <input class="form-input" type="date" name="end_date" value="{{ filters.end_date }}">
     </label>
-    <label class="field">申请日期（投产征集）
+    <label class="field">投产日期
       <select class="form-input" name="release_date">
         <option value="">全部</option>
         {% for d in release_date_options %}
@@ -122,12 +443,14 @@
         {% endfor %}
       </select>
     </label>
-    <label class="field">状态
+    <label class="field">状态(按照执行状态筛选)
       <select class="form-input" name="status">
         <option value="">全部</option>
-        <option value="pending" {% if filters.status == "pending" %}selected{% endif %}>未审批</option>
+        <option value="pending" {% if filters.status == "pending" %}selected{% endif %}>待审批</option>
+        <option value="running" {% if filters.status == "running" %}selected{% endif %}>审批中</option>
         <option value="success" {% if filters.status == "success" %}selected{% endif %}>执行成功</option>
         <option value="failed" {% if filters.status == "failed" %}selected{% endif %}>执行失败</option>
+        <option value="rejected" {% if filters.status == "rejected" %}selected{% endif %}>审批拒绝</option>
       </select>
     </label>
     <label class="field">申请人
@@ -136,7 +459,7 @@
     <label class="field">目录名称
       <input class="form-input" name="folder" value="{{ filters.folder }}" placeholder="目录名称模糊匹配">
     </label>
-    <label class="field">操作
+    <label class="field field-action">操作
       <button class="btn btn-primary" type="submit">筛选</button>
     </label>
   </form>
@@ -145,14 +468,20 @@
     {% if can_approve %}
       <button id="btn-sync-repo" class="btn btn-secondary" type="button">同步最新仓库</button>
     {% endif %}
-    <span id="tip" class="muted">默认展示前后30天申请记录；仓库每10分钟自动同步一次，也可手动同步</span>
+    <span id="tip" class="muted">默认展示前后30天申请记录；仓库每10分钟自动同步一次</span>
   </div>
 
   {% if can_apply %}
   <div class="apply-box">
     <h3 style="margin:0 0 8px;">发起 SQL 执行申请</h3>
+    <p class="muted" style="margin:0 0 8px;">
+      机器审批规则：文件名需匹配管理员配置的 DDL/备份/执行/回滚关键字，脚本需为 UTF-8 编码；
+      若已配置数据库名，首行需为 <code>use &lt;后台配置数据库名&gt;;</code>；
+      每个文件只能命中一种脚本类型，执行与回滚脚本必须至少各有 1 个，DDL/备份可选；
+      DDL 脚本包含建表语句时需使用 <code>create table if not exists</code>，回滚脚本包含删表语句时需使用 <code>drop table if exists</code>。
+    </p>
     <div class="grid">
-      <label class="field">申请日期（投产征集日期）
+      <label class="field">投产日期
         <select id="apply-release-date" class="form-input">
           <option value="">请选择</option>
           {% for d in release_date_options %}
@@ -163,11 +492,23 @@
       <label class="field">SQL 目录
         <select id="apply-folder" class="form-input"></select>
       </label>
-      <label class="field">动作
-        <button id="btn-load-folder" class="btn btn-secondary" type="button">加载目录 SQL</button>
-      </label>
     </div>
     <div id="sql-file-list" class="sql-file-grid" style="margin-top:8px;"></div>
+    <div class="sql-file-toolbar">
+      <span id="sql-file-page-info">共 0 条</span>
+      <div class="sql-file-toolbar-right">
+        <label>
+          每页
+          <select id="sql-file-page-size" class="form-input" style="width:90px; display:inline-block;">
+            <option value="20" selected>20 条</option>
+            <option value="30">30 条</option>
+            <option value="50">50 条</option>
+          </select>
+        </label>
+        <button id="sql-file-prev-page" class="sql-file-pager-btn" type="button">上一页</button>
+        <button id="sql-file-next-page" class="sql-file-pager-btn" type="button">下一页</button>
+      </div>
+    </div>
     <div class="actions">
       <button id="btn-create-request" class="btn btn-primary" type="button">提交执行申请</button>
     </div>
@@ -176,15 +517,26 @@
 
   <div class="table-wrap">
     <table>
+      <colgroup>
+        <col class="col-id">
+        <col class="col-release-date">
+        <col class="col-selected-sql">
+        <col class="col-user">
+        <col class="col-created-at">
+        <col class="col-status">
+        <col class="col-progress">
+        <col class="col-result">
+        <col class="col-log">
+        <col class="col-actions">
+      </colgroup>
       <thead>
         <tr>
           <th>ID</th>
           <th>申请日期</th>
-          <th>目录</th>
           <th>勾选SQL</th>
           <th>申请人</th>
           <th>申请时间</th>
-          <th>状态</th>
+          <th class="status-header">状态</th>
           <th>进度</th>
           <th>执行结果</th>
           <th>执行日志</th>
@@ -196,17 +548,17 @@
         <tr data-sql-id="{{ row.id }}" data-sql-status="{{ row.status }}">
           <td>{{ row.id }}</td>
           <td>{{ row.release_date }}</td>
-          <td><code>{{ row.folder_path }}</code></td>
-          <td>
-            {% for sql_name in row.selected_files %}
+          <td class="td-wrap">
+            {% for item in row.selected_file_items %}
               <div class="sql-selected-item">
-                <code class="sql-path-text" title="{{ sql_name }}">{{ sql_name }}</code>
+                <span class="sql-order-badge">{{ forloop.counter }}</span>
                 <button
                   type="button"
-                  class="btn-text btn-view-sql-file"
+                  class="sql-link sql-path-text btn-open-request-sql"
+                  title="{{ item.display }}"
                   data-request-id="{{ row.id }}"
-                  data-file-path="{{ sql_name }}"
-                >查看</button>
+                  data-file-path="{{ item.raw }}"
+                ><code>{{ item.display }}</code></button>
               </div>
             {% empty %}
               <span class="muted">-</span>
@@ -214,21 +566,42 @@
           </td>
           <td>{{ row.requested_by }}</td>
           <td>{{ row.created_at }}</td>
-          <td class="status-{{ row.status }}">{{ row.status_label }}</td>
+          <td class="status-{{ row.status }} status-cell">{{ row.status_label }}</td>
           <td class="muted">{{ row.execution_tip|default:"-" }}</td>
-          <td>{{ row.execution_result|default:"-" }}</td>
-          <td><pre class="muted" style="white-space: pre-wrap; max-height:120px; overflow:auto;">{{ row.execution_log|default:"-" }}</pre></td>
-          <td>
-            {% if can_approve and row.status == "pending" %}
-              <button class="btn btn-primary btn-approve" data-id="{{ row.id }}" type="button">审批并执行</button>
-              <button class="btn btn-secondary btn-reject" data-id="{{ row.id }}" type="button">拒绝</button>
+          <td class="td-wrap">
+            <div class="exec-result-cell">
+              <span class="exec-result-status status-{{ row.status }}">{{ row.status_label }}</span>
+              <button
+                type="button"
+                class="btn-text btn-open-exec-result"
+                data-request-id="{{ row.id }}"
+              >分文件详情</button>
+            </div>
+          </td>
+          <td class="td-wrap">
+            <button
+              type="button"
+              class="btn-text btn-open-exec-log"
+              data-request-id="{{ row.id }}"
+            >查看</button>
+          </td>
+          <td class="action-cell">
+            {% if row.status == "pending" and can_approve %}
+              <div class="action-stack">
+                <button class="btn-op primary btn-approve" data-id="{{ row.id }}" type="button">审批并执行</button>
+                <button class="btn-op btn-reject" data-id="{{ row.id }}" type="button">拒绝</button>
+              </div>
+            {% elif can_apply and row.status == "pending" and row.requested_by_id == current_user_id %}
+              <div class="action-stack">
+                <button class="btn-op warn btn-withdraw" data-id="{{ row.id }}" type="button">撤回申请</button>
+              </div>
             {% else %}
               <span class="muted">-</span>
             {% endif %}
           </td>
         </tr>
       {% empty %}
-        <tr><td colspan="11" class="muted">暂无申请记录</td></tr>
+        <tr><td colspan="10" class="muted">暂无申请记录</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -251,6 +624,47 @@
   </div>
 </div>
 
+<div id="sql-exec-result-mask" class="sql-preview-mask" role="dialog" aria-modal="true" aria-label="SQL分文件执行结果">
+  <div class="sql-exec-result-modal">
+    <div class="sql-preview-header">
+      <h4 id="sql-exec-result-title" class="sql-preview-title">SQL 分文件执行结果</h4>
+      <button id="btn-close-sql-exec-result" type="button" class="btn btn-secondary">关闭</button>
+    </div>
+    <div id="sql-exec-summary" class="sql-exec-summary">加载中…</div>
+    <div class="sql-exec-result-body">
+      <aside id="sql-exec-file-list" class="sql-exec-file-list" aria-label="按文件切换"></aside>
+      <div class="sql-exec-detail-wrap">
+        <div id="sql-exec-detail" class="sql-exec-detail"></div>
+        <div id="sql-exec-orphan" class="sql-exec-orphan" style="display:none;">
+          <h5>未归类日志</h5>
+          <pre id="sql-exec-orphan-content" class="sql-exec-raw-log" style="max-height:140px; margin:0;"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="order-confirm-mask" class="order-confirm-mask" role="dialog" aria-modal="true" aria-label="确认SQL执行顺序">
+  <div class="order-confirm-modal">
+    <div class="order-confirm-header">
+      <h4 class="order-confirm-title">确认 SQL 执行顺序</h4>
+      <button id="btn-close-order-confirm" type="button" class="btn btn-secondary">关闭</button>
+    </div>
+    <div class="order-confirm-body">
+      <p class="order-confirm-note">已按文件名排序，可拖动列表调整最终执行顺序。</p>
+      <div class="order-confirm-toolbar">
+        <select id="order-confirm-add-select" class="form-input"></select>
+        <button id="order-confirm-add-btn" type="button" class="btn btn-secondary">添加到顺序</button>
+      </div>
+      <ul id="order-confirm-list" class="order-confirm-list"></ul>
+    </div>
+    <div class="order-confirm-footer">
+      <button id="btn-cancel-order-confirm" type="button" class="btn btn-secondary">取消</button>
+      <button id="btn-submit-order-confirm" type="button" class="btn btn-primary">确认并提交</button>
+    </div>
+  </div>
+</div>
+
 <script>
   const tipEl = document.getElementById("tip");
   const applyReleaseDateEl = document.getElementById("apply-release-date");
@@ -262,6 +676,70 @@
   const sqlPreviewMaskEl = document.getElementById("sql-preview-mask");
   const sqlPreviewTitleEl = document.getElementById("sql-preview-title");
   const sqlPreviewContentEl = document.getElementById("sql-preview-content");
+  const sqlExecResultMaskEl = document.getElementById("sql-exec-result-mask");
+  const sqlExecResultTitleEl = document.getElementById("sql-exec-result-title");
+  const sqlExecSummaryEl = document.getElementById("sql-exec-summary");
+  const sqlExecFileListEl = document.getElementById("sql-exec-file-list");
+  const sqlExecDetailEl = document.getElementById("sql-exec-detail");
+  const sqlExecOrphanEl = document.getElementById("sql-exec-orphan");
+  const sqlExecOrphanContentEl = document.getElementById("sql-exec-orphan-content");
+  const orderConfirmMaskEl = document.getElementById("order-confirm-mask");
+  const sqlExecState = { files: [], requestId: "", activeIdx: 0 };
+  const orderConfirmListEl = document.getElementById("order-confirm-list");
+  const submitOrderConfirmBtn = document.getElementById("btn-submit-order-confirm");
+  const orderConfirmAddSelectEl = document.getElementById("order-confirm-add-select");
+  const orderConfirmAddBtn = document.getElementById("order-confirm-add-btn");
+  const sqlFilePageSizeEl = document.getElementById("sql-file-page-size");
+  const sqlFilePageInfoEl = document.getElementById("sql-file-page-info");
+  const sqlFilePrevPageBtn = document.getElementById("sql-file-prev-page");
+  const sqlFileNextPageBtn = document.getElementById("sql-file-next-page");
+  const filterReleaseDateEl = document.querySelector("form.grid select[name='release_date']");
+  let pendingSubmitPayload = null;
+  let dragItemEl = null;
+  const sqlFileState = {
+    allFiles: [],
+    checkedFiles: new Set(),
+    page: 1,
+    pageSize: 20,
+  };
+  function renderSqlFilePage() {
+    if (!fileListEl) return;
+    const total = sqlFileState.allFiles.length;
+    const pageSize = sqlFileState.pageSize;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (sqlFileState.page > totalPages) sqlFileState.page = totalPages;
+    if (sqlFileState.page < 1) sqlFileState.page = 1;
+    const startIdx = (sqlFileState.page - 1) * pageSize;
+    const endIdx = Math.min(total, startIdx + pageSize);
+    const currentFiles = sqlFileState.allFiles.slice(startIdx, endIdx);
+
+    fileListEl.innerHTML = "";
+    currentFiles.forEach((name) => {
+      const row = document.createElement("div");
+      row.className = "sql-file-row";
+      const isChecked = sqlFileState.checkedFiles.has(name);
+      row.innerHTML = `
+        <label class="sql-file-row" style="flex:1;">
+          <input type="checkbox" class="sql-file-item" value="${name}" ${isChecked ? "checked" : ""}>
+          <button type="button" class="sql-link sql-file-name sql-file-name-link" data-file-name="${name}">
+            <code>${name}</code>
+          </button>
+        </label>
+      `;
+      fileListEl.appendChild(row);
+    });
+
+    if (total === 0) {
+      fileListEl.innerHTML = "<span class='muted'>目录下暂无 .sql 文件</span>";
+    }
+
+    if (sqlFilePageInfoEl) {
+      sqlFilePageInfoEl.textContent = `共 ${total} 条，当前第 ${sqlFileState.page}/${totalPages} 页`;
+    }
+    if (sqlFilePrevPageBtn) sqlFilePrevPageBtn.disabled = sqlFileState.page <= 1;
+    if (sqlFileNextPageBtn) sqlFileNextPageBtn.disabled = sqlFileState.page >= totalPages;
+  }
+
 
   function showProgressPanel() {
     const panel = document.getElementById("exec-progress-panel");
@@ -333,6 +811,10 @@
       opt.value = "";
       opt.textContent = "请先选择申请日期";
       folderSelect.appendChild(opt);
+      sqlFileState.allFiles = [];
+      sqlFileState.checkedFiles = new Set();
+      sqlFileState.page = 1;
+      renderSqlFilePage();
       if (fileListEl) fileListEl.innerHTML = "<span class='muted'>请先选择申请日期</span>";
       return;
     }
@@ -348,19 +830,21 @@
       opt.value = "";
       opt.textContent = "当前申请日期无可用目录";
       folderSelect.appendChild(opt);
+      sqlFileState.allFiles = [];
+      sqlFileState.checkedFiles = new Set();
+      sqlFileState.page = 1;
+      renderSqlFilePage();
       if (fileListEl) fileListEl.innerHTML = "<span class='muted'>当前申请日期无可用目录</span>";
       return;
     }
-    const emptyOpt = document.createElement("option");
-    emptyOpt.value = "";
-    emptyOpt.textContent = "请选择目录";
-    folderSelect.appendChild(emptyOpt);
     folders.forEach((folder) => {
       const opt = document.createElement("option");
       opt.value = folder;
       opt.textContent = folder;
       folderSelect.appendChild(opt);
     });
+    folderSelect.value = folders[0] || "";
+    await loadFiles();
   }
 
   async function loadFiles() {
@@ -373,16 +857,133 @@
     const resp = await fetch(`/sql-execute/api/repo/files/?folder=${encodeURIComponent(folder)}`);
     const data = await resp.json();
     if (!resp.ok || !data.success) throw data;
-    fileListEl.innerHTML = "";
-    (data.files || []).forEach((name) => {
-      const label = document.createElement("label");
-      label.style.display = "flex";
-      label.style.gap = "6px";
-      label.innerHTML = `<input type="checkbox" class="sql-file-item" value="${name}" checked><code>${name}</code>`;
-      fileListEl.appendChild(label);
+    sqlFileState.allFiles = data.files || [];
+    sqlFileState.checkedFiles = new Set(sqlFileState.allFiles);
+    sqlFileState.page = 1;
+    renderSqlFilePage();
+  }
+
+  function escapeHtml(str) {
+    return String(str ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function closeSqlExecResult() {
+    if (sqlExecResultMaskEl) sqlExecResultMaskEl.style.display = "none";
+  }
+
+  function openSqlExecResult() {
+    if (sqlExecResultMaskEl) sqlExecResultMaskEl.style.display = "flex";
+  }
+
+  function renderGStyleDetail(entry) {
+    const title = entry.file_name
+      ? `${entry.phase || ""} / ${entry.file_name}`.trim()
+      : `${entry.phase || "段落"} · ${entry.outcome_label || ""}`.trim();
+    const star = "***************************";
+    const banner = `${star} ${title} ${star}`;
+    const fields = entry.g_fields || [];
+    const lineHtml = fields
+      .map((f) => {
+        const raw = f.value != null ? String(f.value) : "";
+        const isErr =
+          f.key === "log" && /(\[ERROR\])|回滚前阶段失败|回滚失败|WORKER_ERROR/i.test(raw);
+        const k = escapeHtml(f.label);
+        const v = escapeHtml(raw);
+        return `<div class="sql-g-line${
+          isErr ? " is-error" : ""
+        }"><span class="sql-g-k">${k}:</span><span class="sql-g-v${isErr ? " is-error" : ""}">${v}</span></div>`;
+      })
+      .join("");
+    return `<div class="sql-g-block"><div class="sql-g-banner">${escapeHtml(banner)}</div>${lineHtml}</div>`;
+  }
+
+  function renderSqlExecActiveDetail() {
+    if (!sqlExecDetailEl) return;
+    const entry = sqlExecState.files[sqlExecState.activeIdx];
+    if (!entry) {
+      sqlExecDetailEl.innerHTML =
+        '<p class="muted" style="margin:0">暂无分文件解析结果。</p>';
+      return;
+    }
+    sqlExecDetailEl.innerHTML = renderGStyleDetail(entry);
+  }
+
+  function renderSqlExecFileList() {
+    if (!sqlExecFileListEl) return;
+    sqlExecFileListEl.innerHTML = "";
+    const files = sqlExecState.files || [];
+    if (files.length === 0) {
+      const p = document.createElement("p");
+      p.className = "muted";
+      p.style.padding = "8px";
+      p.textContent = "无分文件条目";
+      sqlExecFileListEl.appendChild(p);
+      return;
+    }
+    files.forEach((f, idx) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "sql-exec-file-item" + (idx === sqlExecState.activeIdx ? " is-active" : "");
+      btn.dataset.idx = String(idx);
+      const main = f.file_name ? `${f.phase || ""} · ${f.file_name}` : `${f.phase || "—"}`;
+      const sub = f.outcome_label || (f.log ? String(f.log).slice(0, 48) : "");
+      btn.innerHTML = `<span class="file-main">${escapeHtml(main)}</span><span class="file-sub">${escapeHtml(
+        sub
+      )}</span>`;
+      sqlExecFileListEl.appendChild(btn);
     });
-    if ((data.files || []).length === 0) {
-      fileListEl.innerHTML = "<span class='muted'>目录下暂无 .sql 文件</span>";
+  }
+
+  function setSqlExecActiveIdx(idx) {
+    const n = sqlExecState.files.length;
+    if (n === 0) return;
+    sqlExecState.activeIdx = Math.max(0, Math.min(idx, n - 1));
+    renderSqlExecFileList();
+    renderSqlExecActiveDetail();
+  }
+
+  async function loadSqlExecResult(requestId) {
+    if (!requestId) return;
+    sqlExecState.requestId = requestId;
+    sqlExecState.files = [];
+    sqlExecState.activeIdx = 0;
+    if (sqlExecResultTitleEl) sqlExecResultTitleEl.textContent = `SQL 分文件执行结果 #${requestId}`;
+    if (sqlExecSummaryEl) sqlExecSummaryEl.innerHTML = "<strong>整体状态</strong>：加载中…";
+    if (sqlExecDetailEl) sqlExecDetailEl.innerHTML = "";
+    if (sqlExecFileListEl) sqlExecFileListEl.innerHTML = "";
+    if (sqlExecOrphanEl) sqlExecOrphanEl.style.display = "none";
+    openSqlExecResult();
+    try {
+      const resp = await fetch(`/sql-execute/api/request/progress/?request_id=${encodeURIComponent(requestId)}`);
+      const data = await resp.json();
+      if (!resp.ok || !data.success) throw data;
+      const req = data.request || {};
+      const parsed = data.execution_parsed || {};
+      const summary = parsed.summary || {};
+      if (sqlExecSummaryEl) {
+        sqlExecSummaryEl.innerHTML = `<strong>整体状态</strong>：${escapeHtml(
+          summary.overall || req.status_label || "—"
+        )}`;
+      }
+      sqlExecState.files = parsed.files || [];
+      if (sqlExecState.files.length > 0) sqlExecState.activeIdx = 0;
+      if (sqlExecOrphanContentEl) sqlExecOrphanContentEl.textContent = parsed.orphan_log || "";
+      if (sqlExecOrphanEl) {
+        sqlExecOrphanEl.style.display = parsed.orphan_log && String(parsed.orphan_log).trim() ? "block" : "none";
+      }
+      renderSqlExecFileList();
+      renderSqlExecActiveDetail();
+    } catch (e) {
+      if (sqlExecSummaryEl) {
+        sqlExecSummaryEl.innerHTML = `<strong>整体状态</strong>：加载失败（${escapeHtml(
+          e.error || "未知错误"
+        )}）`;
+      }
+      if (sqlExecDetailEl) sqlExecDetailEl.innerHTML = "";
     }
   }
 
@@ -394,14 +995,217 @@
     if (sqlPreviewMaskEl) sqlPreviewMaskEl.style.display = "flex";
   }
 
-  document.getElementById("btn-load-folder")?.addEventListener("click", async () => {
-    try {
-      await loadFiles();
-      tipEl.textContent = "SQL 文件加载完成";
-    } catch (e) {
-      tipEl.textContent = `加载失败：${e.error || "未知错误"}`;
+  function showErrorPopup(title, message) {
+    const finalTitle = title || "操作失败";
+    const finalMessage = message || "未知错误";
+    if (sqlPreviewTitleEl) {
+      sqlPreviewTitleEl.textContent = finalTitle;
     }
-  });
+    if (sqlPreviewContentEl) {
+      sqlPreviewContentEl.textContent = finalMessage;
+    }
+    openSqlPreview();
+  }
+
+  function withSyncHint(message) {
+    const base = message || "未知错误";
+    const hint = "整改好之后请点击同步最新仓库";
+    return `${base}\n\n${hint}`;
+  }
+
+  function closeOrderConfirm() {
+    if (orderConfirmMaskEl) orderConfirmMaskEl.style.display = "none";
+    pendingSubmitPayload = null;
+    dragItemEl = null;
+  }
+
+  function openOrderConfirm() {
+    if (orderConfirmMaskEl) orderConfirmMaskEl.style.display = "flex";
+  }
+
+  function renderOrderConfirmAddOptions(files) {
+    if (!orderConfirmAddSelectEl) return;
+    orderConfirmAddSelectEl.innerHTML = "";
+    const normalizedFiles = (files || []).map((name) => String(name || "").trim()).filter(Boolean);
+    if (normalizedFiles.length === 0) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "暂无可添加脚本";
+      orderConfirmAddSelectEl.appendChild(opt);
+      return;
+    }
+    normalizedFiles.forEach((name) => {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      orderConfirmAddSelectEl.appendChild(opt);
+    });
+  }
+
+  function renderOrderConfirmList(files) {
+    if (!orderConfirmListEl) return;
+    orderConfirmListEl.innerHTML = "";
+    files.forEach((name, idx) => {
+      const key = String(name || "").trim();
+      if (!key) return;
+      const li = document.createElement("li");
+      li.className = "order-confirm-item";
+      li.draggable = true;
+      li.dataset.fileName = key;
+      li.innerHTML = `
+        <span class="order-confirm-index">${idx + 1}</span>
+        <code class="order-confirm-name">${key}</code>
+        <button type="button" class="order-confirm-move order-confirm-up">上移</button>
+        <button type="button" class="order-confirm-move order-confirm-down">下移</button>
+        <button type="button" class="order-confirm-add" data-file-name="${key}">添加</button>
+        <button type="button" class="order-confirm-remove" data-file-name="${name}">删除</button>
+      `;
+      orderConfirmListEl.appendChild(li);
+    });
+    bindOrderListDragEvents();
+  }
+
+  function refreshOrderConfirmIndexes() {
+    if (!orderConfirmListEl) return;
+    Array.from(orderConfirmListEl.children).forEach((item, idx) => {
+      const badge = item.querySelector(".order-confirm-index");
+      if (badge) badge.textContent = String(idx + 1);
+    });
+  }
+
+  function bindOrderListDragEvents() {
+    if (!orderConfirmListEl) return;
+    const items = orderConfirmListEl.querySelectorAll(".order-confirm-item");
+    items.forEach((item) => {
+      item.addEventListener("dragstart", () => {
+        dragItemEl = item;
+        item.classList.add("dragging");
+      });
+      item.addEventListener("dragend", () => {
+        item.classList.remove("dragging");
+        dragItemEl = null;
+        refreshOrderConfirmIndexes();
+      });
+      item.addEventListener("dragover", (evt) => {
+        evt.preventDefault();
+      });
+      item.addEventListener("drop", (evt) => {
+        evt.preventDefault();
+        if (!dragItemEl || dragItemEl === item) return;
+        const allItems = Array.from(orderConfirmListEl.querySelectorAll(".order-confirm-item"));
+        const dragIndex = allItems.indexOf(dragItemEl);
+        const dropIndex = allItems.indexOf(item);
+        if (dragIndex < 0 || dropIndex < 0) return;
+        if (dragIndex < dropIndex) {
+          orderConfirmListEl.insertBefore(dragItemEl, item.nextSibling);
+        } else {
+          orderConfirmListEl.insertBefore(dragItemEl, item);
+        }
+        refreshOrderConfirmIndexes();
+      });
+      const removeBtn = item.querySelector(".order-confirm-remove");
+      removeBtn?.addEventListener("click", (evt) => {
+        evt.preventDefault();
+        evt.stopPropagation();
+        item.remove();
+        refreshOrderConfirmIndexes();
+      });
+      const addBtn = item.querySelector(".order-confirm-add");
+      addBtn?.addEventListener("click", (evt) => {
+        evt.preventDefault();
+        evt.stopPropagation();
+        const fileName = item.dataset.fileName || "";
+        if (!fileName) return;
+        const newItem = document.createElement("li");
+        newItem.className = "order-confirm-item";
+        newItem.draggable = true;
+        newItem.dataset.fileName = fileName;
+        newItem.innerHTML = `
+          <span class="order-confirm-index">0</span>
+          <code class="order-confirm-name">${fileName}</code>
+          <button type="button" class="order-confirm-move order-confirm-up">上移</button>
+          <button type="button" class="order-confirm-move order-confirm-down">下移</button>
+          <button type="button" class="order-confirm-add" data-file-name="${fileName}">添加</button>
+          <button type="button" class="order-confirm-remove" data-file-name="${fileName}">删除</button>
+        `;
+        orderConfirmListEl.insertBefore(newItem, item.nextSibling);
+        refreshOrderConfirmIndexes();
+        bindOrderListDragEvents();
+      });
+      const upBtn = item.querySelector(".order-confirm-up");
+      upBtn?.addEventListener("click", (evt) => {
+        evt.preventDefault();
+        evt.stopPropagation();
+        const prev = item.previousElementSibling;
+        if (!prev) return;
+        orderConfirmListEl.insertBefore(item, prev);
+        refreshOrderConfirmIndexes();
+      });
+      const downBtn = item.querySelector(".order-confirm-down");
+      downBtn?.addEventListener("click", (evt) => {
+        evt.preventDefault();
+        evt.stopPropagation();
+        const next = item.nextElementSibling;
+        if (!next) return;
+        orderConfirmListEl.insertBefore(next, item);
+        refreshOrderConfirmIndexes();
+      });
+    });
+  }
+
+  function collectOrderedFilesFromConfirmList() {
+    if (!orderConfirmListEl) return [];
+    return Array.from(orderConfirmListEl.querySelectorAll(".order-confirm-item"))
+      .map((item) => item.dataset.fileName || "")
+      .map((name) => String(name || "").trim())
+      .filter(Boolean);
+  }
+
+  function hasExecuteFile(files) {
+    return files.some((name) => {
+      const lower = String(name || "").toLowerCase();
+      return lower.includes("execute") || String(name || "").includes("执行");
+    });
+  }
+
+  function getFilePhaseOrder(name) {
+    const lower = String(name || "").toLowerCase();
+    if (lower.includes("rollback") || lower.includes("回滚")) return 3;
+    if (lower.includes("ddl")) return 0;
+    if (lower.includes("backup") || lower.includes("bak") || lower.includes("备份")) return 1;
+    return 2;
+  }
+
+  function buildDefaultOrderedFiles(selectedFiles) {
+    const sorted = [...selectedFiles].sort((a, b) => a.localeCompare(b, "zh-Hans-CN"));
+    const ddlFiles = sorted.filter((name) => getFilePhaseOrder(name) === 0);
+    const backupFiles = sorted.filter((name) => getFilePhaseOrder(name) === 1);
+    const executeFiles = sorted.filter((name) => getFilePhaseOrder(name) === 2);
+    const rollbackFiles = sorted.filter((name) => getFilePhaseOrder(name) === 3);
+
+    const hasAllFourTypes =
+      backupFiles.length > 0 &&
+      ddlFiles.length > 0 &&
+      executeFiles.length > 0 &&
+      rollbackFiles.length > 0;
+
+    if (hasAllFourTypes) {
+      return [
+        ...backupFiles,
+        ...ddlFiles,
+        ...executeFiles,
+        ...rollbackFiles,
+        ...executeFiles,
+      ];
+    }
+
+    return [
+      ...ddlFiles,
+      ...executeFiles,
+      ...rollbackFiles,
+      ...executeFiles,
+    ];
+  }
 
   document.getElementById("btn-create-request")?.addEventListener("click", async () => {
     try {
@@ -409,14 +1213,55 @@
       const folder = folderSelect.value;
       if (!releaseDate) throw { error: "请选择申请日期" };
       if (!folder) throw { error: "请选择目录" };
+      const selectedFiles = Array.from(sqlFileState.checkedFiles);
+      if (selectedFiles.length === 0) throw { error: "请至少勾选一个 SQL 文件" };
+      const defaultOrderedFiles = buildDefaultOrderedFiles(selectedFiles);
+      pendingSubmitPayload = {
+        releaseDate,
+        folder,
+        selectedFiles,
+      };
+      renderOrderConfirmList(defaultOrderedFiles);
+      renderOrderConfirmAddOptions(selectedFiles);
+      openOrderConfirm();
+    } catch (e) {
+      const reason = e.error || "未知错误";
+      const reasonWithHint = withSyncHint(reason);
+      tipEl.textContent = `提交失败：${reasonWithHint}`;
+      showErrorPopup("SQL 机器审批失败", reasonWithHint);
+    }
+  });
+
+  submitOrderConfirmBtn?.addEventListener("click", async () => {
+    if (!pendingSubmitPayload) return;
+    const orderedFiles = collectOrderedFilesFromConfirmList();
+    if (orderedFiles.length === 0) {
+      tipEl.textContent = "提交失败：请至少保留一个 SQL 文件";
+      return;
+    }
+    if (!hasExecuteFile(orderedFiles)) {
+      const reason = "提交失败：请至少保留一个执行脚本（文件名需包含 execute 或 执行）";
+      tipEl.textContent = reason;
+      showErrorPopup("SQL 提交失败", reason);
+      return;
+    }
+    try {
+      submitOrderConfirmBtn.disabled = true;
       await postForm("/sql-execute/api/request/create/", {
-        release_date: releaseDate,
-        folder: folder,
+        release_date: pendingSubmitPayload.releaseDate,
+        folder: pendingSubmitPayload.folder,
+        selected_files: JSON.stringify(orderedFiles),
       });
+      closeOrderConfirm();
       tipEl.textContent = "提交成功，刷新页面查看最新状态";
       window.location.reload();
     } catch (e) {
-      tipEl.textContent = `提交失败：${e.error || "未知错误"}`;
+      const reason = e.error || "未知错误";
+      const reasonWithHint = withSyncHint(reason);
+      tipEl.textContent = `提交失败：${reasonWithHint}`;
+      showErrorPopup("SQL 提交失败", reasonWithHint);
+    } finally {
+      submitOrderConfirmBtn.disabled = false;
     }
   });
 
@@ -460,9 +1305,93 @@
   applyReleaseDateEl?.addEventListener("change", async () => {
     try {
       await loadFolders();
-      if (tipEl) tipEl.textContent = "目录已按申请日期刷新";
+      const selectedReleaseDate = applyReleaseDateEl?.value || "";
+      if (filterReleaseDateEl) {
+        filterReleaseDateEl.value = selectedReleaseDate;
+      }
+      const targetUrl = new URL(window.location.href);
+      if (selectedReleaseDate) {
+        targetUrl.searchParams.set("release_date", selectedReleaseDate);
+      } else {
+        targetUrl.searchParams.delete("release_date");
+      }
+      if (targetUrl.toString() !== window.location.href) {
+        window.location.href = targetUrl.toString();
+        return;
+      }
+      if (tipEl) tipEl.textContent = "目录及 SQL 文件已按投产日期刷新";
     } catch (e) {
       if (tipEl) tipEl.textContent = `目录加载失败：${e.error || "未知错误"}`;
+    }
+  });
+
+  folderSelect?.addEventListener("change", async () => {
+    try {
+      await loadFiles();
+      if (tipEl) tipEl.textContent = "SQL 文件已按目录刷新";
+    } catch (e) {
+      if (tipEl) tipEl.textContent = `SQL 文件加载失败：${e.error || "未知错误"}`;
+    }
+  });
+
+  fileListEl?.addEventListener("change", (evt) => {
+    const checkbox = evt.target.closest(".sql-file-item");
+    if (!checkbox) return;
+    const fileName = checkbox.value;
+    if (!fileName) return;
+    if (checkbox.checked) {
+      sqlFileState.checkedFiles.add(fileName);
+    } else {
+      sqlFileState.checkedFiles.delete(fileName);
+    }
+  });
+
+  sqlFilePageSizeEl?.addEventListener("change", () => {
+    const nextSize = Number(sqlFilePageSizeEl.value) || 20;
+    sqlFileState.pageSize = nextSize;
+    sqlFileState.page = 1;
+    renderSqlFilePage();
+  });
+
+  sqlFilePrevPageBtn?.addEventListener("click", () => {
+    if (sqlFileState.page <= 1) return;
+    sqlFileState.page -= 1;
+    renderSqlFilePage();
+  });
+
+  sqlFileNextPageBtn?.addEventListener("click", () => {
+    const totalPages = Math.max(1, Math.ceil(sqlFileState.allFiles.length / sqlFileState.pageSize));
+    if (sqlFileState.page >= totalPages) return;
+    sqlFileState.page += 1;
+    renderSqlFilePage();
+  });
+
+  fileListEl?.addEventListener("click", async (evt) => {
+    const btn = evt.target.closest(".sql-file-name-link");
+    if (!btn) return;
+    try {
+      const folder = folderSelect?.value || "";
+      const fileName = btn.dataset.fileName || "";
+      if (!folder || !fileName) throw { error: "缺少目录或文件名" };
+      if (sqlPreviewTitleEl) {
+        sqlPreviewTitleEl.textContent = `SQL 文件预览 ${folder}/${fileName}`;
+      }
+      if (sqlPreviewContentEl) {
+        sqlPreviewContentEl.textContent = "加载中...";
+      }
+      openSqlPreview();
+      const resp = await fetch(
+        `/sql-execute/api/repo/file-preview/?folder=${encodeURIComponent(folder)}&file_name=${encodeURIComponent(fileName)}`
+      );
+      const data = await resp.json();
+      if (!resp.ok || !data.success) throw data;
+      if (sqlPreviewContentEl) {
+        sqlPreviewContentEl.textContent = data.content || "";
+      }
+    } catch (e) {
+      if (sqlPreviewContentEl) {
+        sqlPreviewContentEl.textContent = `加载失败：${e.error || "未知错误"}`;
+      }
     }
   });
 
@@ -495,7 +1424,18 @@
     });
   });
 
-  document.querySelectorAll(".btn-view-sql-file").forEach((btn) => {
+  document.querySelectorAll(".btn-withdraw").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      try {
+        await postForm("/sql-execute/api/request/action/", { request_id: btn.dataset.id, action: "withdraw" });
+        window.location.reload();
+      } catch (e) {
+        tipEl.textContent = `撤回失败：${e.error || "未知错误"}`;
+      }
+    });
+  });
+
+  document.querySelectorAll(".btn-open-request-sql").forEach((btn) => {
     btn.addEventListener("click", async () => {
       try {
         const requestId = btn.dataset.requestId || "";
@@ -524,14 +1464,125 @@
     });
   });
 
+  document.querySelectorAll(".btn-open-exec-log").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      try {
+        const requestId = btn.dataset.requestId || "";
+        if (!requestId) throw { error: "缺少申请 ID" };
+        if (sqlPreviewTitleEl) {
+          sqlPreviewTitleEl.textContent = `执行日志 #${requestId}`;
+        }
+        if (sqlPreviewContentEl) {
+          sqlPreviewContentEl.textContent = "加载中...";
+        }
+        openSqlPreview();
+        const resp = await fetch(`/sql-execute/api/request/progress/?request_id=${encodeURIComponent(requestId)}`);
+        const data = await resp.json();
+        if (!resp.ok || !data.success) throw data;
+        const req = data.request || {};
+        if (sqlPreviewContentEl) {
+          sqlPreviewContentEl.textContent = req.execution_log || "-";
+        }
+      } catch (e) {
+        if (sqlPreviewContentEl) {
+          sqlPreviewContentEl.textContent = `加载失败：${e.error || "未知错误"}`;
+        }
+      }
+    });
+  });
+
+  document.querySelectorAll(".btn-open-exec-result").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const requestId = btn.dataset.requestId || "";
+      if (!requestId) return;
+      loadSqlExecResult(requestId);
+    });
+  });
+
+  sqlExecFileListEl?.addEventListener("click", (evt) => {
+    const item = evt.target.closest(".sql-exec-file-item");
+    if (!item || !sqlExecFileListEl.contains(item)) return;
+    const idx = Number(item.dataset.idx);
+    if (Number.isNaN(idx)) return;
+    setSqlExecActiveIdx(idx);
+  });
+
+  document.getElementById("btn-close-sql-exec-result")?.addEventListener("click", () => {
+    closeSqlExecResult();
+  });
+
+  sqlExecResultMaskEl?.addEventListener("click", (evt) => {
+    if (evt.target === sqlExecResultMaskEl) closeSqlExecResult();
+  });
+
   document.getElementById("btn-close-sql-preview")?.addEventListener("click", () => {
     closeSqlPreview();
+  });
+
+  document.getElementById("btn-close-order-confirm")?.addEventListener("click", () => {
+    closeOrderConfirm();
+  });
+
+  document.getElementById("btn-cancel-order-confirm")?.addEventListener("click", () => {
+    closeOrderConfirm();
+  });
+
+  orderConfirmAddBtn?.addEventListener("click", () => {
+    const fileName = String(orderConfirmAddSelectEl?.value || "").trim();
+    if (!fileName || !orderConfirmListEl) return;
+    const item = document.createElement("li");
+    item.className = "order-confirm-item";
+    item.draggable = true;
+    item.dataset.fileName = fileName;
+    item.innerHTML = `
+      <span class="order-confirm-index">0</span>
+      <code class="order-confirm-name">${fileName}</code>
+      <button type="button" class="order-confirm-move order-confirm-up">上移</button>
+      <button type="button" class="order-confirm-move order-confirm-down">下移</button>
+      <button type="button" class="order-confirm-add" data-file-name="${fileName}">添加</button>
+      <button type="button" class="order-confirm-remove" data-file-name="${fileName}">删除</button>
+    `;
+    orderConfirmListEl.appendChild(item);
+    refreshOrderConfirmIndexes();
+    bindOrderListDragEvents();
   });
 
   sqlPreviewMaskEl?.addEventListener("click", (evt) => {
     if (evt.target === sqlPreviewMaskEl) closeSqlPreview();
   });
 
+  orderConfirmMaskEl?.addEventListener("click", (evt) => {
+    if (evt.target === orderConfirmMaskEl) closeOrderConfirm();
+  });
+
+  function initApplyReleaseDateSelect() {
+    if (!applyReleaseDateEl) return;
+    const serverDefault = "{{ apply_default_release_date|default:''|escapejs }}";
+    if (
+      serverDefault &&
+      Array.from(applyReleaseDateEl.options).some((o) => o.value === serverDefault)
+    ) {
+      applyReleaseDateEl.value = serverDefault;
+      return;
+    }
+    const isoRe = /^\d{4}-\d{2}-\d{2}$/;
+    const values = Array.from(applyReleaseDateEl.options)
+      .map((o) => o.value)
+      .filter((v) => isoRe.test(v));
+    if (values.length === 0) return;
+    const pad = (n) => String(n).padStart(2, "0");
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const eligible = values.filter((d) => d >= todayStr);
+    if (eligible.length === 0) return;
+    eligible.sort();
+    const chosen = eligible[0];
+    if (Array.from(applyReleaseDateEl.options).some((o) => o.value === chosen)) {
+      applyReleaseDateEl.value = chosen;
+    }
+  }
+
+  initApplyReleaseDateSelect();
   loadFolders().catch((e) => {
     if (tipEl) tipEl.textContent = `目录加载失败：${e.error || "未知错误"}`;
   });

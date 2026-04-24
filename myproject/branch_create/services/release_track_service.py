@@ -406,7 +406,7 @@ class ReleaseTrackService:
     def _approval_gate(self) -> None:
         default_url = RELEASE_TRACK_APPROVAL_URL
         self.output("")
-        self.output("MR 请求已发送，请管理员完成审批后确认继续：")
+        self.output("MR 请求已发送，请先在 GitLab 手动完成 MR 合并，再确认继续：")
         self.output(default_url)
         self._emit("approval", url=default_url)
         if self.approval_callback is not None:
@@ -465,6 +465,17 @@ class ReleaseTrackService:
             state = self.summary.states[repo]
             state.stage = "mr"
             try:
+                # 创建 MR 前再次拉取远端最新代码，避免基于旧基线提 MR。
+                repo_dir = self.git.ensure_repo(repo)
+                self.git.rollback_merge_if_needed(repo_dir)
+                self.git.set_origin(repo, repo_dir)
+                self.git.ensure_clean_worktree(repo_dir)
+                self.git.fetch_all(repo_dir)
+                self.git.checkout_and_pull(repo_dir, state.release_branch)
+                self.git.checkout_and_pull(repo_dir, state.target_branch)
+                self.git.local_trial_merge(repo_dir, state.release_branch)
+                self.git.cleanup_trial_merge(repo_dir, state.target_branch)
+
                 title = f"{self.summary.tag_name}-{repo}"
                 desc = (
                     f"repo={repo}; source={state.release_branch}; target={state.target_branch}; "
@@ -487,7 +498,10 @@ class ReleaseTrackService:
                 self._append_unique(repo, self.summary.mr_created_repos)
 
                 if not self.config.auto_merge_mr:
-                    self._mark_success(repo, "MR 已创建，未自动合并，跳过打 tag")
+                    if self.options.dry_run:
+                        self._mark_success(repo, "Dry Run 预演完成，未进入 MR 合并与 Tag 阶段")
+                    else:
+                        self._mark_waiting_mr(repo, "MR 已创建，待人工合并后确认继续打 tag")
                     continue
 
                 if self.options.dry_run:
@@ -556,6 +570,16 @@ class ReleaseTrackService:
     def _mark_merged(self, repo: str, reason: str) -> None:
         state = self.summary.states[repo]
         state.status = "MERGED"
+        state.reason = reason
+        self._append_unique(repo, self.summary.merged_repos)
+        self._remove(repo, self.summary.ready_repos)
+        self._remove(repo, self.summary.failed_repos)
+        self._remove(repo, self.summary.skipped_repos)
+        self._emit_repo_state(repo)
+
+    def _mark_waiting_mr(self, repo: str, reason: str) -> None:
+        state = self.summary.states[repo]
+        state.status = "WAIT_MR"
         state.reason = reason
         self._append_unique(repo, self.summary.merged_repos)
         self._remove(repo, self.summary.ready_repos)

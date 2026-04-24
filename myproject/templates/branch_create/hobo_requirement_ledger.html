@@ -13,6 +13,26 @@
   .muted { color: #6b7280; font-size: 12px; }
   .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .table-wrap { overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
+  .ledger-table-wrap { max-height: 520px; overflow-y: auto; }
+  .ledger-table-wrap thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .pager {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .pager-left, .pager-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
   table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 920px; }
   th, td { padding: 8px 10px; border-bottom: 1px solid #eef2f7; text-align: left; vertical-align: top; }
   th { background: #f8fafc; font-weight: 600; }
@@ -207,7 +227,7 @@
       <button id="btn-search-items" class="btn btn-secondary" type="button">搜索</button>
       <button id="btn-reset-search" class="btn btn-secondary" type="button">重置</button>
     </div>
-    <div class="table-wrap">
+    <div class="table-wrap ledger-table-wrap">
       <table>
         <thead>
         <tr>
@@ -225,6 +245,24 @@
         <tbody id="item-body"></tbody>
       </table>
     </div>
+    <div class="pager">
+      <div class="pager-left">
+        <div class="muted" id="pager-info">共 0 条</div>
+        <label class="field" style="min-width: 120px;">
+          每页条数
+          <select id="page-size" class="form-input">
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+          </select>
+        </label>
+      </div>
+      <div class="pager-right">
+        <button id="btn-prev-page" class="btn btn-secondary" type="button">上一页</button>
+        <span class="muted" id="page-indicator">1 / 1</span>
+        <button id="btn-next-page" class="btn btn-secondary" type="button">下一页</button>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -236,6 +274,9 @@
 
   let projectList = [];
   let editingItemId = null;
+  let allItems = [];
+  let currentPage = 1;
+  let pageSize = 10;
 
   function el(id) { return document.getElementById(id); }
   function dateOffsetStr(days) {
@@ -492,7 +533,7 @@
 
     body.querySelectorAll(".btn-edit").forEach((btn) => {
       btn.addEventListener("click", () => {
-        const target = items.find((i) => i.id === Number(btn.dataset.id));
+        const target = allItems.find((i) => i.id === Number(btn.dataset.id));
         if (target) {
           fillFormByItem(target);
           openFormModal();
@@ -501,7 +542,7 @@
     });
     body.querySelectorAll(".btn-view").forEach((btn) => {
       btn.addEventListener("click", () => {
-        const target = items.find((i) => i.id === Number(btn.dataset.id));
+        const target = allItems.find((i) => i.id === Number(btn.dataset.id));
         if (target) {
           renderDetailBody(target);
           openDetailModal();
@@ -520,6 +561,22 @@
         }
       });
     });
+  }
+
+  function renderPagedItems() {
+    const total = allItems.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const start = (currentPage - 1) * pageSize;
+    const pageItems = allItems.slice(start, start + pageSize);
+    renderItems(pageItems);
+
+    el("pager-info").textContent = `共 ${total} 条，当前显示 ${total === 0 ? 0 : start + 1}-${Math.min(start + pageSize, total)} 条`;
+    el("page-indicator").textContent = `${currentPage} / ${totalPages}`;
+    el("btn-prev-page").disabled = currentPage <= 1;
+    el("btn-next-page").disabled = currentPage >= totalPages;
   }
 
   async function loadProjects() {
@@ -543,7 +600,9 @@
       const resp = await fetch(`/branch-create/hobo-ledger/api/items/?${query.toString()}`);
       const data = await resp.json();
       if (!data.success) throw data;
-      renderItems(data.items || []);
+      allItems = data.items || [];
+      currentPage = 1;
+      renderPagedItems();
     } catch (e) {
       setTip(`加载失败：${e.error || "未知错误"}`, true);
     }
@@ -571,6 +630,23 @@
     el("search-requirement-type").value = "";
     el("search-project-id").value = "";
     await loadItems();
+  });
+  el("page-size").addEventListener("change", (event) => {
+    const parsed = Number(event.target.value);
+    pageSize = [10, 20, 50].includes(parsed) ? parsed : 10;
+    currentPage = 1;
+    renderPagedItems();
+  });
+  el("btn-prev-page").addEventListener("click", () => {
+    if (currentPage <= 1) return;
+    currentPage -= 1;
+    renderPagedItems();
+  });
+  el("btn-next-page").addEventListener("click", () => {
+    const totalPages = Math.max(1, Math.ceil(allItems.length / pageSize));
+    if (currentPage >= totalPages) return;
+    currentPage += 1;
+    renderPagedItems();
   });
 
   el("btn-close-form").addEventListener("click", closeFormModal);

@@ -40,6 +40,37 @@ from .services.branch_tasks import (
 )
 
 
+def _cron_matches(expr: str, now) -> bool:
+    parts = str(expr or "").split()
+    if len(parts) != 5:
+        return False
+    minute, hour, dom, month, dow = parts
+
+    def match(token: str, value: int) -> bool:
+        if token == "*":
+            return True
+        if token.startswith("*/"):
+            try:
+                step = int(token[2:])
+                return step > 0 and value % step == 0
+            except ValueError:
+                return False
+        if "," in token:
+            return any(match(t.strip(), value) for t in token.split(","))
+        try:
+            return int(token) == value
+        except ValueError:
+            return False
+
+    return (
+        match(minute, now.minute)
+        and match(hour, now.hour)
+        and match(dom, now.day)
+        and match(month, now.month)
+        and match(dow, now.weekday())
+    )
+
+
 def _create_job_payload_file(prefix: str, payload: dict) -> Path:
     jobs_dir = Path(settings.BASE_DIR) / ".runtime" / "jobs"
     jobs_dir.mkdir(parents=True, exist_ok=True)
@@ -386,15 +417,18 @@ def branch_task_preview_api(request):
         release_flow_name=request.POST.get("release_flow_name", ""),
         release_project_id=request.POST.get("release_project_id", ""),
     )
-    tasks = collect_pending_tasks(source_type, filters)
-    tasks, auto_marked_count = filter_preview_tasks_with_remote_check(tasks, request.user)
-    return JsonResponse(
-        {
-            "success": True,
-            "tasks": tasks,
-            "auto_marked_count": auto_marked_count,
-        }
-    )
+    try:
+        tasks = collect_pending_tasks(source_type, filters)
+        tasks, auto_marked_count = filter_preview_tasks_with_remote_check(tasks, request.user)
+        return JsonResponse(
+            {
+                "success": True,
+                "tasks": tasks,
+                "auto_marked_count": auto_marked_count,
+            }
+        )
+    except Exception as exc:  # noqa: BLE001
+        return JsonResponse({"success": False, "error": str(exc)}, status=500)
 
 
 @login_required
@@ -559,3 +593,30 @@ def schedule_run_api(request):
             },
         }
     )
+
+
+@login_required
+@require_http_methods(["POST"])
+def schedule_run_due_api(request):
+    if not can_do_action(request.user, "schedule_manage"):
+        return JsonResponse({"success": False, "error": "仅管理员可操作"}, status=403)
+    now = timezone.localtime()
+    schedules = BranchCreateSchedule.objects.filter(enabled=True).order_by("id")
+    executed = 0
+    for schedule in schedules:
+        if not _cron_matches(schedule.cron_expr.strip(), now):
+            continue
+        last_run_at = schedule.last_run_at
+        if last_run_at:
+            last_local = timezone.localtime(last_run_at)
+            if (
+                last_local.year == now.year
+                and last_local.month == now.month
+                and last_local.day == now.day
+                and last_local.hour == now.hour
+                and last_local.minute == now.minute
+            ):
+                continue
+        run_schedule(schedule, operator=schedule.created_by, trigger_mode="cron")
+        executed += 1
+    return JsonResponse({"success": True, "executed": executed})

@@ -104,6 +104,55 @@
   .close-btn { border:0; background:transparent; font-size:20px; cursor:pointer; color:#6b7280; }
   .secret-meta { margin: 6px 0 0; color: #6b7280; font-size: 12px; display: flex; align-items: center; gap: 8px; }
   .btn-link { border: 0; background: transparent; color: #2563eb; cursor: pointer; padding: 0; font-size: 12px; }
+  .rule-builder { border: 1px solid #e5e7eb; border-radius: 10px; background: #f8fafc; padding: 10px; display: grid; gap: 10px; }
+  .rule-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .rule-list { display: grid; gap: 8px; }
+  .rule-row { border: 1px solid #dbe2ea; border-radius: 8px; background: #fff; padding: 8px; }
+  .rule-row-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 12px; color: #475569; }
+  .rule-cards { display: flex; gap: 8px; flex-wrap: wrap; }
+  .phase-card {
+    border: 1px solid #bfdbfe;
+    background: #eff6ff;
+    color: #1e3a8a;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: grab;
+    user-select: none;
+  }
+  .phase-card.dragging { opacity: 0.55; }
+  .phase-keyword { margin-left: 6px; color: #475569; font-size: 11px; }
+  .phase-card-remove {
+    border: 0;
+    background: transparent;
+    color: #1e3a8a;
+    margin-left: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+  }
+  .rule-row-actions { display: inline-flex; gap: 6px; }
+  .rule-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 2100;
+  }
+  .rule-modal-panel {
+    width: min(560px, 96vw);
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 14px;
+    display: grid;
+    gap: 10px;
+  }
+  .rule-modal-phase-list { display: flex; gap: 8px; flex-wrap: wrap; }
+  .rule-modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
   .home-icon-link {
     position: absolute;
     top: 14px;
@@ -136,7 +185,6 @@
       <path d="M10 21v-6h4v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
     </svg>
   </a>
-  <div class="nav-bread"><a href="{% url 'dashboard' %}">工作台</a> / 管理员配置</div>
   <h1 class="card-title">管理员配置</h1>
   <p class="card-subtitle">集中维护账号、工程与 Git/SQL 配置。建议先配置 Git/PAT，再进行投产相关操作。</p>
 
@@ -253,33 +301,33 @@
           </div>
         </details>
 
-        <details class="config-accordion">
+        <details class="config-accordion" open>
           <summary>SQL 仓库与数据库配置</summary>
           <div class="accordion-body">
             <p class="accordion-hint">用于 SQL 执行申请流程，SQL 密码同样支持留空不变或手动清空。</p>
             <div class="config-form-grid">
               <label class="form-label span-full">
-                <span>SQL 执行仓库本地路径（可选）</span>
+                <span>SQL 执行仓库本地保存的路径（容器内目录）</span>
                 <input class="form-input" name="sql_repo_path" value="{{ git_config.sql_repo_path }}" placeholder="/workspace/sql-repo">
               </label>
               <label class="form-label span-full">
-                <span>SQL 仓库 Clone URL（可选，用于首次克隆）</span>
+                <span>SQL 仓库 Clone URL（用于首次克隆）</span>
                 <input class="form-input" name="sql_repo_clone_url" value="{{ git_config.sql_repo_clone_url }}" placeholder="https://gitlab.example.com/group/sql-repo.git">
               </label>
               <label class="form-label">
-                <span>MySQL Host（可选）</span>
+                <span>MySQL Host</span>
                 <input class="form-input" name="sql_db_host" value="{{ git_config.sql_db_host }}" placeholder="127.0.0.1">
               </label>
               <label class="form-label">
-                <span>MySQL Port（可选）</span>
+                <span>MySQL Port</span>
                 <input class="form-input" name="sql_db_port" value="{{ git_config.sql_db_port }}" placeholder="3306">
               </label>
               <label class="form-label">
-                <span>MySQL Database（可选）</span>
+                <span>SQL 数据库名（sql_db_name）</span>
                 <input class="form-input" name="sql_db_name" value="{{ git_config.sql_db_name }}" placeholder="db_name">
               </label>
               <label class="form-label">
-                <span>MySQL User（可选）</span>
+                <span>MySQL User</span>
                 <input class="form-input" name="sql_db_user" value="{{ git_config.sql_db_user }}" placeholder="db_user">
               </label>
               <label class="form-label span-full">
@@ -302,6 +350,33 @@
               <label class="check-row">
                 <input type="checkbox" name="clear_sql_db_password">
                 <span>清空已保存的 MySQL 密码</span>
+              </label>
+              <label class="form-label">
+                <span>DDL 脚本关键字（逗号分隔）</span>
+                <input class="form-input" name="sql_keyword_ddl" value="{{ git_config.sql_keyword_ddl }}" placeholder="ddl">
+              </label>
+              <label class="form-label">
+                <span>备份脚本关键字（逗号分隔）</span>
+                <input class="form-input" name="sql_keyword_backup" value="{{ git_config.sql_keyword_backup }}" placeholder="backup,bak,备份">
+              </label>
+              <label class="form-label">
+                <span>执行脚本关键字（逗号分隔）</span>
+                <input class="form-input" name="sql_keyword_execute" value="{{ git_config.sql_keyword_execute }}" placeholder="execute,执行">
+              </label>
+              <label class="form-label span-full">
+                <span>回滚脚本关键字（逗号分隔）</span>
+                <input class="form-input" name="sql_keyword_rollback" value="{{ git_config.sql_keyword_rollback }}" placeholder="rollback,回滚">
+              </label>
+              <label class="form-label span-full">
+                <span>允许研发提交的执行顺序规则（机器审批）</span>
+                <input type="hidden" id="sql-auto-approve-order-input" name="sql_auto_approve_order" value="{{ git_config.sql_auto_approve_order }}">
+                <div class="rule-builder">
+                  <div class="rule-toolbar">
+                    <span class="muted">支持多条规则；可拖动卡片排序、重复添加同一类型、删除规则。</span>
+                    <button id="btn-add-auto-approve-rule" class="btn btn-secondary" type="button">新增一条规则</button>
+                  </div>
+                  <div id="sql-auto-approve-rule-list" class="rule-list"></div>
+                </div>
               </label>
             </div>
           </div>
@@ -478,6 +553,26 @@
     </div>
   </div>
 </section>
+<div id="rule-editor-modal" class="rule-modal-backdrop hidden">
+  <div class="rule-modal-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <strong id="rule-editor-title">新增规则</strong>
+      <button id="btn-close-rule-editor" type="button" class="btn btn-secondary">关闭</button>
+    </div>
+    <p class="accordion-hint">点击下方类型可重复添加到规则，支持多次添加同一类型。</p>
+    <div class="rule-modal-phase-list">
+      <button type="button" class="btn btn-secondary btn-rule-add-phase" data-phase="backup">添加备份</button>
+      <button type="button" class="btn btn-secondary btn-rule-add-phase" data-phase="ddl">添加DDL</button>
+      <button type="button" class="btn btn-secondary btn-rule-add-phase" data-phase="execute">添加执行</button>
+      <button type="button" class="btn btn-secondary btn-rule-add-phase" data-phase="rollback">添加回滚</button>
+    </div>
+    <div id="rule-editor-preview" class="rule-cards"></div>
+    <div class="rule-modal-actions">
+      <button id="btn-cancel-rule-editor" type="button" class="btn btn-secondary">取消</button>
+      <button id="btn-save-rule-editor" type="button" class="btn btn-primary">确认保存规则</button>
+    </div>
+  </div>
+</div>
 <script>
   function escapeHtml(value) {
     return String(value ?? "")
@@ -620,6 +715,203 @@
       }
     });
   });
+
+  const AUTO_PHASES = ["backup", "ddl", "execute", "rollback"];
+  const AUTO_PHASE_LABELS = { backup: "备份", ddl: "DDL", execute: "执行", rollback: "回滚" };
+  const autoRuleListEl = document.getElementById("sql-auto-approve-rule-list");
+  const autoRuleInputEl = document.getElementById("sql-auto-approve-order-input");
+  const ruleEditorModalEl = document.getElementById("rule-editor-modal");
+  const ruleEditorPreviewEl = document.getElementById("rule-editor-preview");
+  const keywordInputMap = {
+    backup: document.querySelector("input[name='sql_keyword_backup']"),
+    ddl: document.querySelector("input[name='sql_keyword_ddl']"),
+    execute: document.querySelector("input[name='sql_keyword_execute']"),
+    rollback: document.querySelector("input[name='sql_keyword_rollback']"),
+  };
+  let autoApproveRules = [];
+  let editingRuleIdx = -1;
+  let ruleEditorBuffer = [];
+
+  function normalizePhaseName(raw) {
+    const value = String(raw || "").trim().toLowerCase();
+    if (value === "备份") return "backup";
+    if (value === "执行") return "execute";
+    if (value === "回滚") return "rollback";
+    if (value === "ddl" || value === "backup" || value === "execute" || value === "rollback") return value;
+    return "";
+  }
+
+  function keywordPreviewForPhase(phase) {
+    const input = keywordInputMap[phase];
+    return input ? ((input.value || "").trim() || "-") : "-";
+  }
+
+  function parseAutoApproveRules(raw) {
+    const text = (raw || "").replaceAll("，", ",");
+    const rows = text.replaceAll("\n", ";").split(";").map((x) => x.trim()).filter(Boolean);
+    if (rows.length === 0) return [["backup", "ddl", "execute", "rollback"]];
+    const parsed = rows.map((row) => row.split(",").map(normalizePhaseName).filter(Boolean)).filter((rule) => rule.length > 0);
+    return parsed.length ? parsed : [["backup", "ddl", "execute", "rollback"]];
+  }
+
+  function syncAutoApproveRulesToInput() {
+    if (!autoRuleInputEl) return;
+    autoRuleInputEl.value = autoApproveRules.map((rule) => rule.join(",")).join("\n");
+  }
+
+  function renderRuleCards(rule, wrap) {
+    wrap.innerHTML = "";
+    rule.forEach((phase, idx) => {
+      const card = document.createElement("div");
+      card.className = "phase-card";
+      card.draggable = true;
+      card.dataset.phase = phase;
+      card.dataset.phaseIdx = String(idx);
+      card.innerHTML = `${AUTO_PHASE_LABELS[phase] || phase}<span class="phase-keyword">${keywordPreviewForPhase(phase)}</span><button class="phase-card-remove" type="button" title="删除该卡片">×</button>`;
+      wrap.appendChild(card);
+    });
+  }
+
+  function renderAutoApproveRuleCards() {
+    if (!autoRuleListEl) return;
+    autoRuleListEl.innerHTML = "";
+    autoApproveRules.forEach((rule, idx) => {
+      const row = document.createElement("div");
+      row.className = "rule-row";
+      row.innerHTML = `
+        <div class="rule-row-head">
+          <span>规则 ${idx + 1}</span>
+          <span class="rule-row-actions">
+            <button class="btn btn-secondary btn-edit-rule" type="button" data-rule-idx="${idx}">编辑规则</button>
+            <button class="btn btn-secondary btn-remove-rule" type="button" data-rule-idx="${idx}">删除规则</button>
+          </span>
+        </div>
+        <div class="rule-cards" data-rule-idx="${idx}"></div>
+      `;
+      const wrap = row.querySelector(".rule-cards");
+      renderRuleCards(rule, wrap);
+      autoRuleListEl.appendChild(row);
+    });
+    syncAutoApproveRulesToInput();
+  }
+
+  function openRuleEditor(mode, ruleIdx = -1) {
+    if (!ruleEditorModalEl || !ruleEditorPreviewEl) return;
+    editingRuleIdx = ruleIdx;
+    const titleEl = document.getElementById("rule-editor-title");
+    if (mode === "edit" && ruleIdx >= 0) {
+      ruleEditorBuffer = [...(autoApproveRules[ruleIdx] || [])];
+      if (titleEl) titleEl.textContent = `编辑规则 ${ruleIdx + 1}`;
+    } else {
+      ruleEditorBuffer = [];
+      if (titleEl) titleEl.textContent = "新增规则";
+    }
+    renderRuleCards(ruleEditorBuffer, ruleEditorPreviewEl);
+    bindRuleEditorPreviewEvents();
+    ruleEditorModalEl.classList.remove("hidden");
+  }
+
+  function closeRuleEditor() {
+    ruleEditorModalEl?.classList.add("hidden");
+    editingRuleIdx = -1;
+    ruleEditorBuffer = [];
+  }
+
+  function bindRuleEditorPreviewEvents() {
+    if (!ruleEditorPreviewEl) return;
+    let dragCard = null;
+    ruleEditorPreviewEl.querySelectorAll(".phase-card").forEach((card) => {
+      card.addEventListener("dragstart", () => {
+        dragCard = card;
+        card.classList.add("dragging");
+      });
+      card.addEventListener("dragend", () => {
+        card.classList.remove("dragging");
+        dragCard = null;
+        ruleEditorBuffer = Array.from(ruleEditorPreviewEl.querySelectorAll(".phase-card")).map((node) => node.dataset.phase);
+      });
+      card.addEventListener("dragover", (event) => event.preventDefault());
+      card.addEventListener("drop", (event) => {
+        event.preventDefault();
+        if (!dragCard || dragCard === card) return;
+        const cards = Array.from(ruleEditorPreviewEl.querySelectorAll(".phase-card"));
+        const dragIdx = cards.indexOf(dragCard);
+        const dropIdx = cards.indexOf(card);
+        if (dragIdx < dropIdx) ruleEditorPreviewEl.insertBefore(dragCard, card.nextSibling);
+        else ruleEditorPreviewEl.insertBefore(dragCard, card);
+      });
+      card.querySelector(".phase-card-remove")?.addEventListener("click", () => {
+        const idx = Number(card.dataset.phaseIdx || "-1");
+        if (idx < 0) return;
+        ruleEditorBuffer.splice(idx, 1);
+        renderRuleCards(ruleEditorBuffer, ruleEditorPreviewEl);
+        bindRuleEditorPreviewEvents();
+      });
+    });
+  }
+
+  function bindRuleEvents() {
+    if (!autoRuleListEl) return;
+    autoRuleListEl.querySelectorAll(".btn-remove-rule").forEach((btn) => {
+      btn.onclick = () => {
+        const idx = Number(btn.dataset.ruleIdx || "-1");
+        if (idx < 0 || idx >= autoApproveRules.length) return;
+        autoApproveRules.splice(idx, 1);
+        if (autoApproveRules.length === 0) autoApproveRules.push(["backup", "ddl", "execute", "rollback"]);
+        renderAutoApproveRuleCards();
+        bindRuleEvents();
+      };
+    });
+    autoRuleListEl.querySelectorAll(".btn-edit-rule").forEach((btn) => {
+      btn.onclick = () => {
+        const idx = Number(btn.dataset.ruleIdx || "-1");
+        if (idx < 0 || idx >= autoApproveRules.length) return;
+        openRuleEditor("edit", idx);
+      };
+    });
+  }
+
+  if (autoRuleInputEl && autoRuleListEl) {
+    autoApproveRules = parseAutoApproveRules(autoRuleInputEl.value);
+    renderAutoApproveRuleCards();
+    bindRuleEvents();
+    document.getElementById("btn-add-auto-approve-rule")?.addEventListener("click", () => openRuleEditor("add"));
+    document.querySelectorAll(".btn-rule-add-phase").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const phase = normalizePhaseName(btn.dataset.phase || "");
+        if (!phase) return;
+        ruleEditorBuffer.push(phase);
+        renderRuleCards(ruleEditorBuffer, ruleEditorPreviewEl);
+        bindRuleEditorPreviewEvents();
+      });
+    });
+    document.getElementById("btn-save-rule-editor")?.addEventListener("click", () => {
+      if (ruleEditorBuffer.length === 0) {
+        alert("请至少添加一个脚本类型卡片。");
+        return;
+      }
+      if (editingRuleIdx >= 0 && editingRuleIdx < autoApproveRules.length) autoApproveRules[editingRuleIdx] = [...ruleEditorBuffer];
+      else autoApproveRules.push([...ruleEditorBuffer]);
+      renderAutoApproveRuleCards();
+      bindRuleEvents();
+      closeRuleEditor();
+    });
+    document.getElementById("btn-close-rule-editor")?.addEventListener("click", closeRuleEditor);
+    document.getElementById("btn-cancel-rule-editor")?.addEventListener("click", closeRuleEditor);
+    ruleEditorModalEl?.addEventListener("click", (event) => {
+      if (event.target === ruleEditorModalEl) closeRuleEditor();
+    });
+    Object.values(keywordInputMap).forEach((input) => {
+      input?.addEventListener("input", () => {
+        renderAutoApproveRuleCards();
+        bindRuleEvents();
+        if (!ruleEditorModalEl?.classList.contains("hidden")) {
+          renderRuleCards(ruleEditorBuffer, ruleEditorPreviewEl);
+          bindRuleEditorPreviewEvents();
+        }
+      });
+    });
+  }
 
   const gitConfigForm = document.querySelector("form input[name='action'][value='save_git_config']")?.closest("form");
   if (gitConfigForm) {

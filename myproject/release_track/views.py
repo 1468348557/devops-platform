@@ -444,13 +444,27 @@ def _get_completed_repo_codes_for_batch(batch_id: int) -> set[str]:
     completed_repos = (
         ReleaseTrackRunItem.objects.filter(
             run__batch_id=batch_id,
-            run__status=ReleaseTrackRun.Status.SUCCESS,
+            run__dry_run=False,
             status="SUCCESS",
         )
         .values_list("repo", flat=True)
         .distinct()
     )
     return {str(repo).strip() for repo in completed_repos if str(repo).strip()}
+
+
+def _build_manual_mr_url(repo: str, mr_url: str, mr_iid: int) -> str:
+    existing = str(mr_url or "").strip()
+    if existing:
+        return existing
+    if not repo or not mr_iid:
+        return ""
+    runtime = get_runtime_git_settings()
+    base = (runtime.git_base_url or "").rstrip("/")
+    group = (runtime.git_group or "").strip().strip("/")
+    if not base or not group:
+        return ""
+    return f"{base}/{group}/{repo}/-/merge_requests/{mr_iid}"
 
 
 def _run_to_dict(run: ReleaseTrackRun) -> dict:
@@ -465,6 +479,7 @@ def _run_to_dict(run: ReleaseTrackRun) -> dict:
             "pending_count": item.pending_count,
             "mr_url": item.mr_url,
             "mr_iid": item.mr_iid,
+            "manual_mr_url": _build_manual_mr_url(item.repo, item.mr_url, item.mr_iid),
             "mr_state": item.mr_state,
             "tag_result": item.tag_result,
             "source": item.source,
@@ -483,6 +498,7 @@ def _run_to_dict(run: ReleaseTrackRun) -> dict:
         "tag_name": run.tag_name,
         "merge_message": run.merge_message,
         "tag_message": run.tag_message,
+        "dry_run": run.dry_run,
         "total": run.total_count,
         "processed": run.processed_count,
         "success": run.success_count,
@@ -784,6 +800,7 @@ def release_track_api_run_start(request):
         tag_name=options.tag_name,
         merge_message=options.merge_message,
         tag_message=options.tag_message,
+        dry_run=options.dry_run,
         tip="任务已启动",
     )
 

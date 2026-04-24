@@ -36,6 +36,10 @@
   .status-success { color: #16a34a; font-weight: 600; }
   .status-failed { color: #dc2626; font-weight: 600; }
   .approval-box { margin-top: 10px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; background: #fafafa; display: none; }
+  .mr-links { margin-top: 8px; display: grid; gap: 4px; }
+  .mr-links .muted { font-size: 12px; }
+  .mr-link-item a { font-size: 12px; color: #1f75cb; text-decoration: none; }
+  .mr-link-item a:hover { text-decoration: underline; }
   .table-wrap { overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
   .review-box { margin: 8px 0 14px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; background: #fafafa; }
   .risk-row { background: #fff1f2; }
@@ -53,10 +57,6 @@
   th { background: #f8fafc; font-weight: 600; }
   .log-pre { margin:0; padding:10px; border:1px solid #e5e7eb; border-radius:8px; background:#f8fafc; white-space:pre-wrap; word-break:break-word; font-size:12px; max-height: 220px; overflow:auto; }
 </style>
-
-<div class="nav-bread">
-  <a href="{% url 'dashboard' %}">工作台</a> / 投产追版
-</div>
 
 <section class="card">
   <a class="home-icon-link" href="{% url 'dashboard' %}" title="返回主界面" aria-label="返回主界面">
@@ -87,13 +87,9 @@
     <label class="field">默认目标分支
       <input id="default-target-branch" class="form-input" value="master">
     </label>
-    <label class="field">审批页面（固定）
-      <input class="form-input" value="http://gitlab.spdb.com/zh-1087" readonly>
-    </label>
   </div>
 
   <div class="action-row">
-    <button id="btn-drawer" class="btn btn-secondary" type="button">执行窗口</button>
     <label><input id="dry-run" type="checkbox"> Dry Run（演练）</label>
     <button id="btn-start" class="btn btn-primary" type="button">启动追板</button>
     <button id="btn-refresh" class="btn btn-secondary" type="button">刷新进度</button>
@@ -124,9 +120,9 @@
   <pre id="live-log" class="log-pre">暂无执行记录</pre>
   <div id="approval-box" class="approval-box">
     <div class="muted" id="approval-text">审批闸口：待命</div>
+    <div id="approval-mr-links" class="mr-links"></div>
     <div class="action-row" style="margin-top: 8px;">
-      <button id="btn-approve" class="btn btn-primary" type="button">审批通过，继续执行</button>
-      <button id="btn-reject" class="btn btn-secondary" type="button">审批驳回，结束任务</button>
+      <button id="btn-approve" class="btn btn-primary" type="button">我已完成MR，继续打Tag</button>
     </div>
   </div>
 
@@ -141,7 +137,6 @@
           <th>状态</th>
           <th>原因</th>
           <th>待合并提交</th>
-          <th>MR</th>
           <th>Tag</th>
         </tr>
       </thead>
@@ -161,9 +156,9 @@
     <pre id="drawer-log" class="log-pre" style="margin-top:8px;">暂无执行记录</pre>
     <div id="drawer-approval-box" class="approval-box" style="margin-top:8px;">
       <div class="muted" id="drawer-approval-text">审批闸口：待命</div>
+      <div id="drawer-approval-mr-links" class="mr-links"></div>
       <div class="action-row" style="margin-top: 8px;">
-        <button id="btn-drawer-approve" class="btn btn-primary" type="button">审批通过，继续执行</button>
-        <button id="btn-drawer-reject" class="btn btn-secondary" type="button">审批驳回，结束任务</button>
+        <button id="btn-drawer-approve" class="btn btn-primary" type="button">我已完成MR，继续打Tag</button>
       </div>
     </div>
     <div class="table-wrap" style="margin-top: 10px;">
@@ -177,7 +172,6 @@
             <th>状态</th>
             <th>原因</th>
             <th>待合并提交</th>
-            <th>MR</th>
             <th>Tag</th>
           </tr>
         </thead>
@@ -191,6 +185,7 @@
   let currentRunId = '';
   let polling = false;
   const selectedProjectCodes = new Set();
+  let batchMetaById = {};
 
   function el(id) { return document.getElementById(id); }
   function escapeHtml(value) {
@@ -227,20 +222,55 @@
       return "";
     }
   }
-
+  function renderApprovalMrLinks(run, containerId) {
+    const box = el(containerId);
+    if (!box) return;
+    box.innerHTML = '';
+    const rows = (run?.rows || []).filter((row) => {
+      const status = String(row.status || "");
+      const url = safeHttpUrl(row.manual_mr_url || row.mr_url);
+      return !!url && (status === "WAIT_MR" || status === "MERGED");
+    });
+    if (!rows.length) {
+      const tip = document.createElement("div");
+      tip.className = "muted";
+      tip.textContent = "暂无可打开的 MR 链接";
+      box.appendChild(tip);
+      return;
+    }
+    rows.forEach((row) => {
+      const line = document.createElement("div");
+      line.className = "mr-link-item";
+      const repo = String(row.repo || "仓库");
+      const anchor = document.createElement("a");
+      anchor.href = safeHttpUrl(row.manual_mr_url || row.mr_url);
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      anchor.textContent = `${repo}：打开 MR`;
+      line.appendChild(anchor);
+      box.appendChild(line);
+    });
+  }
   function todayYmdCompact() {
     const now = new Date();
     return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
   }
 
-  function initDefaultTextInputs() {
-    const ds = todayYmdCompact();
+  function _batchDateCompact(batchId) {
+    const row = batchMetaById[String(batchId || "")];
+    const raw = String(row?.release_date || "").trim();
+    if (!raw) return "";
+    return raw.replaceAll("-", "");
+  }
+
+  function syncTextInputsByBatch(batchId) {
+    const ds = _batchDateCompact(batchId) || todayYmdCompact();
     const tagName = el('tag-name');
     const mergeMsg = el('merge-message');
     const tagMsg = el('tag-message');
-    if (tagName && !tagName.value.trim()) tagName.value = `${ds}_v1`;
-    if (mergeMsg && !mergeMsg.value.trim()) mergeMsg.value = `${ds}投产追板`;
-    if (tagMsg && !tagMsg.value.trim()) tagMsg.value = `${ds}投产变更`;
+    if (tagName) tagName.value = `${ds}_v1`;
+    if (mergeMsg) mergeMsg.value = `${ds}投产追板`;
+    if (tagMsg) tagMsg.value = `${ds}投产变更`;
   }
 
   function pickDefaultBatchId(rows) {
@@ -250,7 +280,7 @@
     (rows || []).forEach((b) => {
       const d = new Date(`${b.release_date}T00:00:00`);
       if (Number.isNaN(d.getTime())) return;
-      if (d <= today && (!best || d > best.date)) {
+      if (d < today && (!best || d > best.date)) {
         best = { id: String(b.id), date: d };
       }
     });
@@ -270,7 +300,9 @@
   function renderBatches(rows) {
     const select = el('batch-id');
     select.innerHTML = '';
+    batchMetaById = {};
     (rows || []).forEach((b) => {
+      batchMetaById[String(b.id)] = b;
       const opt = document.createElement('option');
       opt.value = b.id;
       opt.textContent = `#${b.id} ${b.release_date} ${b.release_branch}（上线结束标记 ${b.marked_count}）`;
@@ -279,8 +311,10 @@
     const defaultId = pickDefaultBatchId(rows || []);
     if (defaultId) {
       select.value = defaultId;
+      syncTextInputsByBatch(defaultId);
       loadBatchDetail(defaultId);
     } else {
+      syncTextInputsByBatch("");
       loadBatchDetail('');
     }
   }
@@ -417,16 +451,6 @@
       reasonTd.textContent = String(r.reason || "");
       const pendingTd = document.createElement("td");
       pendingTd.textContent = String(r.pending_count || 0);
-      const mrTd = document.createElement("td");
-      const mrUrl = safeHttpUrl(r.mr_url);
-      if (mrUrl) {
-        const anchor = document.createElement("a");
-        anchor.href = mrUrl;
-        anchor.target = "_blank";
-        anchor.rel = "noopener noreferrer";
-        anchor.textContent = "查看MR";
-        mrTd.appendChild(anchor);
-      }
       const tagTd = document.createElement("td");
       tagTd.textContent = String(r.tag_result || "");
       tr.appendChild(repoTd);
@@ -436,7 +460,6 @@
       tr.appendChild(statusTd);
       tr.appendChild(reasonTd);
       tr.appendChild(pendingTd);
-      tr.appendChild(mrTd);
       tr.appendChild(tagTd);
       body.appendChild(tr);
     });
@@ -452,11 +475,11 @@
     const approvalBox = el('approval-box');
     const approvalText = el('approval-text');
     const approveBtn = el('btn-approve');
-    const rejectBtn = el('btn-reject');
     const drawerApprovalBox = el('drawer-approval-box');
     const drawerApprovalText = el('drawer-approval-text');
     const drawerApproveBtn = el('btn-drawer-approve');
-    const drawerRejectBtn = el('btn-drawer-reject');
+    const approvalMrLinks = el('approval-mr-links');
+    const drawerApprovalMrLinks = el('drawer-approval-mr-links');
     const approvalPending = run.phase === 'approval' && run.status === 'running' && run.approval_status === 'pending';
     const approvalApproved = run.approval_status === 'approved';
     const approvalRejected = run.approval_status === 'rejected';
@@ -465,41 +488,43 @@
       drawerApprovalBox.style.display = 'block';
       if (approvalPending) {
         approveBtn.style.display = 'inline-block';
-        rejectBtn.style.display = 'inline-block';
         drawerApproveBtn.style.display = 'inline-block';
-        drawerRejectBtn.style.display = 'inline-block';
         approvalBox.style.background = '#fafafa';
         approvalBox.style.borderColor = '#e5e7eb';
         drawerApprovalBox.style.background = '#fafafa';
         drawerApprovalBox.style.borderColor = '#e5e7eb';
-        approvalText.textContent = `审批闸口：MR已发送，请在审批页面完成审批后点击“审批通过”继续 ${run.approval_url || ''}`;
-        drawerApprovalText.textContent = `审批闸口：MR已发送，请在审批页面完成审批后点击“审批通过”继续 ${run.approval_url || ''}`;
+        approvalText.textContent = `确认闸口：请先手动完成 MR 合并，再点击按钮继续自动打Tag ${run.approval_url || ''}`;
+        drawerApprovalText.textContent = `确认闸口：请先手动完成 MR 合并，再点击按钮继续自动打Tag ${run.approval_url || ''}`;
+        renderApprovalMrLinks(run, 'approval-mr-links');
+        renderApprovalMrLinks(run, 'drawer-approval-mr-links');
       } else if (approvalApproved) {
         approveBtn.style.display = 'none';
-        rejectBtn.style.display = 'none';
         drawerApproveBtn.style.display = 'none';
-        drawerRejectBtn.style.display = 'none';
         approvalBox.style.background = '#ecfdf3';
         approvalBox.style.borderColor = '#86efac';
         drawerApprovalBox.style.background = '#ecfdf3';
         drawerApprovalBox.style.borderColor = '#86efac';
         approvalText.textContent = `审批已通过：${run.approved_by || '管理员'} ${run.approved_at || ''}`;
         drawerApprovalText.textContent = `审批已通过：${run.approved_by || '管理员'} ${run.approved_at || ''}`;
+        renderApprovalMrLinks(run, 'approval-mr-links');
+        renderApprovalMrLinks(run, 'drawer-approval-mr-links');
       } else {
         approveBtn.style.display = 'none';
-        rejectBtn.style.display = 'none';
         drawerApproveBtn.style.display = 'none';
-        drawerRejectBtn.style.display = 'none';
         approvalBox.style.background = '#fef2f2';
         approvalBox.style.borderColor = '#fca5a5';
         drawerApprovalBox.style.background = '#fef2f2';
         drawerApprovalBox.style.borderColor = '#fca5a5';
         approvalText.textContent = `审批已驳回：${run.approved_by || '管理员'} ${run.approved_at || ''}`;
         drawerApprovalText.textContent = `审批已驳回：${run.approved_by || '管理员'} ${run.approved_at || ''}`;
+        renderApprovalMrLinks(run, 'approval-mr-links');
+        renderApprovalMrLinks(run, 'drawer-approval-mr-links');
       }
     } else {
       approvalBox.style.display = 'none';
       drawerApprovalBox.style.display = 'none';
+      if (approvalMrLinks) approvalMrLinks.innerHTML = '';
+      if (drawerApprovalMrLinks) drawerApprovalMrLinks.innerHTML = '';
     }
     renderRows(run.rows || [], 'run-body');
     renderRows(run.rows || [], 'drawer-run-body');
@@ -528,6 +553,10 @@
     const data = await resp.json();
     if (!resp.ok || !data.success) throw data;
     renderRun(data.run);
+    const batchId = el('batch-id')?.value || '';
+    if (batchId && data.run && data.run.status !== 'running') {
+      await loadBatchDetail(batchId);
+    }
     return data.run;
   }
 
@@ -579,9 +608,7 @@
 
   el('btn-start').addEventListener('click', startRun);
   el('btn-approve').addEventListener('click', () => approveRun('approve'));
-  el('btn-reject').addEventListener('click', () => approveRun('reject'));
-  el('btn-drawer-approve').addEventListener('click', () => approveRun('approve'));
-  el('btn-drawer-reject').addEventListener('click', () => approveRun('reject'));
+  el('btn-drawer-approve')?.addEventListener('click', () => approveRun('approve'));
   el('btn-refresh').addEventListener('click', async () => {
     try {
       await refreshProgress();
@@ -592,6 +619,7 @@
   el('batch-id').addEventListener('change', (ev) => {
     selectedProjectCodes.clear();
     updateSelectedCount();
+    syncTextInputsByBatch(ev.target.value);
     loadBatchDetail(ev.target.value);
   });
   el('batch-check-all').addEventListener('change', (ev) => {
@@ -604,11 +632,11 @@
     });
     updateSelectedCount();
   });
-  el('btn-drawer').addEventListener('click', () => {
+  el('btn-drawer')?.addEventListener('click', () => {
     el('exec-drawer').classList.add('show');
     el('drawer-backdrop').classList.add('show');
   });
-  el('btn-drawer-close').addEventListener('click', () => {
+  el('btn-drawer-close')?.addEventListener('click', () => {
     el('exec-drawer').classList.remove('show');
     el('drawer-backdrop').classList.remove('show');
   });
@@ -620,6 +648,6 @@
   loadBatches().catch((e) => {
     el('tip').textContent = `批次加载失败：${e.error || '未知错误'}`;
   });
-  initDefaultTextInputs();
+  syncTextInputsByBatch(el('batch-id')?.value || "");
 </script>
 {% endblock %}

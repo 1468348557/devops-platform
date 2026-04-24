@@ -20,6 +20,7 @@ urlpatterns = [
     path("api/schedules/save/", views.schedule_save_api, name="schedule_save_api"),
     path("api/schedules/delete/", views.schedule_delete_api, name="schedule_delete_api"),
     path("api/schedules/run/", views.schedule_run_api, name="schedule_run_api"),
+    path("api/schedules/run-due/", views.schedule_run_due_api, name="schedule_run_due_api"),
     # Release entry APIs
     path("release-entry/api/batches/", release_entry_views.release_entry_batch_list, name="release_entry_batch_list"),
     path("release-entry/api/batches/create/", release_entry_views.release_entry_batch_create, name="release_entry_batch_create"),
@@ -30,6 +31,7 @@ urlpatterns = [
     path("release-entry/api/items/update/", release_entry_views.release_entry_item_update, name="release_entry_item_update"),
     path("release-entry/api/items/submit/", release_entry_views.release_entry_item_submit, name="release_entry_item_submit"),
     path("release-entry/api/items/delete/", release_entry_views.release_entry_item_delete, name="release_entry_item_delete"),
+    path("release-entry/api/items/bulk-update/", release_entry_views.release_entry_item_bulk_update, name="release_entry_item_bulk_update"),
     # HOBO 需求登记台账
     path("hobo-ledger/", hobo_ledger_views.hobo_ledger_page, name="hobo_ledger_page"),
     path("hobo-ledger/api/projects/", hobo_ledger_views.hobo_ledger_project_list, name="hobo_ledger_project_list"),

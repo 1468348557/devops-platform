@@ -37,9 +37,14 @@ class BranchExecutor:
     def __init__(self, work_base_dir: str | None = None):
         self.work_base_dir = Path(work_base_dir) if work_base_dir else None
 
-    def _git(self, *args: str, cwd: Path | None = None) -> subprocess.CompletedProcess:
+    def _git(
+        self,
+        *args: str,
+        cwd: Path | None = None,
+        auth_args: tuple[str, ...] = (),
+    ) -> subprocess.CompletedProcess:
         return subprocess.run(
-            ["git", *args],
+            ["git", *auth_args, *args],
             cwd=cwd,
             capture_output=True,
             text=True,
@@ -52,8 +57,9 @@ class BranchExecutor:
         work_base_dir = self.work_base_dir or resolved_base_dir
         project = normalize_project_code(task.project_code)
         project_dir = work_base_dir / project
-        git_url = runtime.with_credentials_url(project)
-        git_url_masked = runtime.masked_remote_url(project)
+        git_url = runtime.repo_url(project)
+        git_url_masked = scrub_sensitive_text(git_url)
+        auth_args = tuple(runtime.git_auth_config_args())
         logs: list[str] = []
 
         def add_log(msg: str) -> None:
@@ -92,7 +98,7 @@ class BranchExecutor:
 
             if not project_dir.exists():
                 add_log("step: clone project")
-                clone = self._git("clone", git_url, str(project_dir))
+                clone = self._git("clone", git_url, str(project_dir), auth_args=auth_args)
                 if clone.returncode != 0:
                     add_process_output(clone)
                     return done("failed", "clone 失败")
@@ -101,13 +107,20 @@ class BranchExecutor:
                 return done("failed", f"目录存在但不是 Git 仓库: {project_dir}")
 
             add_log("step: set remote origin url")
-            origin_set = self._git("remote", "set-url", "origin", git_url, cwd=project_dir)
+            origin_set = self._git(
+                "remote",
+                "set-url",
+                "origin",
+                git_url,
+                cwd=project_dir,
+                auth_args=auth_args,
+            )
             if origin_set.returncode != 0:
                 add_process_output(origin_set)
                 return done("failed", "设置远端地址失败")
 
             add_log("step: check status --porcelain")
-            st = self._git("status", "--porcelain", cwd=project_dir)
+            st = self._git("status", "--porcelain", cwd=project_dir, auth_args=auth_args)
             if st.returncode != 0:
                 add_process_output(st)
                 return done("failed", "status 检查失败")
@@ -116,45 +129,88 @@ class BranchExecutor:
                 return done("failed", "工作区有未提交改动")
 
             add_log("step: fetch origin --prune")
-            fr = self._git("fetch", "origin", "--prune", cwd=project_dir)
+            fr = self._git("fetch", "origin", "--prune", cwd=project_dir, auth_args=auth_args)
             if fr.returncode != 0:
                 add_process_output(fr)
                 return done("failed", "git fetch 失败")
 
             add_log("step: local branch exists?")
-            if self._git("show-ref", "--verify", f"refs/heads/{task.new_branch}", cwd=project_dir).returncode == 0:
+            if (
+                self._git(
+                    "show-ref",
+                    "--verify",
+                    f"refs/heads/{task.new_branch}",
+                    cwd=project_dir,
+                    auth_args=auth_args,
+                ).returncode
+                == 0
+            ):
                 return done("skipped", "本地分支已存在")
 
             add_log("step: remote branch exists?")
-            if self._git("ls-remote", "--exit-code", "--heads", "origin", task.new_branch, cwd=project_dir).returncode == 0:
+            if (
+                self._git(
+                    "ls-remote",
+                    "--exit-code",
+                    "--heads",
+                    "origin",
+                    task.new_branch,
+                    cwd=project_dir,
+                    auth_args=auth_args,
+                ).returncode
+                == 0
+            ):
                 return done("skipped", "远程分支已存在")
 
             add_log(f"step: checkout base branch {task.base_branch}")
-            if self._git("show-ref", "--verify", f"refs/heads/{task.base_branch}", cwd=project_dir).returncode == 0:
-                co = self._git("checkout", task.base_branch, cwd=project_dir)
+            if (
+                self._git(
+                    "show-ref",
+                    "--verify",
+                    f"refs/heads/{task.base_branch}",
+                    cwd=project_dir,
+                    auth_args=auth_args,
+                ).returncode
+                == 0
+            ):
+                co = self._git("checkout", task.base_branch, cwd=project_dir, auth_args=auth_args)
                 if co.returncode != 0:
                     add_process_output(co)
                     return done("failed", f"切换基准分支失败: {task.base_branch}")
             else:
-                co = self._git("checkout", "-b", task.base_branch, f"origin/{task.base_branch}", cwd=project_dir)
+                co = self._git(
+                    "checkout",
+                    "-b",
+                    task.base_branch,
+                    f"origin/{task.base_branch}",
+                    cwd=project_dir,
+                    auth_args=auth_args,
+                )
                 if co.returncode != 0:
                     add_process_output(co)
                     return done("failed", f"基准分支不存在: {task.base_branch}")
 
             add_log("step: pull --ff-only origin base")
-            pull = self._git("pull", "--ff-only", "origin", task.base_branch, cwd=project_dir)
+            pull = self._git(
+                "pull",
+                "--ff-only",
+                "origin",
+                task.base_branch,
+                cwd=project_dir,
+                auth_args=auth_args,
+            )
             if pull.returncode != 0:
                 add_process_output(pull)
                 return done("failed", f"基准分支更新失败: {task.base_branch}")
 
             add_log(f"step: checkout -b {task.new_branch}")
-            cb = self._git("checkout", "-b", task.new_branch, cwd=project_dir)
+            cb = self._git("checkout", "-b", task.new_branch, cwd=project_dir, auth_args=auth_args)
             if cb.returncode != 0:
                 add_process_output(cb)
                 return done("failed", "创建分支失败")
 
             add_log("step: push -u origin new branch")
-            ps = self._git("push", "-u", "origin", task.new_branch, cwd=project_dir)
+            ps = self._git("push", "-u", "origin", task.new_branch, cwd=project_dir, auth_args=auth_args)
             if ps.returncode != 0:
                 add_process_output(ps)
                 return done("failed", "推送分支失败")

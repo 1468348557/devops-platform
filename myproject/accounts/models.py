@@ -94,6 +94,15 @@ class GitPlatformConfig(models.Model):
     sql_db_name = models.CharField(max_length=128, blank=True, default="")
     sql_db_user = models.CharField(max_length=128, blank=True, default="")
     sql_db_password = models.CharField(max_length=255, blank=True, default="")
+    sql_keyword_ddl = models.CharField(max_length=255, blank=True, default="ddl")
+    sql_keyword_backup = models.CharField(max_length=255, blank=True, default="backup,bak,备份")
+    sql_keyword_execute = models.CharField(max_length=255, blank=True, default="execute,执行")
+    sql_keyword_rollback = models.CharField(max_length=255, blank=True, default="rollback,回滚")
+    sql_auto_approve_order = models.CharField(
+        max_length=255,
+        blank=True,
+        default="backup,ddl,execute,rollback",
+    )
     updated_by = models.ForeignKey(
         User,
         null=True,
@@ -131,6 +140,11 @@ class GitPlatformConfig(models.Model):
             sql_db_name="",
             sql_db_user="",
             sql_db_password="",
+            sql_keyword_ddl="ddl",
+            sql_keyword_backup="backup,bak,备份",
+            sql_keyword_execute="execute,执行",
+            sql_keyword_rollback="rollback,回滚",
+            sql_auto_approve_order="backup,ddl,execute,rollback",
         )
 
     @classmethod
@@ -192,6 +206,7 @@ class RolePermissionPolicy(models.Model):
     action_sql_repo_sync = models.BooleanField(default=False)
     action_sql_request_apply = models.BooleanField(default=False)
     action_sql_request_approve = models.BooleanField(default=False)
+    action_sql_request_auto_approve = models.BooleanField(default=False)
     action_sql_request_edit_others = models.BooleanField(default=False)
     release_entry_editable_fields = models.JSONField(default=list, blank=True)
 
@@ -251,6 +266,7 @@ class RolePermissionPolicy(models.Model):
                 "action_sql_repo_sync": False,
                 "action_sql_request_apply": False,
                 "action_sql_request_approve": False,
+                "action_sql_request_auto_approve": True,
                 "action_sql_request_edit_others": False,
                 "release_entry_editable_fields": DEFAULT_RELEASE_ENTRY_FIELDS_BY_ROLE_KEY.get("ops", []),
                 "data_scope_release_entry": cls.DataScope.ALL,
@@ -282,6 +298,7 @@ class RolePermissionPolicy(models.Model):
             "action_sql_repo_sync": False,
             "action_sql_request_apply": True,
             "action_sql_request_approve": False,
+            "action_sql_request_auto_approve": False,
             "action_sql_request_edit_others": False,
             "release_entry_editable_fields": DEFAULT_RELEASE_ENTRY_FIELDS_BY_ROLE_KEY.get(
                 "developer", []

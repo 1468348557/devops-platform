@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import base64
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import quote, urlsplit, urlunsplit
@@ -67,6 +68,28 @@ class RuntimeGitSettings:
             netloc = f"{user}:{password}@{netloc}"
         new_path = f"{parsed.path.rstrip('/')}/{path}"
         return urlunsplit((parsed.scheme, netloc, new_path, "", ""))
+
+    def repo_url(self, project: str) -> str:
+        path = f"{self.git_group}/{project}.git".strip("/")
+        parsed = self.parsed_base_url
+        new_path = f"{parsed.path.rstrip('/')}/{path}"
+        return urlunsplit((parsed.scheme, parsed.netloc, new_path, "", ""))
+
+    def git_auth_config_args(self) -> list[str]:
+        auth_mode = self.preferred_auth()
+        username = ""
+        secret = ""
+        if auth_mode == "pat":
+            username = "oauth2"
+            secret = self.git_pat
+        elif auth_mode == "basic":
+            username = self.git_username
+            secret = self.git_password
+        if not username or not secret:
+            return []
+        token_raw = f"{username}:{secret}".encode("utf-8")
+        token = base64.b64encode(token_raw).decode("ascii")
+        return ["-c", f"http.extraHeader=Authorization: Basic {token}"]
 
     def masked_remote_url(self, project: str) -> str:
         path = f"{self.git_group}/{project}.git".strip("/")

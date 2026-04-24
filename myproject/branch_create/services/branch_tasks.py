@@ -159,10 +159,11 @@ def _prepare_repo_for_remote_check(
         return cached
 
     project_dir = work_base_dir / project
-    git_url = runtime.with_credentials_url(project)
+    git_url = runtime.repo_url(project)
+    auth_args = tuple(runtime.git_auth_config_args())
 
     if not project_dir.exists():
-        clone = executor._git("clone", git_url, str(project_dir))
+        clone = executor._git("clone", git_url, str(project_dir), auth_args=auth_args)
         if clone.returncode != 0:
             repo_ready_cache[project] = (
                 False,
@@ -174,7 +175,14 @@ def _prepare_repo_for_remote_check(
         repo_ready_cache[project] = (False, "目录存在但不是 Git 仓库", None)
         return repo_ready_cache[project]
 
-    origin_set = executor._git("remote", "set-url", "origin", git_url, cwd=project_dir)
+    origin_set = executor._git(
+        "remote",
+        "set-url",
+        "origin",
+        git_url,
+        cwd=project_dir,
+        auth_args=auth_args,
+    )
     if origin_set.returncode != 0:
         repo_ready_cache[project] = (
             False,
@@ -193,6 +201,7 @@ def filter_preview_tasks_with_remote_check(tasks: list[dict], operator) -> tuple
 
     runtime = get_runtime_git_settings()
     work_base_dir, _ = runtime.resolve_writable_work_base_path()
+    auth_args = tuple(runtime.git_auth_config_args())
     executor = BranchExecutor(work_base_dir=str(work_base_dir))
     repo_ready_cache: dict[str, tuple[bool, str, object | None]] = {}
     remote_exists_cache: dict[tuple[str, str], bool] = {}
@@ -222,6 +231,7 @@ def filter_preview_tasks_with_remote_check(tasks: list[dict], operator) -> tuple
                 "origin",
                 branch,
                 cwd=project_dir,
+                auth_args=auth_args,
             )
             exists = ls.returncode == 0
             remote_exists_cache[cache_key] = exists

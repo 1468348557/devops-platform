@@ -107,9 +107,11 @@ class ReleaseItem(models.Model):
     )
     requirement_branch = models.CharField(
         max_length=32,
-        unique=True,
+        null=True,
+        blank=True,
         validators=[RegexValidator(regex=BRANCH_REGEX, message="需求分支格式不正确")],
     )
+    sql_only_release = models.BooleanField(default=False)
     batch = models.ForeignKey(ReleaseBatch, on_delete=models.CASCADE, related_name="items")
     project = models.ForeignKey(
         ReleaseBatchProject, on_delete=models.PROTECT, related_name="release_items"
@@ -186,7 +188,6 @@ class ReleaseItem(models.Model):
             "flow_name": self.flow_name,
             "biz_category": self.biz_category,
             "project": self.project_id,
-            "requirement_branch": self.requirement_branch,
             "tech_owner": self.tech_owner,
             "biz_owner": self.biz_owner,
             "need_param_release": self.need_param_release,

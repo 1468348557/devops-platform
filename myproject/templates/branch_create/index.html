@@ -8,9 +8,22 @@
   .card { max-width: 1400px; padding: 20px; position: relative; }
   .nav-bread { font-size: 13px; color: #6b7280; margin-bottom: 16px; }
   .nav-bread a { color: #1f75cb; text-decoration: none; }
-  .feature-header { margin-bottom: 20px; }
+  .feature-header { margin-bottom: 16px; }
   .feature-header h1 { margin: 0 0 4px; font-size: 22px; }
   .feature-header p { margin: 0; color: #6b7280; font-size: 13px; }
+  .panel {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #f8fafc;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .panel-title {
+    margin: 0 0 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+  }
   .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 12px; }
   .field { display: grid; gap: 4px; min-width: 180px; }
   .filter-grid {
@@ -24,10 +37,40 @@
     flex-wrap: wrap;
     gap: 10px;
     align-items: center;
-    margin-bottom: 12px;
+    justify-content: space-between;
+    margin-bottom: 0;
   }
-  .tabs { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
-  .tab-btn { border: 1px solid #d1d5db; border-radius: 6px; background: #fff; padding: 6px 12px; cursor: pointer; }
+  .action-main {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+  }
+  .action-side {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+  }
+  .tabs {
+    display: inline-flex;
+    gap: 6px;
+    margin-bottom: 10px;
+    align-items: center;
+    padding: 4px;
+    background: #eef2ff;
+    border: 1px solid #dbeafe;
+    border-radius: 10px;
+  }
+  .tab-btn {
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: #334155;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-weight: 500;
+  }
   .tab-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
   .home-icon-link {
     position: absolute;
@@ -46,13 +89,16 @@
   }
   .home-icon-link:hover { background: #f8fafc; border-color: #94a3b8; }
   .home-icon-link svg { width: 18px; height: 18px; display: block; }
-  .table-wrap { overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
+  .table-wrap { overflow: auto; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 980px; }
   th, td { border-bottom: 1px solid #e5e7eb; padding: 8px 10px; text-align: left; vertical-align: top; }
-  th { background: #f8fafc; font-weight: 600; }
+  th { background: #f8fafc; font-weight: 600; position: sticky; top: 0; z-index: 1; }
+  tbody tr:nth-child(even) { background: #fcfdff; }
+  tbody tr:hover { background: #f3f7ff; }
   .status-pending { background: #fee2e2; color: #991b1b; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
   .status-created { background: #dcfce7; color: #14532d; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
   .muted { color: #6b7280; font-size: 12px; }
+  .inline-check { display: inline-flex; align-items: center; gap: 6px; color: #334155; }
   .schedule-box { margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 16px; }
   .schedule-panel { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; background: #fafafa; }
   .schedule-panel > summary { cursor: pointer; font-weight: 600; margin-bottom: 10px; }
@@ -71,10 +117,6 @@
   .drawer-body { padding: 12px 14px; overflow: auto; }
 </style>
 
-<div class="nav-bread">
-  <a href="{% url 'dashboard' %}">工作台</a> / 查询所有新建分支
-</div>
-
 <section class="card">
   <a class="home-icon-link" href="{% url 'dashboard' %}" title="返回主界面" aria-label="返回主界面">
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -88,62 +130,67 @@
     <p>汇总投产征集与 HOBO 需求登记台账的新建分支需求，支持统一筛选查看。</p>
   </div>
 
-  <div class="tabs">
-    {% if can_view_hobo %}<button id="tab-hobo" class="tab-btn active" type="button">需求分支（HOBO）</button>{% endif %}
-    {% if can_view_release %}<button id="tab-release" class="tab-btn {% if not can_view_hobo %}active{% endif %}" type="button">投产分支（投产征集）</button>{% endif %}
-    {% if can_view_hobo and can_view_release %}<button id="tab-both" class="tab-btn" type="button">两者</button>{% endif %}
+  <div class="panel">
+    <p class="panel-title">筛选条件</p>
+    <div class="tabs">
+      {% if can_view_hobo %}<button id="tab-hobo" class="tab-btn active" type="button">需求分支（HOBO）</button>{% endif %}
+      {% if can_view_release %}<button id="tab-release" class="tab-btn {% if not can_view_hobo %}active{% endif %}" type="button">投产分支（投产征集）</button>{% endif %}
+      {% if can_view_hobo and can_view_release %}<button id="tab-both" class="tab-btn" type="button">两者</button>{% endif %}
+    </div>
+
+    <div class="filter-grid">
+      <label class="field">开始日期
+        <input id="start-date" class="form-input" type="date">
+      </label>
+      <label class="field">结束日期
+        <input id="end-date" class="form-input" type="date">
+      </label>
+
+      <label class="field" id="field-hobo-description">需求描述（模糊）
+        <input id="hobo-description" class="form-input" placeholder="关键字">
+      </label>
+      <label class="field" id="field-hobo-type">需求类型
+        <select id="hobo-type" class="form-input">
+          <option value="">全部</option>
+          <option value="REQ">REQ</option>
+          <option value="FIX">FIX</option>
+          <option value="PUB">PUB</option>
+        </select>
+      </label>
+      <label class="field" id="field-hobo-project">工程名称（HOBO）
+        <select id="hobo-project-id" class="form-input"><option value="">全部</option></select>
+      </label>
+
+      <label class="field" id="field-release-flow">流程/功能（模糊）
+        <input id="release-flow-name" class="form-input" placeholder="关键字">
+      </label>
+      <label class="field" id="field-release-project">工程名称（投产）
+        <select id="release-project-id" class="form-input">
+          <option value="">全部</option>
+          {% for p in release_project_options %}
+          <option value="{{ p.id }}">{{ p.project_code }}{% if p.project_name and p.project_name != p.project_code %} ({{ p.project_name }}){% endif %}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+
+    <div class="action-row">
+      <div class="action-main">
+        <button id="btn-preview" class="btn btn-primary" type="button">查询待创建</button>
+        <button id="btn-reset" class="btn btn-secondary" type="button">重置筛选</button>
+        {% if can_execute_tasks %}
+        <button id="btn-execute" class="btn btn-secondary" type="button">批量创建所选分支</button>
+        <label class="inline-check"><input id="check-all" type="checkbox"> 全选当前列表</label>
+        {% else %}
+        <span class="muted">当前账号仅支持查看与搜索过滤</span>
+        {% endif %}
+      </div>
+      <span id="tip" class="muted"></span>
+    </div>
   </div>
 
-  <div class="filter-grid">
-    <label class="field">开始日期
-      <input id="start-date" class="form-input" type="date">
-    </label>
-    <label class="field">结束日期
-      <input id="end-date" class="form-input" type="date">
-    </label>
-
-    <label class="field" id="field-hobo-description">需求描述（模糊）
-      <input id="hobo-description" class="form-input" placeholder="关键字">
-    </label>
-    <label class="field" id="field-hobo-type">需求类型
-      <select id="hobo-type" class="form-input">
-        <option value="">全部</option>
-        <option value="REQ">REQ</option>
-        <option value="FIX">FIX</option>
-        <option value="PUB">PUB</option>
-      </select>
-    </label>
-    <label class="field" id="field-hobo-project">工程名称（HOBO）
-      <select id="hobo-project-id" class="form-input"><option value="">全部</option></select>
-    </label>
-
-    <label class="field" id="field-release-flow">流程/功能（模糊）
-      <input id="release-flow-name" class="form-input" placeholder="关键字">
-    </label>
-    <label class="field" id="field-release-project">工程名称（投产）
-      <select id="release-project-id" class="form-input">
-        <option value="">全部</option>
-        {% for p in release_project_options %}
-        <option value="{{ p.id }}">{{ p.project_code }}{% if p.project_name and p.project_name != p.project_code %} ({{ p.project_name }}){% endif %}</option>
-        {% endfor %}
-      </select>
-    </label>
-
-  </div>
-
-  <div class="action-row">
-    <button id="btn-preview" class="btn btn-secondary" type="button">查询待创建</button>
-    <button id="btn-reset" class="btn btn-secondary" type="button">重置筛选</button>
-    {% if can_execute_tasks %}
-    <label><input id="check-all" type="checkbox"> 全选当前列表</label>
-    <button id="btn-execute" class="btn btn-primary" type="button">批量创建所选分支</button>
-    {% else %}
-    <span class="muted">当前账号仅支持查看与搜索过滤</span>
-    {% endif %}
-    <span id="tip" class="muted"></span>
-  </div>
-  <div class="live-log-box">
-    <p class="live-log-title">实时执行记录</p>
+  <div class="panel live-log-box">
+    <p class="panel-title">实时执行记录</p>
     <pre id="live-exec-log" class="log-pre">暂无执行记录</pre>
   </div>
 
@@ -245,8 +292,15 @@
     const fd = new FormData();
     Object.entries(payload || {}).forEach(([k,v]) => fd.append(k, v == null ? '' : String(v)));
     const resp = await fetch(url, { method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}'}, body: fd });
-    const data = await resp.json();
-    if (!resp.ok || !data.success) throw data;
+    const contentType = resp.headers.get('content-type') || '';
+    let data = null;
+    if (contentType.includes('application/json')) {
+      data = await resp.json();
+    } else {
+      const text = await resp.text();
+      data = { success: false, error: text ? text.slice(0, 300) : `HTTP ${resp.status}` };
+    }
+    if (!resp.ok || !data.success) throw data || { error: `HTTP ${resp.status}` };
     return data;
   }
 
@@ -416,9 +470,9 @@
         <td>${escapeHtml(s.last_run_at || '-')}</td>
         <td>${escapeHtml(s.created_by)}</td>
         <td>
-          <button class="btn btn-secondary btn-edit-s" data-id="${s.id}">编辑</button>
-          <button class="btn btn-secondary btn-run-s" data-id="${s.id}">执行</button>
-          <button class="btn btn-secondary btn-del-s" data-id="${s.id}">删除</button>
+          <button class="btn btn-secondary btn-edit-s" type="button" data-id="${s.id}">编辑</button>
+          <button class="btn btn-secondary btn-run-s" type="button" data-id="${s.id}">执行</button>
+          <button class="btn btn-secondary btn-del-s" type="button" data-id="${s.id}">删除</button>
         </td>
       `;
       body.appendChild(tr);
@@ -503,6 +557,19 @@
   el('log-modal').addEventListener('click', (ev) => { if (ev.target.id === 'log-modal') el('log-modal').classList.remove('show'); });
 
   {% if can_manage_schedule %}
+  async function runDueSchedulesTick() {
+    try {
+      const data = await requestForm('/branch-create/api/schedules/run-due/', {});
+      if ((data.executed || 0) > 0) {
+        el('schedule-tip').textContent = `自动执行计划任务 ${data.executed} 条`;
+        await loadSchedules();
+        await previewTasks();
+      }
+    } catch (_e) {
+      // 静默失败，避免频繁打扰页面操作
+    }
+  }
+
   document.getElementById('btn-save-schedule').addEventListener('click', async () => {
     try {
       await requestForm('/branch-create/api/schedules/save/', {
@@ -528,6 +595,8 @@
     el('schedule-days').value = '30';
     el('schedule-enabled').value = '1';
   });
+  window.setInterval(runDueSchedulesTick, 60 * 1000);
+  runDueSchedulesTick();
   {% endif %}
 
   setDefaultDateRange();

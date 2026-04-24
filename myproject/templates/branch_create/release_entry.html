@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}投产征集 - DevOps Platform{% endblock %}
+{% block title %}投产征集 - DevOps Platform v2{% endblock %}
 
 {% block content %}
 <style>
   .page { align-items: flex-start; }
-  .card { max-width: 1280px; margin-top: 24px; position: relative; }
+  .card { max-width: 1460px; width: 100%; margin-top: 24px; position: relative; }
   .layout { display: grid; gap: 16px; }
   .section-title { margin: 0 0 12px; font-size: 18px; }
   .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -13,15 +13,183 @@
   .field { display: grid; gap: 6px; font-size: 13px; }
   .muted { color: #6b7280; font-size: 12px; }
   .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .table-wrap { overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1024px; }
-  th, td { padding: 8px 10px; border-bottom: 1px solid #eef2f7; text-align: left; vertical-align: top; }
-  th { background: #f8fafc; font-weight: 600; }
+  .records-section { min-width: 0; }
+  .records-headbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .records-hint { color: #64748b; font-size: 12px; }
+  .records-section .table-frame {
+    border: 1px solid #dbe3ef;
+    border-radius: 10px;
+    background: #fff;
+    max-width: 100%;
+    overflow: hidden;
+  }
+  .records-section .table-wrap {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 56vh;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable both-edges;
+  }
+  .records-section .table-wrap::-webkit-scrollbar { height: 12px; width: 12px; }
+  .records-section .table-wrap::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+  .records-section .table-wrap::-webkit-scrollbar-track { background: #f1f5f9; }
+  .records-section .records-table {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13px;
+    table-layout: auto;
+    border-top: 2px solid #475569;
+    border-left: 2px solid #475569;
+  }
+  .records-section .records-table th,
+  .records-section .records-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid #94a3b8;
+    border-right: 1px solid #94a3b8;
+    text-align: left;
+    vertical-align: middle;
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+    writing-mode: horizontal-tb !important;
+    text-orientation: mixed !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 128px;
+    max-width: 320px;
+    background: #fff;
+  }
+  .records-section .records-table th {
+    position: sticky;
+    top: 0;
+    z-index: 8;
+    background: #e2e8f0;
+    color: #1e293b;
+    font-weight: 700;
+    font-size: 13px;
+    border-bottom: 2px solid #64748b;
+    border-right: 1px solid #94a3b8;
+    letter-spacing: 0.3px;
+  }
+  .records-section .records-table tbody tr:nth-child(even) td { background: #f8fafc; }
+  .records-section .records-table tbody tr:hover td { background: #eef6ff; }
+  .records-section .records-table th:last-child,
+  .records-section .records-table td:last-child { border-right: 1px solid #94a3b8; }
+
+  .records-section .records-table th.col-flow_name,
+  .records-section .records-table td.col-flow_name { min-width: 180px; }
+  .records-section .records-table th.col-project_name,
+  .records-section .records-table td.col-project_name { min-width: 150px; }
+  .records-section .records-table th.col-biz_category,
+  .records-section .records-table td.col-biz_category { min-width: 120px; }
+  .records-section .records-table th.col-release_branch,
+  .records-section .records-table td.col-release_branch { min-width: 160px; }
+  .records-section .records-table th.col-branch_status,
+  .records-section .records-table td.col-branch_status { min-width: 170px; }
+  .records-section .records-table th.col-completion,
+  .records-section .records-table td.col-completion { min-width: 260px; max-width: 360px; }
+
+  /* 序号列：固定在最左侧，Excel 行号风格 */
+  .records-section .records-table th.col-row_no,
+  .records-section .records-table td.col-row_no {
+    position: sticky;
+    left: 0;
+    z-index: 12;
+    min-width: 44px;
+    max-width: 54px;
+    width: 44px;
+    text-align: center;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    background: #f1f5f9;
+    padding: 9px 6px;
+    border-right: 1px solid #94a3b8;
+    user-select: none;
+  }
+  .records-section .records-table th.col-row_no {
+    z-index: 20;
+    background: #cbd5e1;
+    color: #1e293b;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #64748b;
+  }
+  .records-section .records-table tbody tr:nth-child(even) td.col-row_no { background: #f1f5f9; }
+  .records-section .records-table tbody tr:hover td.col-row_no { background: #dce3f0; }
+  .records-section .records-table th.col-select_row,
+  .records-section .records-table td.col-select_row {
+    position: sticky;
+    left: 44px;
+    z-index: 12;
+    min-width: 44px;
+    max-width: 52px;
+    width: 44px;
+    text-align: center;
+    background: #f8fafc;
+    padding: 9px 6px;
+  }
+  .records-section .records-table th.col-select_row {
+    z-index: 20;
+    background: #cbd5e1;
+    border-bottom: 2px solid #64748b;
+  }
+  .records-section .records-table tbody tr:nth-child(even) td.col-select_row { background: #f1f5f9; }
+  .records-section .records-table tbody tr:hover td.col-select_row { background: #dce3f0; }
+
+  .records-section .records-table th.col-actions,
+  .records-section .records-table td.col-actions {
+    position: sticky;
+    right: 0;
+    z-index: 12;
+    min-width: 210px;
+    max-width: none;
+    background: #fff;
+    overflow: visible;
+    text-overflow: initial;
+    white-space: nowrap;
+  }
+  .records-section .records-table th.col-actions {
+    z-index: 20;
+    background: #e2e8f0;
+    border-bottom: 2px solid #64748b;
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .records-section .records-table tbody tr:nth-child(even) td.col-actions { background: #fafbfc; }
+  .records-section .records-table tbody tr:hover td.col-actions { background: #eef6ff; }
+  .records-section .records-table td.col-actions .btn {
+    margin-right: 6px;
+  }
+  .records-section .records-table td.col-actions .btn:last-child {
+    margin-right: 0;
+  }
   .tag { display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
   .tag-miss { background: #fee2e2; color: #991b1b; }
   .tag-ok { background: #dcfce7; color: #14532d; }
   .status-pending-branch { background: #fee2e2; color: #991b1b; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
   .status-created-branch { background: #dcfce7; color: #14532d; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
+  .status-sql-only { background: #dbeafe; color: #1e40af; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
+  .status-yn {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .status-yn-yes { background: #dcfce7; color: #166534; }
+  .status-yn-no { background: #fee2e2; color: #991b1b; }
+  .status-yn-empty { background: #f1f5f9; color: #64748b; }
   .status { font-weight: 600; }
   .gap-top { margin-top: 10px; }
   .danger { color: #b91c1c; }
@@ -125,16 +293,38 @@
     color: #334155;
   }
   .column-panel {
-    position: absolute;
-    right: 0;
-    top: calc(100% + 6px);
-    z-index: 50;
-    width: min(560px, 86vw);
+    position: fixed;
+    top: 76px;
+    right: 16px;
+    z-index: 2600;
+    width: min(420px, 92vw);
+    max-height: calc(100vh - 92px);
+    overflow: auto;
     background: #fff;
     border: 1px solid #e5e7eb;
     border-radius: 10px;
     box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
     padding: 10px;
+  }
+  .column-panel-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 2550;
+    background: rgba(15, 23, 42, 0.2);
+  }
+  .column-panel-backdrop.hidden { display: none !important; }
+  .column-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eef2f7;
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 1;
   }
   .column-panel-title {
     font-size: 13px;
@@ -246,9 +436,9 @@
     <h2 class="section-title">选择批次</h2>
     <div class="toolbar">
       <select id="batch-select" class="form-input" style="max-width: 360px;"></select>
-      <button id="btn-refresh" class="btn btn-secondary">刷新</button>
+      <button id="btn-refresh" type="button" class="btn btn-secondary">刷新</button>
       {% if can_manage_batch %}
-      <button id="btn-delete-batch" class="btn btn-secondary">删除当前批次</button>
+      <button id="btn-delete-batch" type="button" class="btn btn-secondary">删除当前批次</button>
       {% endif %}
       <span id="tip" class="muted"></span>
     </div>
@@ -281,7 +471,7 @@
             <input id="biz-category" class="form-input" placeholder="必填">
           </label>
           <label class="field">需求分支
-            <input id="requirement-branch" class="form-input" placeholder="例如：REQ-20260420-0001">
+            <input id="requirement-branch" class="form-input" placeholder="如果投产只包含sql,则可以不填,否则必填">
           </label>
           <label class="field">投产分支（自动生成）
             <input id="release-branch" class="form-input" readonly>
@@ -352,7 +542,7 @@
           <label class="field">涉及投产验证
             <select id="need-release-verify" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
           </label>
-          <label class="field">REL 测试状态（研发填写）
+          <label class="field">REL 测试状态
             <select id="rel-test-status" class="form-input">
               <option value="">未填写</option>
               <option value="是">是</option>
@@ -363,7 +553,7 @@
           <label class="field">REL 是否已部署（运维填写）
             <select id="rel-deployed" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
           </label>
-          <label class="field">投产状态（运维填写）
+          <label class="field">是否已完成投产
             <select id="deploy-status" class="form-input">
               <option value="">未填写</option>
               <option value="是">是</option>
@@ -397,9 +587,10 @@
     </div>
   </div>
 
-  <div>
+  <div class="records-section">
     <h2 class="section-title">当前批次记录</h2>
-    <div class="toolbar gap-top">
+    <div class="records-headbar gap-top">
+      <div class="toolbar">
       <button id="btn-show-project-lines" class="btn btn-secondary" type="button">本次投产工程</button>
       <label class="field">流程/功能名称（模糊）
         <input id="search-flow-name" class="form-input" placeholder="输入关键字">
@@ -411,9 +602,35 @@
       </label>
       <button id="btn-search-items" class="btn btn-secondary" type="button">搜索</button>
       <button id="btn-reset-search" class="btn btn-secondary" type="button">重置</button>
+      {% if can_bulk_update_ops_fields %}
+      <label class="field">批量字段
+        <select id="bulk-field-name" class="form-input">
+          <option value="deploy_status">投产状态</option>
+          <option value="rel_deployed">REL是否已部署</option>
+        </select>
+      </label>
+      <label class="field">批量值
+        <select id="bulk-field-value" class="form-input">
+          <option value="">未填写</option>
+          <option value="是">是</option>
+          <option value="否">否</option>
+        </select>
+      </label>
+      <button id="btn-bulk-update" class="btn btn-secondary" type="button">批量修改所选</button>
+      {% endif %}
       <div class="relative">
         <button id="btn-column-config" class="btn btn-column-emphasis" type="button">自定义列（显示项）</button>
+      </div>
+      </div>
+      <div class="records-hint">提示：表头固定，操作列固定在右侧，可横向滚动查看更多字段。</div>
+    </div>
+    <div id="column-panel-backdrop" class="column-panel-backdrop hidden"></div>
+    <div class="relative">
         <div id="column-config-panel" class="column-panel hidden">
+          <div class="column-panel-header">
+            <strong>自定义列（显示项）</strong>
+            <button id="btn-column-close-top" class="btn btn-secondary" type="button">关闭</button>
+          </div>
           <p class="column-panel-title">填写记录中的字段都可勾选展示（操作列固定保留）</p>
           <div id="column-config-grid" class="column-grid"></div>
           <div class="column-actions">
@@ -421,15 +638,16 @@
             <button id="btn-column-close" class="btn btn-secondary" type="button">关闭</button>
           </div>
         </div>
-      </div>
     </div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-        <tr id="item-head-row"></tr>
-        </thead>
-        <tbody id="item-body"></tbody>
-      </table>
+    <div class="table-frame">
+      <div id="item-table-wrap" class="table-wrap">
+        <table class="records-table">
+          <thead>
+          <tr id="item-head-row"></tr>
+          </thead>
+          <tbody id="item-body"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -454,6 +672,7 @@
   const isStaff = {{ is_staff_user|yesno:"true,false" }};
   const isSuperuser = {{ is_superuser_user|yesno:"true,false" }};
   const canEditOpsFields = {{ can_edit_ops_fields|yesno:"true,false" }};
+  const canBulkUpdateOpsFields = {{ can_bulk_update_ops_fields|yesno:"true,false" }};
   const currentRole = "{{ current_role|escapejs }}";
   const canCreateDevRecord = {{ can_create_dev_record|yesno:"true,false" }};
   const currentUsername = "{{ request.user.username|escapejs }}";
@@ -479,6 +698,7 @@
   let currentBatch = null;
   let currentBatchProjects = [];
   let currentBatchItems = [];
+  let selectedItemIds = new Set();
   let editingItemId = null;
   let viewOnlyMode = false;
   let submitAction = "submit";
@@ -502,6 +722,9 @@
       id: "branch_status",
       label: "分支创建状态",
       render: (item) => {
+        if (item.sql_only_release) {
+          return `<span class="status-sql-only">仅SQL上线</span>`;
+        }
         const safeBranchError = escapeHtml(item.branch_create_error || "");
         const branchStatusHtml = item.branch_created
           ? `<span class="status-created-branch">已创建</span>`
@@ -509,9 +732,9 @@
         return `${branchStatusHtml}${safeBranchError ? `<div class="muted danger">${safeBranchError}</div>` : ""}`;
       },
     },
-    { id: "rel_test_status", label: "REL测试状态", render: (item) => escapeHtml(item.rel_test_status || "-") },
-    { id: "rel_deployed", label: "REL是否已部署", render: (item) => item.rel_deployed === null || item.rel_deployed === undefined ? "-" : (item.rel_deployed ? "是" : "否") },
-    { id: "deploy_status", label: "投产状态", render: (item) => escapeHtml(item.deploy_status || "-") },
+    { id: "rel_test_status", label: "REL测试状态", render: (item) => renderYnStatus(item.rel_test_status) },
+    { id: "rel_deployed", label: "REL是否已部署", render: (item) => renderYnStatus(item.rel_deployed === null || item.rel_deployed === undefined ? "" : (item.rel_deployed ? "是" : "否")) },
+    { id: "deploy_status", label: "投产状态", render: (item) => renderYnStatus(item.deploy_status) },
     { id: "developer", label: "填写人", render: (item) => escapeHtml(item.developer || "-") },
     {
       id: "completion",
@@ -577,15 +800,35 @@
   function saveColumnPrefs() {
     localStorage.setItem(columnPrefKey, JSON.stringify(visibleColumnIds));
   }
+  const rowNoCol = { id: "row_no", label: "#", fixed: true, render: null };
+  const selectRowCol = {
+    id: "select_row",
+    label: "勾选",
+    fixed: true,
+    render: (item) => {
+      if (!canBulkUpdateOpsFields) return "";
+      const checked = selectedItemIds.has(item.id) ? "checked" : "";
+      return `<input type="checkbox" class="bulk-item-check" data-id="${item.id}" ${checked}>`;
+    }
+  };
   function getActiveColumns() {
     const dynamicCols = visibleColumnIds.map((id) => getColumnDef(id)).filter(Boolean);
     const fixedCols = fixedColumnIds.map((id) => getColumnDef(id)).filter(Boolean);
-    return [...dynamicCols, ...fixedCols];
+    if (canBulkUpdateOpsFields) {
+      return [rowNoCol, selectRowCol, ...dynamicCols, ...fixedCols];
+    }
+    return [rowNoCol, ...dynamicCols, ...fixedCols];
   }
   function renderTableHeader() {
     const head = el("item-head-row");
     const cols = getActiveColumns();
-    head.innerHTML = cols.map((col) => `<th>${escapeHtml(col.label)}</th>`).join("");
+    head.innerHTML = cols.map((col) => {
+      if (col.id === "row_no") return `<th class="col-row_no">#</th>`;
+      if (col.id === "select_row") {
+        return `<th class="col-select_row"><input id="bulk-check-all" type="checkbox" ${currentBatchItems.length > 0 && selectedItemIds.size === currentBatchItems.length ? "checked" : ""}></th>`;
+      }
+      return `<th class="col-${col.id}">${escapeHtml(col.label)}</th>`;
+    }).join("");
   }
   function renderColumnConfigPanel() {
     const grid = el("column-config-grid");
@@ -712,6 +955,19 @@
   function openProjectLinesModal() { el("project-lines-modal").classList.remove("hidden"); }
   function closeProjectLinesModal() { el("project-lines-modal").classList.add("hidden"); }
 
+  function summarizeErrorMessage(rawMessage, statusCode) {
+    const raw = String(rawMessage || "").replace(/\s+/g, " ").trim();
+    if (!raw) return `请求失败（HTTP ${statusCode || "未知"}）`;
+    const short = raw.slice(0, 180);
+    if (/TemplateSyntaxError|Traceback|Exception Value|IntegrityError|OperationalError|ProgrammingError/i.test(raw)) {
+      return `服务端异常（HTTP ${statusCode || "未知"}），请联系管理员查看后台日志`;
+    }
+    if (short.length < raw.length) {
+      return `${short}...`;
+    }
+    return short;
+  }
+
   async function request(url, method, payload) {
     const formData = new FormData();
     if (payload) Object.entries(payload).forEach(([k, v]) => formData.append(k, v ?? ""));
@@ -720,7 +976,18 @@
       headers: { "X-CSRFToken": csrfToken },
       body: method === "GET" ? null : formData
     });
-    const data = await resp.json();
+    const contentType = (resp.headers.get("content-type") || "").toLowerCase();
+    let data;
+    if (contentType.includes("application/json")) {
+      data = await resp.json();
+    } else {
+      const raw = await resp.text();
+      const cleaned = String(raw || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      data = { success: false, error: summarizeErrorMessage(cleaned, resp.status) };
+    }
+    if (data && typeof data === "object" && "error" in data) {
+      data.error = summarizeErrorMessage(data.error, resp.status);
+    }
     if (!resp.ok || !data.success) throw data;
     return data;
   }
@@ -733,6 +1000,25 @@
   function denormalizeBool(value) {
     if (value === "") return "";
     return value === "是" ? "是" : "否";
+  }
+
+  function normalizeYesNoChoice(value) {
+    const raw = String(value ?? "").trim();
+    if (!raw) return "";
+    if (raw === "是" || raw.toLowerCase() === "true" || raw === "1") return "是";
+    if (raw === "否" || raw.toLowerCase() === "false" || raw === "0") return "否";
+    return raw;
+  }
+
+  function renderYnStatus(value) {
+    const normalized = normalizeYesNoChoice(value);
+    if (normalized === "是") {
+      return `<span class="status-yn status-yn-yes">是</span>`;
+    }
+    if (normalized === "否") {
+      return `<span class="status-yn status-yn-no">否</span>`;
+    }
+    return `<span class="status-yn status-yn-empty">-</span>`;
   }
 
   function fillProjectOptions() {
@@ -820,7 +1106,7 @@
     el("need-esf").value = normalizeBool(item.need_esf);
     el("need-trade-tuning").value = normalizeBool(item.need_trade_tuning);
     el("need-release-verify").value = normalizeBool(item.need_release_verify);
-    el("rel-test-status").value = item.rel_test_status || "";
+    el("rel-test-status").value = normalizeYesNoChoice(item.rel_test_status);
     if (canEditOpsFields) {
       el("rel-deployed").value = normalizeBool(item.rel_deployed);
       el("deploy-status").value = item.deploy_status || "";
@@ -860,7 +1146,6 @@
     setValue("need-esf", normalizeBool(item.need_esf));
     setValue("need-trade-tuning", normalizeBool(item.need_trade_tuning));
     setValue("need-release-verify", normalizeBool(item.need_release_verify));
-    setValue("rel-test-status", item.rel_test_status || "");
     saveDraftToLocal();
   }
 
@@ -919,12 +1204,44 @@
     renderTableHeader();
     const body = el("item-body");
     body.innerHTML = "";
-    currentBatchItems.forEach((item) => {
+    currentBatchItems.forEach((item, index) => {
       const tr = document.createElement("tr");
       const rowCols = getActiveColumns();
-      tr.innerHTML = rowCols.map((col) => `<td>${col.render(item)}</td>`).join("");
+      tr.innerHTML = rowCols.map((col) => {
+        if (col.id === "row_no") return `<td class="col-row_no">${index + 1}</td>`;
+        if (col.id === "select_row") return `<td class="col-select_row">${col.render(item)}</td>`;
+        return `<td class="col-${col.id}">${col.render(item)}</td>`;
+      }).join("");
       body.appendChild(tr);
     });
+
+    if (canBulkUpdateOpsFields) {
+      const validIds = new Set(currentBatchItems.map((item) => item.id));
+      selectedItemIds = new Set(Array.from(selectedItemIds).filter((id) => validIds.has(id)));
+      const checkAll = el("bulk-check-all");
+      if (checkAll) {
+        checkAll.checked = currentBatchItems.length > 0 && selectedItemIds.size === currentBatchItems.length;
+        checkAll.addEventListener("change", (event) => {
+          if (event.target.checked) {
+            selectedItemIds = new Set(currentBatchItems.map((item) => item.id));
+          } else {
+            selectedItemIds.clear();
+          }
+          renderItems(currentBatchItems);
+        });
+      }
+      body.querySelectorAll(".bulk-item-check").forEach((node) => {
+        node.addEventListener("change", (event) => {
+          const id = Number(node.dataset.id);
+          if (event.target.checked) selectedItemIds.add(id);
+          else selectedItemIds.delete(id);
+          const headerCheck = el("bulk-check-all");
+          if (headerCheck) {
+            headerCheck.checked = currentBatchItems.length > 0 && selectedItemIds.size === currentBatchItems.length;
+          }
+        });
+      });
+    }
 
     body.querySelectorAll(".btn-edit").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -962,6 +1279,13 @@
         }
       });
     });
+    updateTableScrollButtons();
+  }
+
+  function getItemsTableWrap() { return el("item-table-wrap"); }
+
+  function updateTableScrollButtons() {
+    return;
   }
 
   function dash(v) {
@@ -975,7 +1299,7 @@
       ["流程/功能名称", item.flow_name],
       ["业务种类", item.biz_category],
       ["工程名称", item.project ? item.project.name : ""],
-      ["需求分支", item.requirement_branch],
+      ["需求分支", item.requirement_branch || (item.sql_only_release ? "仅SQL上线（无需需求分支）" : "")],
       ["投产分支", item.release_branch],
       ["科技联系人", item.tech_owner],
       ["业务联系人", item.biz_owner],
@@ -1094,6 +1418,7 @@
       }
       select.value = String(currentBatch.id);
       currentBatchProjects = currentBatch.projects.filter((p) => p.enabled);
+      selectedItemIds.clear();
       fillProjectOptions();
       clearForm();
       restoreDraftFromLocal();
@@ -1113,6 +1438,7 @@
     const data = await request("/branch-create/release-entry/api/batches/", "GET");
     currentBatch = data.batches.find((b) => b.id === id) || null;
     currentBatchProjects = currentBatch ? currentBatch.projects.filter((p) => p.enabled) : [];
+    selectedItemIds.clear();
     fillProjectOptions();
     clearForm();
     restoreDraftFromLocal();
@@ -1120,15 +1446,28 @@
   });
 
   el("btn-refresh").addEventListener("click", loadBatches);
+  function openColumnPanel() {
+    const panel = el("column-config-panel");
+    const backdrop = el("column-panel-backdrop");
+    if (!panel || !backdrop) return;
+    panel.classList.remove("hidden");
+    backdrop.classList.remove("hidden");
+    renderColumnConfigPanel();
+  }
+  function closeColumnPanel() {
+    const panel = el("column-config-panel");
+    const backdrop = el("column-panel-backdrop");
+    if (panel) panel.classList.add("hidden");
+    if (backdrop) backdrop.classList.add("hidden");
+  }
   el("btn-column-config").addEventListener("click", () => {
-    el("column-config-panel").classList.toggle("hidden");
-    if (!el("column-config-panel").classList.contains("hidden")) {
-      renderColumnConfigPanel();
-    }
+    const panel = el("column-config-panel");
+    if (panel.classList.contains("hidden")) openColumnPanel();
+    else closeColumnPanel();
   });
-  el("btn-column-close").addEventListener("click", () => {
-    el("column-config-panel").classList.add("hidden");
-  });
+  el("btn-column-close").addEventListener("click", closeColumnPanel);
+  el("btn-column-close-top").addEventListener("click", closeColumnPanel);
+  el("column-panel-backdrop").addEventListener("click", closeColumnPanel);
   el("btn-column-reset").addEventListener("click", () => {
     visibleColumnIds = [...defaultColumnIds];
     saveColumnPrefs();
@@ -1139,9 +1478,10 @@
   document.addEventListener("click", (event) => {
     const panel = el("column-config-panel");
     const trigger = el("btn-column-config");
+    const backdrop = el("column-panel-backdrop");
     if (panel.classList.contains("hidden")) return;
-    if (panel.contains(event.target) || trigger.contains(event.target)) return;
-    panel.classList.add("hidden");
+    if (panel.contains(event.target) || trigger.contains(event.target) || (backdrop && backdrop.contains(event.target))) return;
+    closeColumnPanel();
   });
   el("btn-search-items").addEventListener("click", loadItems);
   el("btn-reset-search").addEventListener("click", async () => {
@@ -1149,6 +1489,46 @@
     el("search-project-id").value = "";
     await loadItems();
   });
+  if (canBulkUpdateOpsFields) {
+    el("bulk-field-name").addEventListener("change", (event) => {
+      const valueSelect = el("bulk-field-value");
+      if (!valueSelect) return;
+      valueSelect.value = "";
+      if ((event.target.value || "") === "rel_deployed") {
+        valueSelect.options[0].textContent = "未填写";
+      } else {
+        valueSelect.options[0].textContent = "未填写";
+      }
+    });
+    el("btn-bulk-update").addEventListener("click", async () => {
+      if (!currentBatch) {
+        setTip("请先选择批次", true);
+        return;
+      }
+      const ids = Array.from(selectedItemIds);
+      if (ids.length === 0) {
+        setTip("请先勾选要批量修改的记录", true);
+        return;
+      }
+      const fieldName = el("bulk-field-name").value;
+      const fieldValue = el("bulk-field-value").value;
+      const fieldLabel = fieldName === "rel_deployed" ? "REL是否已部署" : "投产状态";
+      if (!confirm(`确认将 ${ids.length} 条记录的【${fieldLabel}】批量修改为【${fieldValue || "未填写"}】吗？`)) return;
+      try {
+        const resp = await request("/branch-create/release-entry/api/items/bulk-update/", "POST", {
+          batch_id: currentBatch.id,
+          item_ids: ids.join(","),
+          field_name: fieldName,
+          field_value: fieldValue,
+        });
+        setTip(`批量修改成功，共更新 ${resp.updated_count || ids.length} 条`, false);
+        selectedItemIds.clear();
+        await loadItems();
+      } catch (e) {
+        setTip(`批量修改失败：${e.error || "未知错误"}`, true);
+      }
+    });
+  }
   el("btn-reset").addEventListener("click", () => {
     if (!confirm("确定要清空当前表单内容吗？")) return;
     clearForm();
@@ -1390,6 +1770,8 @@
     }
   });
 
+  getItemsTableWrap()?.addEventListener("scroll", updateTableScrollButtons);
+
   {% if can_manage_batch %}
   function updateBranchPreview() {
     const dateVal = el("new-batch-date").value;
@@ -1426,5 +1808,7 @@
   visibleColumnIds = loadColumnPrefs();
   renderTableHeader();
   loadBatches();
+  window.setTimeout(updateTableScrollButtons, 100);
+  window.addEventListener("resize", updateTableScrollButtons);
 </script>
 {% endblock %}

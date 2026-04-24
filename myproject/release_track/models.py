@@ -32,6 +32,7 @@ class ReleaseTrackRun(models.Model):
     tag_name = models.CharField(max_length=128, blank=True, default="")
     merge_message = models.CharField(max_length=255, blank=True, default="")
     tag_message = models.CharField(max_length=255, blank=True, default="")
+    dry_run = models.BooleanField(default=False)
     total_count = models.PositiveIntegerField(default=0)
     processed_count = models.PositiveIntegerField(default=0)
     success_count = models.PositiveIntegerField(default=0)

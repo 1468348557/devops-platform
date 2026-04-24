@@ -3,6 +3,7 @@ from datetime import timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError
+from django.db.models.deletion import ProtectedError
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
@@ -22,7 +23,6 @@ from .models import (
     ReleaseBatchProject,
     ReleaseBranchSequence,
     ReleaseItem,
-    BRANCH_REGEX,
 )
 
 
@@ -43,6 +43,7 @@ def release_entry_page(request):
             "can_edit_ops_fields": can_edit_ops_fields,
             "can_manage_batch": can_manage_batch,
             "can_create_dev_record": can_do_action(request.user, "release_item_create"),
+            "can_bulk_update_ops_fields": _can_bulk_update_ops_fields(request.user),
         },
     )
 
@@ -81,6 +82,15 @@ def _get_release_entry_editable_fields(user) -> set[str]:
         for field_key in (policy.release_entry_editable_fields or [])
         if field_key in valid_keys
     }
+
+
+def _can_bulk_update_ops_fields(user) -> bool:
+    if user.is_superuser:
+        return True
+    editable_fields = _get_release_entry_editable_fields(user)
+    if not (editable_fields & RELEASE_ENTRY_OPS_FIELD_KEYS):
+        return False
+    return can_do_action(user, "release_item_edit_others")
 
 
 DEFAULT_BATCH_PROJECTS = [
@@ -172,6 +182,7 @@ def _item_to_dict(item: ReleaseItem, user) -> dict:
         "biz_category": item.biz_category,
         "branch_type": item.branch_type,
         "requirement_branch": item.requirement_branch,
+        "sql_only_release": item.sql_only_release,
         "release_branch": item.release_branch,
         "tech_owner": item.tech_owner,
         "biz_owner": item.biz_owner,
@@ -202,7 +213,7 @@ def _item_to_dict(item: ReleaseItem, user) -> dict:
         "branch_create_error": item.branch_create_error,
         "developer": item.developer.username,
         "editable": editable,
-        "can_delete": current_user_id == item.developer_id,
+        "can_delete": is_superuser or current_user_id == item.developer_id,
         "can_edit_dev_fields": can_edit_dev_fields,
         "can_edit_ops_fields": can_edit_ops_fields,
         "missing_fields": missing_fields,
@@ -224,10 +235,6 @@ def _apply_item_fields(
             value = request.POST.get(field)
             if value is not None:
                 setattr(item, field, value.strip())
-
-        requirement_branch = request.POST.get("requirement_branch")
-        if requirement_branch is not None and "requirement_branch" in editable_fields:
-            item.requirement_branch = requirement_branch.strip()
 
         release_branch = request.POST.get("release_branch")
         if release_branch is not None and "release_branch" in editable_fields:
@@ -279,6 +286,38 @@ def _apply_item_fields(
         deploy_status = request.POST.get("deploy_status")
         if deploy_status is not None and "deploy_status" in editable_fields:
             item.deploy_status = deploy_status.strip()
+
+
+def _save_item_or_error(item: ReleaseItem):
+    try:
+        item.save()
+        return None
+    except IntegrityError as exc:
+        detail = str(exc)
+        lowered = detail.lower()
+        is_requirement_branch_duplicate = (
+            ("requirement_branch" in lowered and "unique" in lowered)
+            or ("duplicate entry" in lowered and "requirement_branch" in lowered)
+            or ("unique constraint failed" in lowered and "requirement_branch" in lowered)
+        )
+        if is_requirement_branch_duplicate:
+            dup_match = re.search(r"Duplicate entry '([^']+)'", detail, flags=re.IGNORECASE)
+            dup_value = dup_match.group(1).strip() if dup_match else ""
+            if dup_value:
+                return JsonResponse(
+                    {
+                        "success": False,
+                        "error": f"需求分支已存在：{dup_value}，请更换后重试",
+                    },
+                    status=400,
+                )
+            return JsonResponse(
+                {"success": False, "error": "需求分支已存在，请更换后重试"},
+                status=400,
+            )
+        return JsonResponse({"success": False, "error": f"保存失败：{detail}"}, status=400)
+    except Exception as exc:  # noqa: BLE001
+        return JsonResponse({"success": False, "error": f"保存失败：{str(exc)}"}, status=500)
 
 
 @login_required
@@ -334,17 +373,11 @@ def release_entry_item_create(request):
 
     if not batch_id or not project_id:
         return JsonResponse({"success": False, "error": "batch_id 和 project_id 必填"}, status=400)
-    requirement_branch = request.POST.get("requirement_branch", "").strip()
+    requirement_branch_raw = request.POST.get("requirement_branch", "").strip()
+    requirement_branch = requirement_branch_raw or None
+    sql_only_release = False
     if not requirement_branch:
-        return JsonResponse({"success": False, "error": "需求分支必填"}, status=400)
-    if not re.match(BRANCH_REGEX, requirement_branch):
-        return JsonResponse(
-            {
-                "success": False,
-                "error": "需求分支格式错误，应为 FIX/REQ/PUB-yyyymmdd-xxxx",
-            },
-            status=400,
-        )
+        sql_only_release = True
 
     try:
         batch = ReleaseBatch.objects.get(pk=batch_id)
@@ -366,6 +399,7 @@ def release_entry_item_create(request):
         biz_category=biz_category,
         branch_type=branch_type,
         requirement_branch=requirement_branch,
+        sql_only_release=sql_only_release,
         release_branch=batch.release_branch,
         tech_owner=tech_owner,
         biz_owner=biz_owner,
@@ -379,7 +413,9 @@ def release_entry_item_create(request):
         allow_dev_scope=True,
         allow_ops_scope=request.user.is_superuser,
     )
-    item.save()
+    save_error = _save_item_or_error(item)
+    if save_error is not None:
+        return save_error
     return JsonResponse({"success": True, "item": _item_to_dict(item, request.user)})
 
 
@@ -491,7 +527,6 @@ def release_entry_item_last_by_project(request):
                 "need_esf": last_item.need_esf,
                 "need_trade_tuning": last_item.need_trade_tuning,
                 "need_release_verify": last_item.need_release_verify,
-                "rel_test_status": last_item.rel_test_status,
             },
             "source": {
                 "item_id": last_item.id,
@@ -552,16 +587,8 @@ def release_entry_item_update(request):
     requirement_branch = request.POST.get("requirement_branch")
     if requirement_branch is not None and can_edit_dev_scope and "requirement_branch" in editable_fields:
         requirement_branch = requirement_branch.strip()
-        if not requirement_branch:
-            return JsonResponse({"success": False, "error": "需求分支不能为空"}, status=400)
-        if not re.match(BRANCH_REGEX, requirement_branch):
-            return JsonResponse(
-                {
-                    "success": False,
-                    "error": "需求分支格式错误，应为 FIX/REQ/PUB-yyyymmdd-xxxx",
-                },
-                status=400,
-            )
+        item.requirement_branch = requirement_branch or None
+        item.sql_only_release = not bool(requirement_branch)
 
     _apply_item_fields(
         item,
@@ -570,7 +597,9 @@ def release_entry_item_update(request):
         allow_dev_scope=can_edit_dev_scope,
         allow_ops_scope=can_edit_ops_scope,
     )
-    item.save()
+    save_error = _save_item_or_error(item)
+    if save_error is not None:
+        return save_error
     return JsonResponse({"success": True, "item": _item_to_dict(item, request.user)})
 
 
@@ -625,6 +654,67 @@ def release_entry_item_delete(request):
 
     item.delete()
     return JsonResponse({"success": True})
+
+
+@login_required
+@require_http_methods(["POST"])
+def release_entry_item_bulk_update(request):
+    if not _can_bulk_update_ops_fields(request.user):
+        return JsonResponse({"success": False, "error": "仅运维或超管可批量修改"}, status=403)
+
+    batch_id = (request.POST.get("batch_id") or "").strip()
+    raw_item_ids = (request.POST.get("item_ids") or "").strip()
+    field_name = (request.POST.get("field_name") or "").strip()
+    field_value = request.POST.get("field_value")
+    if field_value is None:
+        field_value = ""
+
+    if not batch_id or not batch_id.isdigit():
+        return JsonResponse({"success": False, "error": "batch_id 非法"}, status=400)
+    if not raw_item_ids:
+        return JsonResponse({"success": False, "error": "请选择至少一条记录"}, status=400)
+
+    if field_name not in {"deploy_status", "rel_deployed"}:
+        return JsonResponse({"success": False, "error": "仅支持批量修改运维字段"}, status=400)
+
+    try:
+        item_ids = [int(part) for part in raw_item_ids.split(",") if part.strip()]
+    except ValueError:
+        return JsonResponse({"success": False, "error": "item_ids 格式非法"}, status=400)
+    if not item_ids:
+        return JsonResponse({"success": False, "error": "请选择至少一条记录"}, status=400)
+
+    editable_fields = _get_release_entry_editable_fields(request.user)
+    if (not request.user.is_superuser) and (field_name not in editable_fields):
+        return JsonResponse({"success": False, "error": "当前角色无该字段批量修改权限"}, status=403)
+
+    items = list(ReleaseItem.objects.filter(batch_id=int(batch_id), id__in=item_ids).select_related("batch"))
+    if not items:
+        return JsonResponse({"success": False, "error": "未找到可更新记录"}, status=404)
+
+    blocked = [str(item.id) for item in items if item.batch.status != ReleaseBatch.Status.OPEN]
+    if blocked:
+        return JsonResponse(
+            {"success": False, "error": f"以下记录所在批次未开放，不能修改：{', '.join(blocked)}"},
+            status=400,
+        )
+
+    if field_name == "deploy_status":
+        normalized = str(field_value).strip()
+        if normalized not in {"", "是", "否"}:
+            return JsonResponse({"success": False, "error": "投产状态仅支持：是/否/未填写"}, status=400)
+        for item in items:
+            item.deploy_status = normalized
+    else:
+        raw = str(field_value).strip()
+        if raw not in {"", "是", "否", "true", "false", "1", "0"}:
+            return JsonResponse({"success": False, "error": "REL是否已部署仅支持：是/否/未填写"}, status=400)
+        parsed = _parse_bool(field_value)
+        for item in items:
+            item.rel_deployed = parsed
+
+    ReleaseItem.objects.bulk_update(items, [field_name, "updated_at"])
+    return JsonResponse({"success": True, "updated_count": len(items)})
 
 
 @login_required
@@ -704,7 +794,32 @@ def release_entry_batch_delete(request):
 
     release_date = str(batch.release_date)
     release_branch = batch.release_branch
-    batch.delete()
+    try:
+        batch.delete()
+    except ProtectedError:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "当前批次存在受保护关联数据，无法删除。请先处理相关记录后再删除。",
+            },
+            status=400,
+        )
+    except IntegrityError:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "当前批次存在数据库约束关联，暂时无法删除。",
+            },
+            status=400,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return JsonResponse(
+            {
+                "success": False,
+                "error": f"删除批次失败：{exc}",
+            },
+            status=500,
+        )
     return JsonResponse(
         {
             "success": True,

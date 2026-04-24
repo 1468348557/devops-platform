@@ -128,11 +128,6 @@
       <path d="M10 21v-6h4v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
     </svg>
   </a>
-  <div class="nav-bread">
-    <a href="{% url 'dashboard' %}">工作台</a> /
-    <a href="{% url 'admin_config' %}">管理员配置</a> /
-    权限配置
-  </div>
   <h1 class="card-title">角色权限范围</h1>
   <p class="card-subtitle">仅超管可配置。保存后对运维/研发角色即时生效；超管始终保留全量权限。</p>
 
@@ -314,6 +309,10 @@
                 <label class="check-row">
                   <input type="checkbox" name="role_{{ section.role_id }}__action_sql_request_approve" {% if section.action_fields.action_sql_request_approve %}checked{% endif %}>
                   <span>审批 SQL 执行申请</span>
+                </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__action_sql_request_auto_approve" {% if section.action_fields.action_sql_request_auto_approve %}checked{% endif %}>
+                  <span>自动审批 SQL 执行申请（显示自动审批按钮）</span>
                 </label>
                 <label class="check-row">
                   <input type="checkbox" name="role_{{ section.role_id }}__action_sql_request_edit_others" {% if section.action_fields.action_sql_request_edit_others %}checked{% endif %}>
