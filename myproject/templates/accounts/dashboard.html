@@ -9,6 +9,41 @@
     padding-top: 32px;
     padding-bottom: 40px;
   }
+  /* ---- 通知铃铛 ---- */
+  .notif-badge {
+    position: absolute; top: -7px; right: -9px;
+    background: #ef4444; color: #fff;
+    font-size: 11px; font-weight: 700;
+    min-width: 17px; height: 17px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 999px; padding: 0 4px;
+    pointer-events: none;
+  }
+  .notif-dropdown {
+    position: absolute; top: calc(100% + 8px); right: -10px;
+    width: 300px;
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(15,23,42,0.12);
+    z-index: 100;
+    display: none;
+  }
+  .notif-dropdown.show { display: block; }
+  .notif-dropdown-header {
+    padding: 12px 14px; font-weight: 700; font-size: 14px;
+    border-bottom: 1px solid #f1f5f9; color: #0f172a;
+  }
+  .notif-list { max-height: 320px; overflow-y: auto; }
+  .notif-item {
+    padding: 10px 14px; border-bottom: 1px solid #f8fafc;
+    font-size: 13px; color: #334155; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .notif-item:hover { background: #f1f5f9; }
+  .notif-item:last-child { border-bottom: none; }
+  .notif-item-title { font-weight: 600; margin-bottom: 3px; }
+  .notif-item-desc { color: #64748b; font-size: 12px; }
+  .notif-empty { padding: 18px 14px; color: #94a3b8; font-size: 13px; text-align: center; }
+  /* ---- 原卡片样式 ---- */
   .card {
     max-width: 1180px;
     border: 1px solid #e5e7eb;
@@ -139,7 +174,22 @@
                 {% endif %}
             </p>
         </div>
-        <span class="role-badge">DevOps Platform</span>
+        <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">
+            {% if can_see_notification %}
+            <div id="notif-bell-wrap" style="position:relative;cursor:pointer;" title="点击查看通知">
+                <span style="font-size:22px;">🔔</span>
+                <span id="notif-badge" class="notif-badge" style="display:none;">0</span>
+                <!-- 下拉面板 -->
+                <div id="notif-dropdown" class="notif-dropdown hidden">
+                    <div class="notif-dropdown-header">待办通知</div>
+                    <div id="notif-list" class="notif-list">
+                        <div class="notif-empty">加载中...</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            <span class="role-badge">DevOps Platform</span>
+        </div>
     </div>
 
     <div class="action-row">
@@ -211,4 +261,113 @@
 
     <a class="logout-link" href="{% url 'logout' %}">退出登录 →</a>
 </section>
+<script>
+(function(){
+  const bellWrap   = document.getElementById('notif-bell-wrap');
+  if (!bellWrap) return;   // 无权限则不渲染
+
+  const badge     = document.getElementById('notif-badge');
+  const dropdown  = document.getElementById('notif-dropdown');
+  const listEl    = document.getElementById('notif-list');
+
+  /* ---- 拉取数量 ---- */
+  function fetchCounts(){
+    console.log('[通知] 开始请求API...');
+    return fetch('/accounts/api/notification/?t=' + Date.now(), {headers:{'X-Requested-With':'XMLHttpRequest'}})
+      .then(r=>{
+        console.log('[通知] API响应状态:', r.status);
+        return r.json();
+      })
+      .then(d=>{
+        console.log('[通知] API返回数据:', d);
+        if(!d.success){
+          window.__notifData = {uncreated_branch_count:0, unapproved_sql_count:0};
+        } else {
+          window.__notifData = d;
+        }
+        updateBadge();
+        // 如果下拉面板已打开，立即刷新内容
+        if(dropdown.classList.contains('show')){
+          buildDropdown();
+        }
+      })
+      .catch((e)=>{
+        console.error('[通知] API请求失败:', e);
+        window.__notifData = {uncreated_branch_count:0, unapproved_sql_count:0};
+        updateBadge();
+      });
+  }
+
+  /* ---- 更新红点数字 ---- */
+  function updateBadge(){
+    const d = window.__notifData;
+    if(!d){
+      badge.style.display = 'none';
+      return;
+    }
+    const total = (d.uncreated_branch_count||0) + (d.unapproved_sql_count||0);
+    if(total>0){
+      badge.style.display = 'flex';
+      badge.textContent   = total>99?'99+':String(total);
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  /* ---- 构建下拉列表 ---- */
+  function buildDropdown(){
+    const d = window.__notifData || {uncreated_branch_count:0, unapproved_sql_count:0};
+    console.log('[通知] 构建下拉列表，数据:', d);
+    let html = '';
+    const branchUrl = "{% url 'branch_create:index' %}";
+    const sqlUrl    = "{% url 'sql_execute:index' %}";
+
+    if(d.uncreated_branch_count>0){
+      html += `<div class="notif-item" onclick="location.href='${branchUrl}'">
+        <div class="notif-item-title">🌿 未建分支</div>
+        <div class="notif-item-desc">有 <strong>${d.uncreated_branch_count}</strong> 条新建分支任务尚未执行</div>
+      </div>`;
+    }
+    if(d.unapproved_sql_count>0){
+      html += `<div class="notif-item" onclick="location.href='${sqlUrl}'">
+        <div class="notif-item-title">🧪 未审批 SQL</div>
+        <div class="notif-item-desc">有 <strong>${d.unapproved_sql_count}</strong> 条 SQL 执行申请待审批</div>
+      </div>`;
+    }
+    if(!html){
+      html = '<div class="notif-empty">暂无待办通知 🎉</div>';
+    }
+    listEl.innerHTML = html;
+    console.log('[通知] 下拉列表HTML:', html);
+  }
+
+  /* ---- 点击铃铛切换面板 ---- */
+  bellWrap.addEventListener('click', function(e){
+    e.stopPropagation();
+    console.log('[通知] 铃铛被点击，window.__notifData:', window.__notifData);
+    const isOpen = dropdown.classList.contains('show');
+    // 关闭其他可能打开的面板
+    document.querySelectorAll('.notif-dropdown.show').forEach(el=>el.classList.remove('show'));
+    if(!isOpen){
+      dropdown.classList.add('show');
+      // 始终先显示加载中，然后等待 fetchCounts 完成
+      listEl.innerHTML = '<div class="notif-empty">加载中...</div>';
+      fetchCounts().then(()=>{
+        buildDropdown();
+      });
+    }
+  });
+
+  /* ---- 点击页面其他区域关闭面板 ---- */
+  document.addEventListener('click', function(){
+    dropdown.classList.remove('show');
+  });
+  dropdown.addEventListener('click', function(e){ e.stopPropagation(); });
+
+  /* ---- 首次加载 ---- */
+  fetchCounts();
+  /* 每 60 秒刷新一次数量 */
+  setInterval(fetchCounts, 60000);
+})();
+</script>
 {% endblock %}

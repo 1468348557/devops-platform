@@ -161,6 +161,7 @@ def _build_role_policy_view_model(role: RoleDefinition, policy: RolePermissionPo
             "menu_release_entry": policy.menu_release_entry,
             "menu_hobo_ledger": policy.menu_hobo_ledger,
             "menu_sql_execute": policy.menu_sql_execute,
+            "menu_notification": policy.menu_notification,
         },
         "action_fields": {
             "action_release_track_use": policy.action_release_track_use,
@@ -208,6 +209,9 @@ def _save_role_policies_from_post(request) -> None:
                 continue
             raw = request.POST.get(f"role_{role.id}__{field_name}", "").strip().lower()
             setattr(policy, field_name, raw in {"on", "1", "true", "yes"})
+        # 通知铃铛（不在 MENU_FIELD_MAP 中）
+        raw = request.POST.get(f"role_{role.id}__menu_notification", "").strip().lower()
+        policy.menu_notification = raw in {"on", "1", "true", "yes"}
         for field_name in ACTION_FIELD_MAP.values():
             if field_name in non_configurable_true_fields:
                 setattr(policy, field_name, True)
@@ -350,12 +354,23 @@ def _apply_approval_decision(target_profile, reviewer, action, reason=""):
 @login_required
 def dashboard(request):
     profile = getattr(request.user, "profile", None)
+
+    # 通知铃铛可见性
+    can_see_notification = False
+    if profile and profile.role_id:
+        policy = RolePermissionPolicy.get_for_role(profile.role)
+        if policy and policy.menu_notification:
+            can_see_notification = True
+    if request.user.is_superuser:
+        can_see_notification = True
+
     return render(
         request,
         "accounts/dashboard.html",
         {
             "profile": profile,
             "can_review_accounts": _can_review(request.user),
+            "can_see_notification": can_see_notification,
             "can_menu_release_track": can_access_menu(request.user, "release_track"),
             "can_menu_branch_create": can_access_menu(request.user, "branch_create"),
             "can_menu_release_entry": can_access_menu(request.user, "release_entry"),
@@ -831,6 +846,41 @@ def role_permissions_config(request):
 
     context = _build_role_policy_context()
     return render(request, "accounts/role_permissions_config.html", context)
+
+
+@login_required
+@require_http_methods(["GET"])
+def notification_counts(request):
+    """API: 获取未建分支和未审批 SQL 的数量"""
+    try:
+        from branch_create.models import HoboRequirementLedger, ReleaseItem, ReleaseBatch
+        from sql_execute.models import SqlExecutionRequest
+
+        # 未建分支数（Hobo + Release）
+        hobo_count = HoboRequirementLedger.objects.filter(branch_created=False).count()
+        release_count = ReleaseItem.objects.filter(
+            branch_created=False,
+        ).count()
+        uncreated_branch_count = hobo_count + release_count
+
+        # 未审批 SQL 数
+        unapproved_sql_count = SqlExecutionRequest.objects.filter(
+            status=SqlExecutionRequest.Status.PENDING
+        ).count()
+
+        return JsonResponse({
+            "success": True,
+            "uncreated_branch_count": uncreated_branch_count,
+            "unapproved_sql_count": unapproved_sql_count,
+            "total": uncreated_branch_count + unapproved_sql_count,
+        })
+    except Exception as e:
+        import traceback
+        return JsonResponse({
+            "success": False,
+            "error": str(e),
+            "trace": traceback.format_exc(),
+        }, status=500)
 
 
 @login_required

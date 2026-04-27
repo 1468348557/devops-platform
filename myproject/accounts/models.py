@@ -186,6 +186,7 @@ class RolePermissionPolicy(models.Model):
     menu_hobo_ledger = models.BooleanField(default=False)
     menu_sql_execute = models.BooleanField(default=False)
     menu_admin_config = models.BooleanField(default=False)
+    menu_notification = models.BooleanField(default=False, verbose_name="通知铃铛可见")
 
     # 接口/操作权限
     action_release_track_use = models.BooleanField(default=False)
@@ -248,6 +249,7 @@ class RolePermissionPolicy(models.Model):
                 "menu_hobo_ledger": True,
                 "menu_sql_execute": True,
                 "menu_admin_config": False,
+                "menu_notification": True,
                 "action_release_track_use": True,
                 "action_branch_task_preview": True,
                 "action_branch_task_execute_release": True,
@@ -280,6 +282,7 @@ class RolePermissionPolicy(models.Model):
             "menu_hobo_ledger": True,
             "menu_sql_execute": True,
             "menu_admin_config": False,
+            "menu_notification": False,
             "action_release_track_use": False,
             "action_branch_task_preview": False,
             "action_branch_task_execute_release": False,

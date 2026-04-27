@@ -42,6 +42,7 @@ chmod +x deploy/deploy.sh deploy/check.sh
 ```
 
 > 首次执行 `deploy.sh` 时，如果 `compose/.env` 不存在会自动生成并退出，提示你先修改变量。
+> 如需导入初始化数据，将 `.sql` 文件放到离线包的 `sql/` 目录下，部署脚本会在数据库迁移完成后按文件名顺序导入。
 
 ## 5. 必填变量说明
 
@@ -50,6 +51,7 @@ chmod +x deploy/deploy.sh deploy/check.sh
 - `DJANGO_SECRET_KEY`
 - `MYSQL_ROOT_PASSWORD`
 - `MYSQL_PASSWORD`
+- `MYSQL_DATA_DIR`（默认 `/docker/devops/mysql/data`，首次初始化时目录必须为空）
 - `DJANGO_ALLOWED_HOSTS`（按实际域名/IP 配置）
 
 ## 6. 部署后检查

@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ROOT_DIR="$(pwd)"
 COMPOSE_FILE="${ROOT_DIR}/compose/docker-compose.yml"
 ENV_FILE="${ROOT_DIR}/compose/.env"
 ENV_EXAMPLE="${ROOT_DIR}/compose/.env.deploy.example"
 IMAGES_DIR="${ROOT_DIR}/images"
+SQL_DIR="${ROOT_DIR}/sql"
 
 log() {
   echo "[INFO] $*"
@@ -58,6 +59,45 @@ validate_env() {
   fi
 }
 
+get_env_value() {
+  local key="$1"
+  local default_value="${2:-}"
+  local env_key
+  local env_value
+  local value=""
+
+  while IFS='=' read -r env_key env_value || [[ -n "${env_key}" ]]; do
+    [[ "${env_key}" == "${key}" ]] || continue
+    value="${env_value}"
+  done < "${ENV_FILE}"
+
+  value="${value%\"}"
+  value="${value#\"}"
+  value="${value%\'}"
+  value="${value#\'}"
+  printf '%s' "${value:-${default_value}}"
+}
+
+prepare_mysql_data_dir() {
+  local mysql_data_dir
+  local entries
+  mysql_data_dir="$(get_env_value MYSQL_DATA_DIR "/docker/devops/mysql/data")"
+
+  mkdir -p "${mysql_data_dir}"
+
+  shopt -s nullglob dotglob
+  entries=("${mysql_data_dir}"/*)
+  shopt -u nullglob dotglob
+
+  if (( ${#entries[@]} == 1 )) && [[ "${entries[0]##*/}" == "auto.cnf" ]]; then
+    die "MySQL data directory only contains stale auto.cnf: ${mysql_data_dir}. Remove it before first deployment."
+  fi
+
+  if command -v chown >/dev/null 2>&1; then
+    chown -R 999:999 "${mysql_data_dir}" 2>/dev/null || warn "Could not chown ${mysql_data_dir}; ensure MySQL can write to it"
+  fi
+}
+
 wait_mysql_healthy() {
   local timeout_sec="${1:-180}"
   local start_ts
@@ -79,9 +119,29 @@ wait_mysql_healthy() {
   done
 }
 
+import_sql_files() {
+  [[ -d "${SQL_DIR}" ]] || return 0
+
+  shopt -s nullglob
+  local sql_files=("${SQL_DIR}"/*.sql)
+  shopt -u nullglob
+
+  if (( ${#sql_files[@]} == 0 )); then
+    log "No SQL import files found"
+    return 0
+  fi
+
+  local sql_file
+  for sql_file in "${sql_files[@]}"; do
+    log "Importing SQL file: ${sql_file}"
+    compose exec -T mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' < "${sql_file}"
+  done
+}
+
 need_cmd docker
 need_cmd grep
 need_cmd date
+need_cmd mkdir
 
 [[ -f "${COMPOSE_FILE}" ]] || die "Missing compose file: ${COMPOSE_FILE}"
 [[ -d "${IMAGES_DIR}" ]] || die "Missing images directory: ${IMAGES_DIR}"
@@ -96,6 +156,7 @@ if [[ ! -f "${ENV_FILE}" ]]; then
 fi
 
 validate_env
+prepare_mysql_data_dir
 
 log "Loading offline images"
 shopt -s nullglob
@@ -114,6 +175,9 @@ wait_mysql_healthy 180
 
 log "Running database migrations"
 compose run --rm web python manage.py migrate --noinput
+
+log "Importing SQL data"
+import_sql_files
 
 log "Collecting static files"
 compose run --rm web python manage.py collectstatic --noinput

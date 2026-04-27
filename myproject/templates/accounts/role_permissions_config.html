@@ -237,6 +237,10 @@
                   <input type="checkbox" name="role_{{ section.role_id }}__menu_sql_execute" {% if section.menu_fields.menu_sql_execute %}checked{% endif %}>
                   <span>SQL执行申请</span>
                 </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__menu_notification" {% if section.menu_fields.menu_notification %}checked{% endif %}>
+                  <span>🔔 通知铃铛可见</span>
+                </label>
 
                 <div class="span-full" style="margin-top: 6px;">
                   <strong style="font-size: 13px;">接口/操作权限</strong>
