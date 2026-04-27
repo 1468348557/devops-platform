@@ -440,17 +440,69 @@ def _parse_selected_projects(value: str | None) -> list[str]:
     return [part.strip() for part in raw.split(",") if part.strip()]
 
 
-def _get_completed_repo_codes_for_batch(batch_id: int) -> set[str]:
-    completed_repos = (
-        ReleaseTrackRunItem.objects.filter(
-            run__batch_id=batch_id,
-            run__dry_run=False,
-            status="SUCCESS",
-        )
-        .values_list("repo", flat=True)
-        .distinct()
+def _track_state_from_item(item: ReleaseTrackRunItem) -> dict:
+    status = str(item.status or "").upper()
+    stage = str(item.stage or "").lower()
+    mr_state = str(item.mr_state or "").lower()
+
+    if status == "SUCCESS":
+        return {
+            "track_status": "completed",
+            "track_status_label": "已追板完成",
+            "track_completed": True,
+            "track_locked": True,
+        }
+    if status == "MERGED_NO_TAG":
+        return {
+            "track_status": "merged_no_tag",
+            "track_status_label": "已追板完成（未打 Tag）",
+            "track_completed": True,
+            "track_locked": True,
+        }
+    if status == "MERGED":
+        return {
+            "track_status": "merged_pending_tag",
+            "track_status_label": "MR 已合并，待打 Tag",
+            "track_completed": True,
+            "track_locked": True,
+        }
+    if status == "WAIT_MR":
+        return {
+            "track_status": "wait_mr",
+            "track_status_label": "MR 已创建，未打 Tag",
+            "track_completed": False,
+            "track_locked": True,
+        }
+    if status == "FAILED" and (stage == "tag" or mr_state == "merged"):
+        return {
+            "track_status": "tag_incomplete",
+            "track_status_label": "已追板完成（Tag 未完成）",
+            "track_completed": True,
+            "track_locked": True,
+        }
+    return {
+        "track_status": "pending",
+        "track_status_label": "待追板",
+        "track_completed": False,
+        "track_locked": False,
+    }
+
+
+def _get_repo_track_states_for_batch(batch_id: int) -> dict[str, dict]:
+    states: dict[str, dict] = {}
+    items = (
+        ReleaseTrackRunItem.objects.select_related("run")
+        .filter(run__batch_id=batch_id, run__dry_run=False)
+        .order_by("-updated_at", "-id")
     )
-    return {str(repo).strip() for repo in completed_repos if str(repo).strip()}
+    for item in items:
+        repo = str(item.repo or "").strip()
+        if not repo or repo in states:
+            continue
+        track_state = _track_state_from_item(item)
+        if track_state["track_locked"]:
+            states[repo] = track_state
+    return states
 
 
 def _build_manual_mr_url(repo: str, mr_url: str, mr_iid: int) -> str:
@@ -498,6 +550,7 @@ def _run_to_dict(run: ReleaseTrackRun) -> dict:
         "tag_name": run.tag_name,
         "merge_message": run.merge_message,
         "tag_message": run.tag_message,
+        "skip_tag": not bool(run.tag_name),
         "dry_run": run.dry_run,
         "total": run.total_count,
         "processed": run.processed_count,
@@ -705,7 +758,7 @@ def release_track_api_batch_detail(request):
         )
         .order_by("project__project_name", "project_id")
     )
-    completed_repo_codes = _get_completed_repo_codes_for_batch(batch.id)
+    track_states = _get_repo_track_states_for_batch(batch.id)
     rows = [
         {
             "project_id": row["project_id"],
@@ -714,7 +767,10 @@ def release_track_api_batch_detail(request):
             "release_branch": batch.release_branch,
             "item_count": row["item_count"],
             "deployed_marked_count": row["deployed_marked_count"],
-            "track_completed": row["project__project_code"] in completed_repo_codes,
+            "track_status": track_states.get(row["project__project_code"], {}).get("track_status", "pending"),
+            "track_status_label": track_states.get(row["project__project_code"], {}).get("track_status_label", "待追板"),
+            "track_completed": track_states.get(row["project__project_code"], {}).get("track_completed", False),
+            "track_locked": track_states.get(row["project__project_code"], {}).get("track_locked", False),
         }
         for row in items
     ]
@@ -758,27 +814,27 @@ def release_track_api_run_start(request):
     selected_projects = _parse_selected_projects(selected_projects_raw)
     if selected_projects_raw is not None and not selected_projects:
         return JsonResponse({"success": False, "error": "请先勾选要追板的项目"}, status=400)
-    completed_selected = sorted(
-        {
-            code
-            for code in selected_projects
-            if code in _get_completed_repo_codes_for_batch(batch_id)
-        }
+    existing_track_states = _get_repo_track_states_for_batch(batch_id)
+    locked_selected = sorted(
+        {code for code in selected_projects if existing_track_states.get(code, {}).get("track_locked")}
     )
-    if completed_selected:
+    if locked_selected:
         return JsonResponse(
             {
                 "success": False,
-                "error": f"以下项目已追板完成，请勿重复执行：{', '.join(completed_selected)}",
+                "error": f"以下项目已有追板记录，请勿重复执行：{', '.join(locked_selected)}",
             },
             status=400,
         )
+    skip_tag = _parse_bool(request.POST.get("skip_tag"), default=False)
+    tag_name = "" if skip_tag else (request.POST.get("tag_name") or "").strip()
+    tag_message = "" if skip_tag else (request.POST.get("tag_message") or "").strip()
     options = ReleaseTrackOptions(
         batch_id=batch_id,
         config_text=config_text,
-        tag_name=(request.POST.get("tag_name") or "").strip(),
+        tag_name=tag_name,
         merge_message=(request.POST.get("merge_message") or "").strip(),
-        tag_message=(request.POST.get("tag_message") or "").strip(),
+        tag_message=tag_message,
         auto_merge_mr=False,
         force_tag=False,
         assume_yes=True,
@@ -786,6 +842,7 @@ def release_track_api_run_start(request):
         default_target_branch=(request.POST.get("default_target_branch") or "master").strip() or "master",
         work_base_dir=(request.POST.get("work_base_dir") or "").strip(),
         dry_run=_parse_bool(request.POST.get("dry_run"), default=False),
+        skip_tag=skip_tag,
         selected_projects=selected_projects,
     )
 
@@ -819,6 +876,7 @@ def release_track_api_run_start(request):
             "default_target_branch": options.default_target_branch,
             "work_base_dir": options.work_base_dir,
             "dry_run": options.dry_run,
+            "skip_tag": options.skip_tag,
             "selected_projects": options.selected_projects,
         },
     )

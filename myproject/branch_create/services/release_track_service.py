@@ -35,6 +35,7 @@ class ReleaseTrackOptions:
     default_target_branch: str = "master"
     work_base_dir: str = ""
     dry_run: bool = False
+    skip_tag: bool = False
     selected_projects: list[str] = field(default_factory=list)
 
 
@@ -311,6 +312,13 @@ class ReleaseTrackService:
             self._set_phase("done")
             return self.summary
 
+        if self.options.skip_tag:
+            for repo in list(self.summary.merged_repos):
+                self._mark_merged_without_tag(repo)
+            self.output("本次配置为不打 tag，已将合并成功仓库标记为未打 tag。")
+            self._set_phase("done")
+            return self.summary
+
         if not self._confirm("是否继续为已合并成功仓库统一打 tag？输入 yes 继续"):
             self.output("未确认打 tag，流程结束。")
             self._set_phase("done")
@@ -323,14 +331,14 @@ class ReleaseTrackService:
 
     def _build_config(self) -> ReleaseConfig:
         config = parse_release_config(self.options.config_text)
-        tag_name = self.options.tag_name or config.tag_name
+        tag_name = "" if self.options.skip_tag else (self.options.tag_name or config.tag_name)
         merge_message = self.options.merge_message or config.merge_message
-        tag_message = self.options.tag_message or config.tag_message
-        if not tag_name:
+        tag_message = "" if self.options.skip_tag else (self.options.tag_message or config.tag_message)
+        if not self.options.skip_tag and not tag_name:
             raise ReleaseTrackError("缺少 TAG_NAME（配置或参数）")
         if not merge_message:
             raise ReleaseTrackError("缺少 MERGE_MESSAGE（配置或参数）")
-        if not tag_message:
+        if not self.options.skip_tag and not tag_message:
             raise ReleaseTrackError("缺少 TAG_MESSAGE（配置或参数）")
         config.tag_name = tag_name
         config.merge_message = merge_message
@@ -476,7 +484,8 @@ class ReleaseTrackService:
                 self.git.local_trial_merge(repo_dir, state.release_branch)
                 self.git.cleanup_trial_merge(repo_dir, state.target_branch)
 
-                title = f"{self.summary.tag_name}-{repo}"
+                title_prefix = self.summary.tag_name or self.summary.merge_message or state.release_branch
+                title = f"{title_prefix}-{repo}"
                 desc = (
                     f"repo={repo}; source={state.release_branch}; target={state.target_branch}; "
                     f"tag={self.summary.tag_name}; merge={self.summary.merge_message}; "
@@ -522,6 +531,9 @@ class ReleaseTrackService:
                 mr_state = self.gitlab.get_mr_state(repo, state.mr_iid)
             state.mr_state = mr_state
             if mr_state == "merged":
+                state.status = "MERGED"
+                state.reason = "MR 已合并，待打 tag"
+                self._emit_repo_state(repo)
                 verified_merged.append(repo)
             else:
                 self._mark_failed(repo, f"审批后 MR 状态不是 merged: {mr_state or 'unknown'}")
@@ -592,6 +604,17 @@ class ReleaseTrackService:
         state.status = "SUCCESS"
         state.reason = reason
         self._append_unique(repo, self.summary.success_repos)
+        self._remove(repo, self.summary.failed_repos)
+        self._remove(repo, self.summary.skipped_repos)
+        self._emit_repo_state(repo)
+
+    def _mark_merged_without_tag(self, repo: str) -> None:
+        state = self.summary.states[repo]
+        state.status = "MERGED_NO_TAG"
+        state.reason = f"已合并至 {state.target_branch}，未打 tag"
+        state.tag_result = "未打 tag"
+        self._append_unique(repo, self.summary.success_repos)
+        self._remove(repo, self.summary.merged_repos)
         self._remove(repo, self.summary.failed_repos)
         self._remove(repo, self.summary.skipped_repos)
         self._emit_repo_state(repo)

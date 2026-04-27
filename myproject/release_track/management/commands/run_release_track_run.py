@@ -36,6 +36,7 @@ class Command(BaseCommand):
             default_target_branch=str(payload.get("default_target_branch") or "master"),
             work_base_dir=str(payload.get("work_base_dir") or ""),
             dry_run=bool(payload.get("dry_run", False)),
+            skip_tag=bool(payload.get("skip_tag", False)),
             selected_projects=list(payload.get("selected_projects") or []),
         )
         if release_options.batch_id <= 0:

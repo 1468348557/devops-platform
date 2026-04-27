@@ -15,5 +15,18 @@
             "username": "devops",
             "password": "devops123"
         }
-    ]
+    ],
+    "terminal.integrated.profiles.osx": {
+        "zsh (venv)": {
+            "path": "/bin/zsh",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "ZDOTDIR": "${workspaceFolder}/.vscode"
+            },
+            "args": [
+                "-il"
+            ]
+        }
+    },
+    "terminal.integrated.defaultProfile.osx": "zsh (venv)"
 }

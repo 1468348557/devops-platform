@@ -89,10 +89,12 @@
   }
   .home-icon-link:hover { background: #f8fafc; border-color: #94a3b8; }
   .home-icon-link svg { width: 18px; height: 18px; display: block; }
-  .table-wrap { overflow: auto; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; }
+  .table-wrap { overflow: auto; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; max-height: 520px; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 980px; }
   th, td { border-bottom: 1px solid #e5e7eb; padding: 8px 10px; text-align: left; vertical-align: top; }
   th { background: #f8fafc; font-weight: 600; position: sticky; top: 0; z-index: 1; }
+  .pager { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .pager-left, .pager-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   tbody tr:nth-child(even) { background: #fcfdff; }
   tbody tr:hover { background: #f3f7ff; }
   .status-pending { background: #fee2e2; color: #991b1b; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
@@ -176,8 +178,9 @@
 
     <div class="action-row">
       <div class="action-main">
-        <button id="btn-preview" class="btn btn-primary" type="button">查询待创建</button>
+        <button id="btn-preview" class="btn btn-primary" type="button">查询分支</button>
         <button id="btn-reset" class="btn btn-secondary" type="button">重置筛选</button>
+        <label class="inline-check"><input id="include-created" type="checkbox"> 包含已新建分支</label>
         {% if can_execute_tasks %}
         <button id="btn-execute" class="btn btn-secondary" type="button">批量创建所选分支</button>
         <label class="inline-check"><input id="check-all" type="checkbox"> 全选当前列表</label>
@@ -212,6 +215,25 @@
       </thead>
       <tbody id="task-body"></tbody>
     </table>
+  </div>
+  <div class="pager" style="display:none;">
+    <div class="pager-left">
+      <div class="muted" id="pager-info">共 0 条</div>
+      <label class="field" style="min-width:120px;">
+        每页条数
+        <select id="page-size" class="form-input">
+          <option value="10">10</option>
+          <option value="20">20</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </label>
+    </div>
+    <div class="pager-right">
+      <button id="btn-prev-page" class="btn btn-secondary" type="button">上一页</button>
+      <span class="muted" id="page-indicator">1 / 1</span>
+      <button id="btn-next-page" class="btn btn-secondary" type="button">下一页</button>
+    </div>
   </div>
 
   {% if can_manage_schedule %}
@@ -275,6 +297,9 @@
   const canExecuteTasks = {% if can_execute_tasks %}true{% else %}false{% endif %};
   let sourceType = {% if can_view_hobo and can_view_release %}"both"{% elif can_view_hobo %}"hobo"{% elif can_view_release %}"release"{% else %}"both"{% endif %};
   let currentTasks = [];
+  let allTasks = [];
+  let currentPage = 1;
+  let pageSize = 10;
 
   function el(id) { return document.getElementById(id); }
   function ymd(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
@@ -328,15 +353,15 @@
     return value || '';
   }
 
-  function renderTasks(tasks) {
-    currentTasks = tasks || [];
+  function renderTaskRows(tasks) {
     const body = el('task-body');
     body.innerHTML = '';
-    currentTasks.forEach((t, idx) => {
+    tasks.forEach((t, idx) => {
+      const globalIdx = allTasks.indexOf(t);
       const tr = document.createElement('tr');
       const statusHtml = t.status === 'created' ? '<span class="status-created">已创建</span>' : '<span class="status-pending">未创建</span>';
       const checkCell = canExecuteTasks
-        ? `<input type="checkbox" class="task-check" data-idx="${idx}">`
+        ? `<input type="checkbox" class="task-check" data-idx="${globalIdx}">`
         : '';
       tr.innerHTML = `
         <td>${checkCell}</td>
@@ -348,17 +373,42 @@
         <td>${escapeHtml(t.date || '')}</td>
         <td>${statusHtml}</td>
         <td>${escapeHtml(t.error || '')}</td>
-        <td><button class="btn btn-secondary btn-log" type="button" data-idx="${idx}">查看日志</button></td>
+        <td><button class="btn btn-secondary btn-log" type="button" data-idx="${globalIdx}">查看日志</button></td>
       `;
       body.appendChild(tr);
     });
     body.querySelectorAll('.btn-log').forEach((btn) => btn.addEventListener('click', () => {
-      const t = currentTasks[Number(btn.dataset.idx)];
+      const t = allTasks[Number(btn.dataset.idx)];
       const text = (t && t.log ? t.log : (t && t.error ? t.error : '暂无日志'));
       el('log-content').textContent = text;
       el('log-modal').classList.add('show');
     }));
-    el('tip').textContent = `共 ${currentTasks.length} 条任务`;
+  }
+
+  function renderPagedItems() {
+    const total = allTasks.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+    const start = (currentPage - 1) * pageSize;
+    const pageItems = allTasks.slice(start, start + pageSize);
+    currentTasks = pageItems;
+    renderTaskRows(pageItems);
+    el('pager-info').textContent = total === 0
+      ? '共 0 条'
+      : `共 ${total} 条，显示 ${start + 1}-${Math.min(start + pageSize, total)} 条`;
+    el('page-indicator').textContent = `${currentPage} / ${totalPages}`;
+    el('btn-prev-page').disabled = currentPage <= 1;
+    el('btn-next-page').disabled = currentPage >= totalPages;
+    el('tip').textContent = `共 ${total} 条任务`;
+    // 总条数不超过每页数量时隐藏分页器
+    document.querySelector('.pager').style.display = total > pageSize ? 'flex' : 'none';
+  }
+
+  function renderTasks(tasks) {
+    allTasks = tasks || [];
+    currentPage = 1;
+    renderPagedItems();
   }
 
   function renderLiveExecLog(rows, tip) {
@@ -398,6 +448,7 @@
         hobo_project_id: el('hobo-project-id').value,
         release_flow_name: el('release-flow-name').value,
         release_project_id: el('release-project-id').value,
+        include_created: el('include-created').checked ? '1' : '0',
       });
       renderTasks(data.tasks || []);
       const autoMarked = Number(data.auto_marked_count || 0);
@@ -415,7 +466,7 @@
       el('tip').textContent = '请先勾选任务';
       return;
     }
-    const tasks = checks.map((c) => currentTasks[Number(c.dataset.idx)]).filter(Boolean);
+    const tasks = checks.map((c) => allTasks[Number(c.dataset.idx)]).filter(Boolean);
     try {
       el('btn-execute').disabled = true;
       el('tip').textContent = '正在启动执行任务...';
@@ -528,6 +579,7 @@
     el('hobo-project-id').value = '';
     el('release-flow-name').value = '';
     el('release-project-id').value = '';
+    el('include-created').checked = false;
   });
   if (el('btn-execute')) {
     document.getElementById('btn-execute').addEventListener('click', executeSelected);
@@ -555,6 +607,24 @@
   });
   el('btn-close-log').addEventListener('click', () => el('log-modal').classList.remove('show'));
   el('log-modal').addEventListener('click', (ev) => { if (ev.target.id === 'log-modal') el('log-modal').classList.remove('show'); });
+
+  el('page-size').addEventListener('change', (event) => {
+    const parsed = Number(event.target.value);
+    pageSize = [10, 20, 50, 100].includes(parsed) ? parsed : 10;
+    currentPage = 1;
+    renderPagedItems();
+  });
+  el('btn-prev-page').addEventListener('click', () => {
+    if (currentPage <= 1) return;
+    currentPage -= 1;
+    renderPagedItems();
+  });
+  el('btn-next-page').addEventListener('click', () => {
+    const totalPages = Math.max(1, Math.ceil(allTasks.length / pageSize));
+    if (currentPage >= totalPages) return;
+    currentPage += 1;
+    renderPagedItems();
+  });
 
   {% if can_manage_schedule %}
   async function runDueSchedulesTick() {

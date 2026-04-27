@@ -28,7 +28,7 @@
   }
   .home-icon-link:hover { background: #f8fafc; border-color: #94a3b8; }
   .home-icon-link svg { width: 18px; height: 18px; display: block; }
-  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .form-grid { display: grid; grid-template-columns: 1.35fr repeat(3, 1fr) .85fr; gap: 12px; margin-bottom: 12px; }
   .field { display: grid; gap: 4px; }
   .action-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
   .muted { color: #6b7280; font-size: 12px; }
@@ -332,11 +332,12 @@
       const tr = document.createElement('tr');
       const markCount = Number(r.deployed_marked_count || 0);
       const trackCompleted = Boolean(r.track_completed);
+      const trackLocked = Boolean(r.track_locked || trackCompleted);
       if (markCount === 0) tr.classList.add('risk-row');
       if (trackCompleted) tr.classList.add('done-row');
-      if (trackCompleted && selectedProjectCodes.has(r.project_code)) selectedProjectCodes.delete(r.project_code);
-      const checked = (!trackCompleted && selectedProjectCodes.has(r.project_code)) ? 'checked' : '';
-      const disabled = trackCompleted ? 'disabled' : '';
+      if (trackLocked && selectedProjectCodes.has(r.project_code)) selectedProjectCodes.delete(r.project_code);
+      const checked = (!trackLocked && selectedProjectCodes.has(r.project_code)) ? 'checked' : '';
+      const disabled = trackLocked ? 'disabled' : '';
       const checkTd = document.createElement("td");
       const checkInput = document.createElement("input");
       checkInput.type = "checkbox";
@@ -368,7 +369,7 @@
 
       const statusTd = document.createElement("td");
       if (trackCompleted) statusTd.classList.add("done-text");
-      statusTd.textContent = trackCompleted ? "已追板完成" : "待追板";
+      statusTd.textContent = String(r.track_status_label || (trackCompleted ? "已追板完成" : "待追板"));
 
       tr.appendChild(checkTd);
       tr.appendChild(codeTd);
@@ -390,7 +391,7 @@
     });
     const checkAll = el('batch-check-all');
     if (checkAll) {
-      const selectableRows = (rows || []).filter((r) => !r.track_completed);
+      const selectableRows = (rows || []).filter((r) => !(r.track_locked || r.track_completed));
       checkAll.disabled = selectableRows.length === 0;
       checkAll.checked = selectableRows.length > 0 && selectableRows.every((r) => selectedProjectCodes.has(r.project_code));
     }

@@ -416,10 +416,18 @@ def branch_task_preview_api(request):
         hobo_project_id=request.POST.get("hobo_project_id", ""),
         release_flow_name=request.POST.get("release_flow_name", ""),
         release_project_id=request.POST.get("release_project_id", ""),
+        include_created=str(request.POST.get("include_created", "")).strip().lower() in {"1", "true", "yes", "on"},
     )
     try:
         tasks = collect_pending_tasks(source_type, filters)
-        tasks, auto_marked_count = filter_preview_tasks_with_remote_check(tasks, request.user)
+        if filters.include_created:
+            auto_marked_count = 0
+        else:
+            tasks, auto_marked_count = filter_preview_tasks_with_remote_check(
+                tasks,
+                request.user,
+                keep_auto_marked=False,
+            )
         return JsonResponse(
             {
                 "success": True,

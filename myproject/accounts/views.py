@@ -9,6 +9,7 @@ from django.contrib.auth.views import LoginView, LogoutView
 from django.db import IntegrityError
 from django.db.utils import OperationalError, ProgrammingError
 from django.db import transaction
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.dateparse import parse_date
 from django.utils import timezone
@@ -537,7 +538,7 @@ def admin_config(request):
                 messages.error(request, "工程配置数据格式错误。")
                 return redirect("/admin-config/")
 
-            normalized_rows = []
+            # 验证payload中无重复编码
             code_set = set()
             for row in rows:
                 if not isinstance(row, dict):
@@ -549,22 +550,52 @@ def admin_config(request):
                     messages.error(request, f"工程编码重复：{code}")
                     return redirect("/admin-config/")
                 code_set.add(code)
-                normalized_rows.append(
-                    ProjectCatalog(
+
+            try:
+                # 获取数据库中已存在的记录
+                existing = {p.project_code: p for p in ProjectCatalog.objects.all()}
+                incoming_codes = set(code_set)
+
+                # 需要删除的：数据库有但payload中没有
+                to_delete = set(existing.keys()) - incoming_codes
+                if to_delete:
+                    ProjectCatalog.objects.filter(project_code__in=to_delete).delete()
+
+                # 更新或新增
+                to_update = []
+                to_create = []
+                for row in rows:
+                    code = str(row.get("project_code", "")).strip()
+                    if not code:
+                        continue
+                    obj = ProjectCatalog(
                         project_code=code,
                         project_name=str(row.get("project_name", "")).strip(),
                         enabled=bool(row.get("enabled", True)),
                     )
-                )
+                    if code in existing:
+                        obj.id = existing[code].id
+                        to_update.append(obj)
+                    else:
+                        to_create.append(obj)
 
-            try:
-                with transaction.atomic():
-                    ProjectCatalog.objects.all().delete()
-                    if normalized_rows:
-                        ProjectCatalog.objects.bulk_create(normalized_rows)
-                messages.success(request, f"工程配置保存成功，共 {len(normalized_rows)} 条。")
-            except IntegrityError:
-                messages.error(request, "保存失败，存在重复工程编码。")
+                updated_count = 0
+                created_count = 0
+                if to_update:
+                    ProjectCatalog.objects.bulk_update(
+                        to_update, ["project_name", "enabled"]
+                    )
+                    updated_count = len(to_update)
+                if to_create:
+                    ProjectCatalog.objects.bulk_create(to_create)
+                    created_count = len(to_create)
+
+                messages.success(
+                    request,
+                    f"工程配置保存成功：更新 {updated_count} 条，新增 {created_count} 条，删除 {len(to_delete)} 条。",
+                )
+            except Exception as e:
+                messages.error(request, f"保存失败：{e}")
             return redirect("/admin-config/")
         elif action == "save_git_config":
             git_config = GitPlatformConfig.get_solo_safe()
@@ -800,6 +831,65 @@ def role_permissions_config(request):
 
     context = _build_role_policy_context()
     return render(request, "accounts/role_permissions_config.html", context)
+
+
+@login_required
+@require_http_methods(["GET"])
+def list_managed_users(request):
+    """API: 分页获取可管理的用户列表，支持搜索"""
+    if not _can_manage_admin_config(request.user):
+        return JsonResponse({"success": False, "error": "无权限"}, status=403)
+
+    keyword = request.GET.get("keyword", "").strip()
+    page = max(1, int(request.GET.get("page", 1)))
+    page_size = min(500, max(10, int(request.GET.get("page_size", 20))))
+
+    queryset = User.objects.exclude(id=request.user.id).select_related("profile")
+    if keyword:
+        queryset = queryset.filter(username__icontains=keyword)
+    queryset = queryset.order_by("username", "id")
+
+    total = queryset.count()
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    if page > total_pages:
+        page = total_pages
+
+    offset = (page - 1) * page_size
+    users = queryset[offset:offset + page_size]
+
+    from .models import RoleDefinition
+    available_roles = list(RoleDefinition.objects.filter(enabled=True).order_by("id").values("id", "name"))
+
+    user_list = []
+    for u in users:
+        profile = getattr(u, "profile", None)
+        current_role = None
+        if u.is_superuser:
+            current_role = {"id": None, "name": "超管"}
+        elif profile and profile.role:
+            current_role = {"id": profile.role.id, "name": profile.role.name}
+        elif profile:
+            current_role = {"id": None, "name": "未设置"}
+        else:
+            current_role = {"id": None, "name": "未设置"}
+
+        user_list.append({
+            "id": u.id,
+            "username": u.username,
+            "email": u.email or "-",
+            "is_superuser": u.is_superuser,
+            "current_role": current_role,
+        })
+
+    return JsonResponse({
+        "success": True,
+        "users": user_list,
+        "available_roles": available_roles,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+    })
 
 
 @login_required

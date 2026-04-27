@@ -33,6 +33,7 @@ class TaskQueryFilters:
     hobo_project_id: str = ""
     release_flow_name: str = ""
     release_project_id: str = ""
+    include_created: bool = False
 
 
 def _resolve_date_range(start_date_raw: str, end_date_raw: str, days_back: int = 30):
@@ -48,10 +49,11 @@ def _resolve_date_range(start_date_raw: str, end_date_raw: str, days_back: int =
 def _hobo_tasks(filters: TaskQueryFilters):
     start_date, end_date = _resolve_date_range(filters.start_date, filters.end_date, filters.days_back)
     qs = HoboRequirementLedger.objects.select_related("project").filter(
-        branch_created=False,
         applied_date__gte=start_date,
         applied_date__lte=end_date,
     )
+    if not filters.include_created:
+        qs = qs.filter(branch_created=False)
     if filters.hobo_description:
         qs = qs.filter(description__icontains=filters.hobo_description.strip())
     if filters.hobo_requirement_type in {c.value for c in HoboRequirementLedger.BranchPrefix}:
@@ -81,11 +83,12 @@ def _hobo_tasks(filters: TaskQueryFilters):
 def _release_tasks(filters: TaskQueryFilters):
     start_date, end_date = _resolve_date_range(filters.start_date, filters.end_date, filters.days_back)
     qs = ReleaseItem.objects.select_related("project", "batch").filter(
-        branch_created=False,
         batch__status=ReleaseBatch.Status.OPEN,
-        created_at__date__gte=start_date,
-        created_at__date__lte=end_date,
+        batch__release_date__gte=start_date,
+        batch__release_date__lte=end_date,
     )
+    if not filters.include_created:
+        qs = qs.filter(branch_created=False)
     if filters.release_flow_name:
         qs = qs.filter(flow_name__icontains=filters.release_flow_name.strip())
     if str(filters.release_project_id).strip():
@@ -102,7 +105,7 @@ def _release_tasks(filters: TaskQueryFilters):
             "new_branch": row.release_branch,
             "base_branch": "master",
             "title": row.flow_name,
-            "date": str(row.created_at.date()),
+            "date": str(row.batch.release_date),
             "status": "created" if row.branch_created else "pending",
             "error": row.branch_create_error,
             "log": row.branch_create_log,
@@ -195,7 +198,11 @@ def _prepare_repo_for_remote_check(
     return repo_ready_cache[project]
 
 
-def filter_preview_tasks_with_remote_check(tasks: list[dict], operator) -> tuple[list[dict], int]:
+def filter_preview_tasks_with_remote_check(
+    tasks: list[dict],
+    operator,
+    keep_auto_marked: bool = False,
+) -> tuple[list[dict], int]:
     if not tasks:
         return [], 0
 
@@ -239,6 +246,13 @@ def filter_preview_tasks_with_remote_check(tasks: list[dict], operator) -> tuple
         if exists:
             _mark_remote_exists(ref, operator)
             auto_marked_count += 1
+            if keep_auto_marked:
+                ref["status"] = "created"
+                ref["error"] = ""
+                reason = "预览阶段检测到远端分支已存在，已自动标记为已创建"
+                old_log = (ref.get("log") or "").strip()
+                ref["log"] = "\n".join([reason, old_log]).strip()
+                kept.append(ref)
             continue
         kept.append(ref)
 

@@ -76,10 +76,17 @@
   }
   .grid-3 { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; }
   .table-wrap { overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
+  .user-table-wrap { overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; max-height: 420px; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 760px; }
   th, td { border-bottom: 1px solid #eef2f7; padding: 10px 12px; text-align: left; vertical-align: middle; }
   th { background: #f8fafc; font-weight: 600; }
+  th.sticky-th { position: sticky; top: 0; z-index: 1; }
   .table-title { margin: 0 0 8px; font-size: 15px; color: #0f172a; }
+  .search-toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+  .search-toolbar .field { min-width: 200px; margin-bottom: 0; }
+  .user-pager { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .user-pager-left, .user-pager-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .pager-info { color: #6b7280; font-size: 12px; }
   .hidden { display: none !important; }
   .modal-backdrop {
     position: fixed;
@@ -220,172 +227,12 @@
 
   <div class="section">
     <h2>Git / SQL 连接配置</h2>
-    <p class="section-desc">用于分支、投产追版和 SQL 执行功能。敏感信息支持“留空不变”与“手动清空”。</p>
-    <form method="post">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="save_git_config">
-      <div class="accordion-stack">
-        <details class="config-accordion" open>
-          <summary>基础连接配置</summary>
-          <div class="accordion-body">
-            <p class="accordion-hint">这些字段决定 Git 平台地址和本地工作目录，建议先完整配置。</p>
-            <div class="config-form-grid">
-              <label class="form-label">
-                <span>Git 地址（支持域名或完整 URL）</span>
-                <input class="form-input" name="git_base_url" value="{{ git_config.git_base_url }}" placeholder="https://gitlab.example.com" data-required="1">
-              </label>
-              <label class="form-label">
-                <span>Group / 命名空间</span>
-                <input class="form-input" name="git_group" value="{{ git_config.git_group }}" placeholder="your-group" data-required="1">
-              </label>
-              <label class="form-label span-full">
-                <span>本地工作目录（容器内目录）</span>
-                <input class="form-input" name="work_base_dir" value="{{ git_config.work_base_dir }}" placeholder="/workspace/repos" data-required="1">
-              </label>
-            </div>
-          </div>
-        </details>
-
-        <details class="config-accordion" open>
-          <summary>认证信息（PAT / 用户名密码）</summary>
-          <div class="accordion-body">
-            <p class="accordion-hint">认证优先级：PAT &gt; 用户名/密码。建议优先配置 PAT。</p>
-            <div class="config-form-grid">
-              <label class="form-label">
-                <span>Git 用户名（可选）</span>
-                <input class="form-input" name="git_username" value="{{ git_config.git_username }}" placeholder="git username">
-              </label>
-              <label class="form-label">
-                <span>Git 密码（留空保持不变）</span>
-                <input class="form-input" type="password" name="git_password" placeholder="请输入新密码（留空保持不变）">
-                <p class="secret-meta">
-                  <span>当前状态：{% if git_password_masked %}已设置{% else %}未设置{% endif %}</span>
-                  {% if git_password_masked %}
-                    <button
-                      type="button"
-                      class="btn-link btn-toggle-mask"
-                      data-target-id="git-password-mask"
-                      data-expand-text="显示掩码值"
-                      data-collapse-text="隐藏掩码值"
-                    >显示掩码值</button>
-                    <span id="git-password-mask" class="hidden">掩码值：{{ git_password_masked }}</span>
-                  {% endif %}
-                </p>
-              </label>
-              <label class="form-label span-full">
-                <span>GitLab 个人访问令牌 PAT（留空保持不变）</span>
-                <input class="form-input" type="password" name="git_pat" placeholder="请输入新 PAT（留空保持不变）">
-                <p class="secret-meta">
-                  <span>当前状态：{% if git_pat_masked %}已设置{% else %}未设置{% endif %}</span>
-                  {% if git_pat_masked %}
-                    <button
-                      type="button"
-                      class="btn-link btn-toggle-mask"
-                      data-target-id="git-pat-mask"
-                      data-expand-text="显示掩码值"
-                      data-collapse-text="隐藏掩码值"
-                    >显示掩码值</button>
-                    <span id="git-pat-mask" class="hidden">掩码值：{{ git_pat_masked }}</span>
-                  {% endif %}
-                </p>
-              </label>
-              <label class="check-row">
-                <input type="checkbox" name="clear_git_password">
-                <span>清空已保存的 Git 密码</span>
-              </label>
-              <label class="check-row">
-                <input type="checkbox" name="clear_git_pat">
-                <span>清空已保存的 PAT</span>
-              </label>
-            </div>
-          </div>
-        </details>
-
-        <details class="config-accordion" open>
-          <summary>SQL 仓库与数据库配置</summary>
-          <div class="accordion-body">
-            <p class="accordion-hint">用于 SQL 执行申请流程，SQL 密码同样支持留空不变或手动清空。</p>
-            <div class="config-form-grid">
-              <label class="form-label span-full">
-                <span>SQL 执行仓库本地保存的路径（容器内目录）</span>
-                <input class="form-input" name="sql_repo_path" value="{{ git_config.sql_repo_path }}" placeholder="/workspace/sql-repo">
-              </label>
-              <label class="form-label span-full">
-                <span>SQL 仓库 Clone URL（用于首次克隆）</span>
-                <input class="form-input" name="sql_repo_clone_url" value="{{ git_config.sql_repo_clone_url }}" placeholder="https://gitlab.example.com/group/sql-repo.git">
-              </label>
-              <label class="form-label">
-                <span>MySQL Host</span>
-                <input class="form-input" name="sql_db_host" value="{{ git_config.sql_db_host }}" placeholder="127.0.0.1">
-              </label>
-              <label class="form-label">
-                <span>MySQL Port</span>
-                <input class="form-input" name="sql_db_port" value="{{ git_config.sql_db_port }}" placeholder="3306">
-              </label>
-              <label class="form-label">
-                <span>SQL 数据库名（sql_db_name）</span>
-                <input class="form-input" name="sql_db_name" value="{{ git_config.sql_db_name }}" placeholder="db_name">
-              </label>
-              <label class="form-label">
-                <span>MySQL User</span>
-                <input class="form-input" name="sql_db_user" value="{{ git_config.sql_db_user }}" placeholder="db_user">
-              </label>
-              <label class="form-label span-full">
-                <span>MySQL Password（留空保持不变）</span>
-                <input class="form-input" type="password" name="sql_db_password" placeholder="请输入新密码（留空保持不变）">
-                <p class="secret-meta">
-                  <span>当前状态：{% if sql_db_password_masked %}已设置{% else %}未设置{% endif %}</span>
-                  {% if sql_db_password_masked %}
-                    <button
-                      type="button"
-                      class="btn-link btn-toggle-mask"
-                      data-target-id="sql-db-password-mask"
-                      data-expand-text="显示掩码值"
-                      data-collapse-text="隐藏掩码值"
-                    >显示掩码值</button>
-                    <span id="sql-db-password-mask" class="hidden">掩码值：{{ sql_db_password_masked }}</span>
-                  {% endif %}
-                </p>
-              </label>
-              <label class="check-row">
-                <input type="checkbox" name="clear_sql_db_password">
-                <span>清空已保存的 MySQL 密码</span>
-              </label>
-              <label class="form-label">
-                <span>DDL 脚本关键字（逗号分隔）</span>
-                <input class="form-input" name="sql_keyword_ddl" value="{{ git_config.sql_keyword_ddl }}" placeholder="ddl">
-              </label>
-              <label class="form-label">
-                <span>备份脚本关键字（逗号分隔）</span>
-                <input class="form-input" name="sql_keyword_backup" value="{{ git_config.sql_keyword_backup }}" placeholder="backup,bak,备份">
-              </label>
-              <label class="form-label">
-                <span>执行脚本关键字（逗号分隔）</span>
-                <input class="form-input" name="sql_keyword_execute" value="{{ git_config.sql_keyword_execute }}" placeholder="execute,执行">
-              </label>
-              <label class="form-label span-full">
-                <span>回滚脚本关键字（逗号分隔）</span>
-                <input class="form-input" name="sql_keyword_rollback" value="{{ git_config.sql_keyword_rollback }}" placeholder="rollback,回滚">
-              </label>
-              <label class="form-label span-full">
-                <span>允许研发提交的执行顺序规则（机器审批）</span>
-                <input type="hidden" id="sql-auto-approve-order-input" name="sql_auto_approve_order" value="{{ git_config.sql_auto_approve_order }}">
-                <div class="rule-builder">
-                  <div class="rule-toolbar">
-                    <span class="muted">支持多条规则；可拖动卡片排序、重复添加同一类型、删除规则。</span>
-                    <button id="btn-add-auto-approve-rule" class="btn btn-secondary" type="button">新增一条规则</button>
-                  </div>
-                  <div id="sql-auto-approve-rule-list" class="rule-list"></div>
-                </div>
-              </label>
-            </div>
-          </div>
-        </details>
-      </div>
-      <div style="margin-top: 12px;">
-        <button class="btn btn-primary" type="submit">保存 Git / SQL 配置</button>
-      </div>
-    </form>
+    <p class="section-desc">用于分支、投产追版和 SQL 执行功能。敏感信息支持"留空不变"与"手动清空"。</p>
+    <div class="inline-actions">
+      <button id="btn-open-git-modal" type="button" class="btn btn-primary">Git 基础配置</button>
+      <button id="btn-open-sql-modal" type="button" class="btn btn-primary">SQL 数据库配置</button>
+      <span class="muted">敏感密码留空表示保持不变。</span>
+    </div>
   </div>
 
   <div class="section">
@@ -397,101 +244,293 @@
   </div>
 
   <div class="section">
-    <h2>账号管理（其他账号）</h2>
+    <h2>账号管理</h2>
     <p class="section-desc">审核新账号申请，并维护已注册账号角色/密码。你自己的账号不在此处展示。</p>
-    <h3 class="table-title">待审核账号</h3>
-    <div class="table-wrap" style="margin-bottom: 14px;">
-      <table>
-        <thead>
-        <tr>
-          <th>用户名</th>
-          <th>邮箱</th>
-          <th>申请角色</th>
-          <th>注册时间</th>
-          <th>审核</th>
-        </tr>
-        </thead>
-        <tbody>
-        {% for profile in pending_profiles %}
-          <tr>
-            <td>{{ profile.user.username }}</td>
-            <td>{{ profile.user.email|default:"-" }}</td>
-            <td>{% if profile.role %}{{ profile.role.name }}{% else %}-{% endif %}</td>
-            <td>{{ profile.user.date_joined|date:"Y-m-d H:i" }}</td>
-            <td>
-              <form method="post" action="{% url 'approval_action' profile.id %}" style="display:inline-block; margin-right:6px;">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="approve">
-                <button class="btn btn-primary" type="submit">通过</button>
-              </form>
-              <form method="post" action="{% url 'approval_action' profile.id %}" style="display:inline-block;">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="reject">
-                <input class="form-input" style="max-width:140px; display:inline-block;" name="reason" placeholder="拒绝原因">
-                <button class="btn btn-secondary" type="submit">拒绝</button>
-              </form>
-            </td>
-          </tr>
-        {% empty %}
-          <tr><td colspan="5" style="color:#6b7280;">暂无待审核账号</td></tr>
-        {% endfor %}
-        </tbody>
-      </table>
+    <div class="inline-actions">
+      <button id="btn-open-account-modal" type="button" class="btn btn-primary">打开账号管理</button>
+      {% if pending_profiles %}
+        <span style="background:#fef3c7;color:#92400e;border-radius:999px;padding:2px 10px;font-size:12px;">{{ pending_profiles|length }} 个待审核</span>
+      {% endif %}
     </div>
+  </div>
 
-    <h3 class="table-title">已注册账号</h3>
-    <div class="table-wrap">
-      <table>
-        <thead>
-        <tr>
-          <th>用户名</th>
-          <th>邮箱</th>
-          <th>当前角色</th>
-          <th>新角色</th>
-          <th>重置密码</th>
-          <th>操作</th>
-        </tr>
-        </thead>
-        <tbody>
-        {% for u in managed_users %}
+  <div id="account-config-modal" class="modal-backdrop hidden">
+    <div class="modal-panel" style="max-width:960px;">
+      <div class="modal-header">
+        <h2 style="margin:0;font-size:18px;">账号管理</h2>
+        <button id="btn-close-account-modal" type="button" class="close-btn">×</button>
+      </div>
+
+      <h3 class="table-title">待审核账号</h3>
+      <div class="table-wrap" style="margin-bottom:14px;">
+        <table>
+          <thead>
           <tr>
-            <form method="post">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="update_user_account">
-              <input type="hidden" name="target_user_id" value="{{ u.id }}">
-              <td>{{ u.username }}</td>
-              <td>{{ u.email|default:"-" }}</td>
-              <td>
-                {% if u.is_superuser %}
-                  超管
-                {% elif u.profile %}
-                  {% if u.profile.role %}{{ u.profile.role.name }}{% else %}未设置{% endif %}
-                {% else %}
-                  未设置
-                {% endif %}
-              </td>
-              <td>
-                {% if u.is_superuser %}
-                  <span class="muted">超管角色不可修改</span>
-                {% else %}
-                  <select class="form-input" name="new_role_id" style="min-width: 140px;">
-                    {% for role in available_roles %}
-                      <option value="{{ role.id }}" {% if u.profile and u.profile.role_id == role.id %}selected{% endif %}>{{ role.name }}</option>
-                    {% endfor %}
-                  </select>
-                {% endif %}
-              </td>
-              <td><input class="form-input" type="password" name="new_password" placeholder="不填则不修改"></td>
-              <td><button class="btn btn-secondary" type="submit">保存</button></td>
-            </form>
+            <th>用户名</th>
+            <th>邮箱</th>
+            <th>申请角色</th>
+            <th>注册时间</th>
+            <th>审核</th>
           </tr>
-        {% empty %}
-          <tr><td colspan="6" style="color:#6b7280;">暂无其他账号</td></tr>
-        {% endfor %}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+          {% for profile in pending_profiles %}
+            <tr>
+              <td>{{ profile.user.username }}</td>
+              <td>{{ profile.user.email|default:"-" }}</td>
+              <td>{% if profile.role %}{{ profile.role.name }}{% else %}-{% endif %}</td>
+              <td>{{ profile.user.date_joined|date:"Y-m-d H:i" }}</td>
+              <td>
+                <form method="post" action="{% url 'approval_action' profile.id %}" style="display:inline-block; margin-right:6px;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="approve">
+                  <button class="btn btn-primary" type="submit">通过</button>
+                </form>
+                <form method="post" action="{% url 'approval_action' profile.id %}" style="display:inline-block;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="reject">
+                  <input class="form-input" style="max-width:140px; display:inline-block;" name="reason" placeholder="拒绝原因">
+                  <button class="btn btn-secondary" type="submit">拒绝</button>
+                </form>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" style="color:#6b7280;">暂无待审核账号</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="table-title">已注册账号</h3>
+      <div class="search-toolbar">
+        <label class="field">
+          <span style="font-size:12px;color:#6b7280;">搜索用户名</span>
+          <input id="user-search-input" class="form-input" type="text" placeholder="输入用户名搜索...">
+        </label>
+        <button id="btn-search-user" class="btn btn-secondary" type="button">搜索</button>
+        <button id="btn-reset-user-search" class="btn btn-secondary" type="button">重置</button>
+        <span id="user-search-tip" class="muted"></span>
+      </div>
+      <div class="user-table-wrap">
+        <table>
+          <thead>
+          <tr>
+            <th class="sticky-th">用户名</th>
+            <th class="sticky-th">邮箱</th>
+            <th class="sticky-th">当前角色</th>
+            <th class="sticky-th">新角色</th>
+            <th class="sticky-th">重置密码</th>
+            <th class="sticky-th">操作</th>
+          </tr>
+          </thead>
+          <tbody id="user-list-body">
+          {% for u in managed_users %}
+            <tr data-user-id="{{ u.id }}">
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_user_account">
+                <input type="hidden" name="target_user_id" value="{{ u.id }}">
+                <td>{{ u.username }}</td>
+                <td>{{ u.email|default:"-" }}</td>
+                <td>
+                  {% if u.is_superuser %}
+                    超管
+                  {% elif u.profile %}
+                    {% if u.profile.role %}{{ u.profile.role.name }}{% else %}未设置{% endif %}
+                  {% else %}
+                    未设置
+                  {% endif %}
+                </td>
+                <td>
+                  {% if u.is_superuser %}
+                    <span class="muted">超管角色不可修改</span>
+                  {% else %}
+                    <select class="form-input" name="new_role_id" style="min-width:140px;">
+                      {% for role in available_roles %}
+                        <option value="{{ role.id }}" {% if u.profile and u.profile.role_id == role.id %}selected{% endif %}>{{ role.name }}</option>
+                      {% endfor %}
+                    </select>
+                  {% endif %}
+                </td>
+                <td><input class="form-input" type="password" name="new_password" placeholder="不填则不修改"></td>
+                <td><button class="btn btn-secondary" type="submit">保存</button></td>
+              </form>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" style="color:#6b7280;">暂无其他账号</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="user-pager" id="user-pager" style="display:none;">
+        <div class="user-pager-left">
+          <span class="pager-info" id="user-pager-info">共 0 条</span>
+          <label class="field" style="min-width:100px;margin-bottom:0;">
+            <span style="font-size:12px;color:#6b7280;">每页</span>
+            <select id="user-page-size" class="form-input">
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+            </select>
+          </label>
+        </div>
+        <div class="user-pager-right">
+          <button id="btn-user-prev" class="btn btn-secondary" type="button" disabled>上一页</button>
+          <span class="muted" id="user-page-indicator">1 / 1</span>
+          <button id="btn-user-next" class="btn btn-secondary" type="button" disabled>下一页</button>
+        </div>
+      </div>
+      <div class="tips-box" style="margin-top:10px;">说明：只能管理其他账号；非超管不能修改超管账号。</div>
     </div>
-    <div class="tips-box" style="margin-top:10px;">说明：只能管理其他账号；非超管不能修改超管账号。</div>
+  </div>
+
+  <div id="git-config-modal" class="modal-backdrop hidden">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <h2 style="margin:0;font-size:18px;">Git 基础配置</h2>
+        <button id="btn-close-git-modal" type="button" class="close-btn">×</button>
+      </div>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save_git_config">
+        <div class="config-form-grid">
+          <label class="form-label">
+            <span>Git 地址（支持域名或完整 URL）</span>
+            <input class="form-input" name="git_base_url" value="{{ git_config.git_base_url }}" placeholder="https://gitlab.example.com">
+          </label>
+          <label class="form-label">
+            <span>Group / 命名空间</span>
+            <input class="form-input" name="git_group" value="{{ git_config.git_group }}" placeholder="your-group">
+          </label>
+          <label class="form-label span-full">
+            <span>本地工作目录（容器内目录）</span>
+            <input class="form-input" name="work_base_dir" value="{{ git_config.work_base_dir }}" placeholder="/workspace/repos">
+          </label>
+          <label class="form-label">
+            <span>Git 用户名（可选）</span>
+            <input class="form-input" name="git_username" value="{{ git_config.git_username }}" placeholder="git username">
+          </label>
+          <label class="form-label">
+            <span>Git 密码（留空保持不变）</span>
+            <input class="form-input" type="password" name="git_password" placeholder="请输入新密码（留空保持不变）">
+            <p class="secret-meta">
+              <span>当前状态：{% if git_password_masked %}已设置{% else %}未设置{% endif %}</span>
+              {% if git_password_masked %}
+                <button type="button" class="btn-link btn-toggle-mask" data-target-id="git-password-mask" data-expand-text="显示掩码值" data-collapse-text="隐藏掩码值">显示掩码值</button>
+                <span id="git-password-mask" class="hidden">掩码值：{{ git_password_masked }}</span>
+              {% endif %}
+            </p>
+          </label>
+          <label class="form-label span-full">
+            <span>GitLab 个人访问令牌 PAT（留空保持不变）</span>
+            <input class="form-input" type="password" name="git_pat" placeholder="请输入新 PAT（留空保持不变）">
+            <p class="secret-meta">
+              <span>当前状态：{% if git_pat_masked %}已设置{% else %}未设置{% endif %}</span>
+              {% if git_pat_masked %}
+                <button type="button" class="btn-link btn-toggle-mask" data-target-id="git-pat-mask" data-expand-text="显示掩码值" data-collapse-text="隐藏掩码值">显示掩码值</button>
+                <span id="git-pat-mask" class="hidden">掩码值：{{ git_pat_masked }}</span>
+              {% endif %}
+            </p>
+          </label>
+          <label class="check-row">
+            <input type="checkbox" name="clear_git_password">
+            <span>清空已保存的 Git 密码</span>
+          </label>
+          <label class="check-row">
+            <input type="checkbox" name="clear_git_pat">
+            <span>清空已保存的 PAT</span>
+          </label>
+        </div>
+        <div style="margin-top:12px;">
+          <button class="btn btn-primary" type="submit">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="sql-config-modal" class="modal-backdrop hidden">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <h2 style="margin:0;font-size:18px;">SQL 数据库配置</h2>
+        <button id="btn-close-sql-modal" type="button" class="close-btn">×</button>
+      </div>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save_git_config">
+        <div class="config-form-grid">
+          <label class="form-label span-full">
+            <span>SQL 执行仓库本地保存的路径（容器内目录）</span>
+            <input class="form-input" name="sql_repo_path" value="{{ git_config.sql_repo_path }}" placeholder="/workspace/sql-repo">
+          </label>
+          <label class="form-label span-full">
+            <span>SQL 仓库 Clone URL（用于首次克隆）</span>
+            <input class="form-input" name="sql_repo_clone_url" value="{{ git_config.sql_repo_clone_url }}" placeholder="https://gitlab.example.com/group/sql-repo.git">
+          </label>
+          <label class="form-label">
+            <span>MySQL Host</span>
+            <input class="form-input" name="sql_db_host" value="{{ git_config.sql_db_host }}" placeholder="127.0.0.1">
+          </label>
+          <label class="form-label">
+            <span>MySQL Port</span>
+            <input class="form-input" name="sql_db_port" value="{{ git_config.sql_db_port }}" placeholder="3306">
+          </label>
+          <label class="form-label">
+            <span>SQL 数据库名（sql_db_name）</span>
+            <input class="form-input" name="sql_db_name" value="{{ git_config.sql_db_name }}" placeholder="db_name">
+          </label>
+          <label class="form-label">
+            <span>MySQL User</span>
+            <input class="form-input" name="sql_db_user" value="{{ git_config.sql_db_user }}" placeholder="db_user">
+          </label>
+          <label class="form-label span-full">
+            <span>MySQL Password（留空保持不变）</span>
+            <input class="form-input" type="password" name="sql_db_password" placeholder="请输入新密码（留空保持不变）">
+            <p class="secret-meta">
+              <span>当前状态：{% if sql_db_password_masked %}已设置{% else %}未设置{% endif %}</span>
+              {% if sql_db_password_masked %}
+                <button type="button" class="btn-link btn-toggle-mask" data-target-id="sql-db-password-mask" data-expand-text="显示掩码值" data-collapse-text="隐藏掩码值">显示掩码值</button>
+                <span id="sql-db-password-mask" class="hidden">掩码值：{{ sql_db_password_masked }}</span>
+              {% endif %}
+            </p>
+          </label>
+          <label class="check-row">
+            <input type="checkbox" name="clear_sql_db_password">
+            <span>清空已保存的 MySQL 密码</span>
+          </label>
+          <hr style="grid-column:1/-1;border:none;border-top:1px solid #e5e7eb;margin:0;">
+          <label class="form-label">
+            <span>DDL 脚本关键字（逗号分隔）</span>
+            <input class="form-input" name="sql_keyword_ddl" value="{{ git_config.sql_keyword_ddl }}" placeholder="ddl">
+          </label>
+          <label class="form-label">
+            <span>备份脚本关键字（逗号分隔）</span>
+            <input class="form-input" name="sql_keyword_backup" value="{{ git_config.sql_keyword_backup }}" placeholder="backup,bak,备份">
+          </label>
+          <label class="form-label">
+            <span>执行脚本关键字（逗号分隔）</span>
+            <input class="form-input" name="sql_keyword_execute" value="{{ git_config.sql_keyword_execute }}" placeholder="execute,执行">
+          </label>
+          <label class="form-label span-full">
+            <span>回滚脚本关键字（逗号分隔）</span>
+            <input class="form-input" name="sql_keyword_rollback" value="{{ git_config.sql_keyword_rollback }}" placeholder="rollback,回滚">
+          </label>
+          <label class="form-label span-full">
+            <span>允许研发提交的执行顺序规则（机器审批）</span>
+            <input type="hidden" id="sql-auto-approve-order-input" name="sql_auto_approve_order" value="{{ git_config.sql_auto_approve_order }}">
+            <div class="rule-builder">
+              <div class="rule-toolbar">
+                <span class="muted">支持多条规则；可拖动卡片排序、重复添加同一类型、删除规则。</span>
+                <button id="btn-add-auto-approve-rule" class="btn btn-secondary" type="button">新增一条规则</button>
+              </div>
+              <div id="sql-auto-approve-rule-list" class="rule-list"></div>
+            </div>
+          </label>
+        </div>
+        <div style="margin-top:12px;">
+          <button class="btn btn-primary" type="submit">保存</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <div id="project-config-modal" class="modal-backdrop hidden">
@@ -574,6 +613,13 @@
   </div>
 </div>
 <script>
+  // ========== 已注册账号搜索 & 分页 ==========
+  let userAllData = [];
+  let userFilteredData = [];
+  let userCurrentPage = 1;
+  let userPageSize = 20;
+  let userCurrentKeyword = "";
+
   function escapeHtml(value) {
     return String(value ?? "")
       .replaceAll("&", "&amp;")
@@ -583,6 +629,124 @@
       .replaceAll("'", "&#39;");
   }
 
+  function renderUserRow(u, roles) {
+    const roleOptions = roles.map(r =>
+      `<option value="${r.id}" ${u.current_role && u.current_role.id == r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>`
+    ).join('');
+    const roleDisplay = u.current_role ? escapeHtml(u.current_role.name) : '未设置';
+    const roleSelectHtml = u.is_superuser
+      ? '<span class="muted">超管角色不可修改</span>'
+      : `<select class="form-input" name="new_role_id" style="min-width:140px;">${roleOptions}</select>`;
+    const tr = document.createElement('tr');
+    tr.dataset.userId = u.id;
+    tr.innerHTML = `
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_user_account">
+        <input type="hidden" name="target_user_id" value="${u.id}">
+        <td>${escapeHtml(u.username)}</td>
+        <td>${escapeHtml(u.email || '-')}</td>
+        <td>${roleDisplay}</td>
+        <td>${roleSelectHtml}</td>
+        <td><input class="form-input" type="password" name="new_password" placeholder="不填则不修改"></td>
+        <td><button class="btn btn-secondary" type="submit">保存</button></td>
+      </form>
+    `;
+    return tr;
+  }
+
+  function renderUserPage() {
+    const tbody = document.getElementById('user-list-body');
+    const total = userFilteredData.length;
+    const totalPages = Math.max(1, Math.ceil(total / userPageSize));
+    if (userCurrentPage > totalPages) userCurrentPage = totalPages;
+    if (userCurrentPage < 1) userCurrentPage = 1;
+
+    const start = (userCurrentPage - 1) * userPageSize;
+    const pageItems = userFilteredData.slice(start, start + userPageSize);
+
+    tbody.innerHTML = '';
+    if (pageItems.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="color:#6b7280;">暂无匹配的账号</td></tr>';
+    } else {
+      pageItems.forEach(u => tbody.appendChild(renderUserRow(u, window._availableRoles || [])));
+    }
+
+    document.getElementById('user-pager-info').textContent = total === 0
+      ? '共 0 条'
+      : `共 ${total} 条，显示 ${start + 1}-${Math.min(start + userPageSize, total)} 条`;
+    document.getElementById('user-page-indicator').textContent = `${userCurrentPage} / ${totalPages}`;
+    document.getElementById('btn-user-prev').disabled = userCurrentPage <= 1;
+    document.getElementById('btn-user-next').disabled = userCurrentPage >= totalPages;
+    document.getElementById('user-pager').style.display = total > userPageSize ? 'flex' : 'none';
+  }
+
+  function applyUserFilter() {
+    const kw = userCurrentKeyword.toLowerCase();
+    userFilteredData = kw
+      ? userAllData.filter(u => u.username.toLowerCase().includes(kw))
+      : [...userAllData];
+    userCurrentPage = 1;
+    renderUserPage();
+  }
+
+  async function loadUsers() {
+    const tip = document.getElementById('user-search-tip');
+    tip.textContent = '加载中...';
+    try {
+      const resp = await fetch('/api/users/?page_size=200', {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      const data = await resp.json();
+      if (!data.success) throw new Error(data.error || '加载失败');
+      userAllData = data.users || [];
+      window._availableRoles = data.available_roles || [];
+      tip.textContent = `共 ${userAllData.length} 个账号`;
+      applyUserFilter();
+    } catch (e) {
+      tip.textContent = '加载失败：' + (e.message || '未知错误');
+    }
+  }
+
+  document.getElementById('btn-search-user').addEventListener('click', () => {
+    userCurrentKeyword = document.getElementById('user-search-input').value.trim();
+    applyUserFilter();
+  });
+  document.getElementById('user-search-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      userCurrentKeyword = e.target.value.trim();
+      applyUserFilter();
+    }
+  });
+  document.getElementById('btn-reset-user-search').addEventListener('click', () => {
+    document.getElementById('user-search-input').value = '';
+    userCurrentKeyword = '';
+    applyUserFilter();
+  });
+  document.getElementById('user-page-size').addEventListener('change', (e) => {
+    userPageSize = Math.min(50, Math.max(10, parseInt(e.target.value) || 20));
+    userCurrentPage = 1;
+    renderUserPage();
+  });
+  document.getElementById('btn-user-prev').addEventListener('click', () => {
+    if (userCurrentPage > 1) { userCurrentPage--; renderUserPage(); }
+  });
+  document.getElementById('btn-user-next').addEventListener('click', () => {
+    const totalPages = Math.max(1, Math.ceil(userFilteredData.length / userPageSize));
+    if (userCurrentPage < totalPages) { userCurrentPage++; renderUserPage(); }
+  });
+
+  // 打开账号管理弹窗时加载数据
+  const accountModal = document.getElementById('account-config-modal');
+  const btnOpenAccount = document.getElementById('btn-open-account-modal');
+  if (btnOpenAccount && accountModal) {
+    btnOpenAccount.addEventListener('click', () => {
+      accountModal.classList.remove('hidden');
+      if (userAllData.length === 0) loadUsers();
+    });
+  }
+
+  // ========== 其他原有代码 ==========
   function validateGitConfigAccordions() {
     const sections = document.querySelectorAll(".config-accordion");
     let firstInvalidInput = null;
@@ -663,6 +827,41 @@
     }
   });
 
+  document.getElementById("btn-close-account-modal").addEventListener("click", () => {
+    accountModal.classList.add("hidden");
+  });
+  accountModal.addEventListener("click", (event) => {
+    if (event.target.id === "account-config-modal") {
+      accountModal.classList.add("hidden");
+    }
+  });
+
+  const gitModal = document.getElementById("git-config-modal");
+  document.getElementById("btn-open-git-modal").addEventListener("click", () => {
+    gitModal.classList.remove("hidden");
+  });
+  document.getElementById("btn-close-git-modal").addEventListener("click", () => {
+    gitModal.classList.add("hidden");
+  });
+  gitModal.addEventListener("click", (event) => {
+    if (event.target.id === "git-config-modal") {
+      gitModal.classList.add("hidden");
+    }
+  });
+
+  const sqlModal = document.getElementById("sql-config-modal");
+  document.getElementById("btn-open-sql-modal").addEventListener("click", () => {
+    sqlModal.classList.remove("hidden");
+  });
+  document.getElementById("btn-close-sql-modal").addEventListener("click", () => {
+    sqlModal.classList.add("hidden");
+  });
+  sqlModal.addEventListener("click", (event) => {
+    if (event.target.id === "sql-config-modal") {
+      sqlModal.classList.add("hidden");
+    }
+  });
+
   document.getElementById("btn-add-project-row").addEventListener("click", () => {
     const codesRaw = document.getElementById("new-project-codes").value;
     const comment = document.getElementById("new-project-name").value;
@@ -677,6 +876,7 @@
   });
 
   document.getElementById("project-config-form").addEventListener("submit", (event) => {
+    event.preventDefault();
     const rows = [];
     document.querySelectorAll("#project-config-body tr").forEach((tr) => {
       if (tr.dataset.emptyRow === "1") return;
@@ -692,11 +892,11 @@
       });
     });
     if (rows.length === 0) {
-      event.preventDefault();
       alert("请至少保留一条工程配置。");
       return;
     }
     document.getElementById("projects-payload").value = JSON.stringify(rows);
+    event.target.submit();
   });
 
   bindRemoveButtons();

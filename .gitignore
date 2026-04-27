@@ -1,2 +1,5 @@
 # Distribution / offline build output (not synced to remote)
 dist/
+tmp/
+.vscode/.zsh_history
+.vscode/.zcompdump*

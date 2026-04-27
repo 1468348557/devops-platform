@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
@@ -14,6 +15,7 @@ from branch_create.models import (
     ReleaseBatchProject,
     ReleaseItem,
 )
+from branch_create.services.branch_tasks import TaskQueryFilters, collect_pending_tasks
 
 
 class BranchExecuteStartTests(TestCase):
@@ -62,6 +64,60 @@ class BranchExecuteStartTests(TestCase):
         self.assertTrue(data["run_id"])
         self.assertEqual(BranchTaskExecuteRun.objects.count(), 1)
         mocked_spawn.assert_called_once()
+
+
+class BranchTaskQueryTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="release_owner",
+            email="release_owner@example.com",
+            password="pass1234",
+        )
+
+    def _create_release_item(self, release_date, project_code):
+        batch = ReleaseBatch.objects.create(
+            release_date=release_date,
+            release_type=ReleaseBatch.ReleaseType.RELEASE,
+            release_branch=f"release-{release_date:%Y%m%d}",
+            status=ReleaseBatch.Status.OPEN,
+            created_by=self.user,
+        )
+        project = ReleaseBatchProject.objects.create(
+            batch=batch,
+            project_code=project_code,
+            project_name=project_code,
+            enabled=True,
+        )
+        return ReleaseItem.objects.create(
+            batch=batch,
+            project=project,
+            flow_name=f"{project_code} flow",
+            biz_category="biz",
+            branch_type="REQ",
+            requirement_branch=f"REQ-{release_date:%Y%m%d}-0001",
+            release_branch=batch.release_branch,
+            tech_owner="tech",
+            biz_owner="biz",
+            developer=self.user,
+        )
+
+    def test_release_tasks_filter_by_batch_release_date(self):
+        future_date = timezone.localdate() + timedelta(days=7)
+        today = timezone.localdate()
+        future_item = self._create_release_item(future_date, "future-project")
+        self._create_release_item(today, "today-project")
+
+        tasks = collect_pending_tasks(
+            "release",
+            TaskQueryFilters(
+                start_date=str(future_date),
+                end_date=str(future_date),
+            ),
+        )
+
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0]["source_id"], future_item.id)
+        self.assertEqual(tasks[0]["date"], str(future_date))
 
 
 class ReleaseEntryCrossOwnerEditTests(TestCase):

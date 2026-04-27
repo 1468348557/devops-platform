@@ -5,6 +5,7 @@ from .views import (
     admin_config,
     role_permissions_config,
     approval_bulk_action,
+    list_managed_users,
     UserLoginView,
     UserLogoutView,
     approval_action,
@@ -22,6 +23,7 @@ urlpatterns = [
     path("approval/<int:profile_id>/action/", approval_action, name="approval_action"),
     path("approval/bulk-action/", approval_bulk_action, name="approval_bulk_action"),
     path("admin-config/", admin_config, name="admin_config"),
+    path("api/users/", list_managed_users, name="list_managed_users"),
     path("role-permissions/", role_permissions_config, name="role_permissions_config"),
     path("my-password/", my_password, name="my_password"),
 ]
