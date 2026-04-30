@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}新建分支 - 结果{% endblock %}
+
+{% block content %}
+<style>
+  .nav-bread { font-size: 13px; color: #6b7280; margin-bottom: 16px; }
+  .nav-bread a { color: #1f75cb; text-decoration: none; }
+  .result-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; }
+  .result-table th, .result-table td { border: 1px solid #e5e7eb; padding: 8px 12px; text-align: left; }
+  .result-table th { background: #f9fafb; font-weight: 600; }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .summary-box { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 14px; margin-bottom: 20px; font-size: 13px; }
+</style>
+
+<section class="card">
+  <h1 class="card-title">🌿 新建分支 - 执行结果</h1>
+
+  <div class="summary-box">
+    <div>基准分支：<strong>{{ base_branch }}</strong></div>
+    <div>任务总数：<strong>{{ tasks|length }} 个</strong></div>
+  </div>
+
+  <table class="result-table">
+    <thead>
+      <tr>
+        <th>行号</th>
+        <th>新分支名</th>
+        <th>原始项目名</th>
+        <th>映射后项目名</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for task in tasks %}
+      <tr id="row-{{ forloop.counter }}">
+        <td>{{ task.line_no }}</td>
+        <td><code>{{ task.new_branch }}</code></td>
+        <td>{{ task.raw_project }}</td>
+        <td><code>{{ task.mapped_project }}</code></td>
+        <td>
+          <button class="btn btn-primary btn-sm" onclick="createBranch({{ forloop.counter }}, '{{ task.new_branch }}', '{{ task.mapped_project }}', '{{ base_branch }}')">
+            创建分支
+          </button>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="5" style="text-align:center;color:#6b7280">没有可执行的任务（检查配置格式）</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <a href="{% url 'branch_create:index' %}" class="btn btn-secondary">← 返回配置页</a>
+</section>
+
+<script>
+  function createBranch(rowId, newBranch, project, baseBranch) {
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = "处理中...";
+
+    const formData = new FormData();
+    formData.append("new_branch", newBranch);
+    formData.append("project", project);
+    formData.append("base_branch", baseBranch);
+
+    fetch("{% url 'branch_create:api_create' %}", {
+      method: "POST",
+      body: formData,
+      headers: { "X-CSRFToken": "{{ csrf_token }}" },
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        btn.textContent = "✅ 成功";
+        btn.className = "btn btn-primary btn-sm";
+      } else {
+        btn.textContent = data.status === "skipped" ? "⏭️ 跳过" : "❌ 失败";
+        btn.disabled = false;
+        alert("错误: " + data.error);
+      }
+    })
+    .catch(e => {
+      btn.textContent = "❌ 失败";
+      btn.disabled = false;
+    });
+  }
+</script>
+{% endblock %}

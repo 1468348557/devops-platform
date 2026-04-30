@@ -68,7 +68,7 @@ if IS_PRODUCTION and SECRET_KEY == "dev-only-insecure-secret-key":
 # SECURITY WARNING: don't run with debug turned on in production.
 DEBUG = env_bool("DJANGO_DEBUG", default=not IS_PRODUCTION)
 
-_default_hosts = ["127.0.0.1", "localhost"] if DEBUG else []
+_default_hosts = ["*"] if DEBUG else []
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", default=_default_hosts)
 if not ALLOWED_HOSTS and DEBUG:
     ALLOWED_HOSTS = ["127.0.0.1", "localhost"]

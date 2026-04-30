@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}投产追版 - 结果{% endblock %}
+
+{% block content %}
+<style>
+  .nav-bread { font-size: 13px; color: #6b7280; margin-bottom: 16px; }
+  .nav-bread a { color: #1f75cb; text-decoration: none; }
+  .result-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; }
+  .result-table th, .result-table td { border: 1px solid #e5e7eb; padding: 8px 12px; text-align: left; }
+  .result-table th { background: #f9fafb; font-weight: 600; }
+  .status-success { color: #16a34a; font-weight: 600; }
+  .status-conflict { color: #dc2626; font-weight: 600; }
+  .status-skipped { color: #d97706; font-weight: 600; }
+  .status-error { color: #dc2626; }
+  .status-pending { color: #6b7280; }
+  .log-block { background: #f3f4f6; border-radius: 6px; padding: 8px; font-family: monospace; font-size: 12px; white-space: pre-wrap; max-height: 150px; overflow-y: auto; margin-top: 6px; }
+  .summary-box { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 14px; margin-bottom: 20px; }
+  .summary-box h3 { margin: 0 0 10px; font-size: 14px; }
+  .summary-box .tag-info { font-size: 13px; color: #374151; }
+  .summary-box .tag-info span { font-weight: 600; color: #1f75cb; }
+  .btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .log-cell { max-width: 300px; }
+</style>
+
+<section class="card">
+  <h1 class="card-title">🚀 投产追版 - 执行结果</h1>
+
+  <div class="summary-box">
+    <h3>📋 本次执行配置</h3>
+    <div class="tag-info">
+      <div>Tag 名称：<span>{{ config.tag_name }}</span></div>
+      <div>合并信息：<span>{{ config.merge_message }}</span></div>
+      <div>Tag 描述：<span>{{ config.tag_message }}</span></div>
+      <div>仓库总数：<span>{{ config.repos|length }} 个</span></div>
+    </div>
+  </div>
+
+  <table class="result-table">
+    <thead>
+      <tr>
+        <th>仓库</th>
+        <th>投产分支</th>
+        <th>目标分支</th>
+        <th>状态</th>
+        <th>原因</th>
+        <th>待合并提交</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in results %}
+      <tr>
+        <td><code>{{ r.repo }}</code></td>
+        <td><code>{{ r.release_branch }}</code></td>
+        <td><code>{{ r.target_branch }}</code></td>
+        <td>
+          {% if r.status == 'success' %}
+            <span class="status-success">✅ 成功</span>
+          {% elif r.status == 'conflict' %}
+            <span class="status-conflict">⚠️ 冲突</span>
+          {% elif r.status == 'skipped' %}
+            <span class="status-skipped">⏭️ 跳过</span>
+          {% elif r.status == 'error' %}
+            <span class="status-error">❌ 错误</span>
+          {% else %}
+            <span class="status-pending">⏳ 待处理</span>
+          {% endif %}
+        </td>
+        <td>{{ r.reason }}</td>
+        <td>{{ r.pending_commits }}</td>
+        <td>
+          {% if r.status == 'success' %}
+            <button class="btn btn-primary btn-sm" onclick="createMr('{{ r.repo }}', '{{ r.release_branch }}', '{{ r.target_branch }}')">创建 MR</button>
+          {% elif r.status == 'conflict' %}
+            <span style="color:#dc2626;font-size:12px">需手动解决冲突</span>
+          {% else %}
+            -
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7" style="text-align:center;color:#6b7280">暂无结果</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="btn-group">
+    <a href="{% url 'release_track:index' %}" class="btn btn-secondary btn-sm">← 返回配置页</a>
+  </div>
+</section>
+
+<script>
+  function createMr(repo, sourceBranch, targetBranch) {
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = "处理中...";
+
+    const formData = new FormData();
+    formData.append("repo", repo);
+    formData.append("source_branch", sourceBranch);
+    formData.append("target_branch", targetBranch);
+
+    fetch("{% url 'release_track:api_create_mr' %}", {
+      method: "POST",
+      body: formData,
+      headers: {
+        "X-CSRFToken": "{{ csrf_token }}",
+      },
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        btn.textContent = data.merge_status === "merged" ? "✅ 已合并" : "✅ MR 已创建";
+        btn.className = "btn btn-primary btn-sm";
+        if (data.mr_url) {
+          const link = document.createElement("a");
+          link.href = data.mr_url;
+          link.target = "_blank";
+          link.textContent = " 查看 MR";
+          link.style.fontSize = "12px";
+          btn.after(link);
+        }
+      } else {
+        btn.textContent = "❌ 失败";
+        btn.disabled = false;
+        alert("错误: " + data.error);
+      }
+    })
+    .catch(e => {
+      btn.textContent = "❌ 失败";
+      btn.disabled = false;
+      alert("请求失败: " + e);
+    });
+  }
+</script>
+{% endblock %}

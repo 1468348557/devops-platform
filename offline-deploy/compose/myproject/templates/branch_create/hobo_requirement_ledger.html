@@ -1,0 +1,705 @@
+{% extends "base.html" %}
+
+{% block title %}HOBO需求登记台账 - DevOps Platform{% endblock %}
+
+{% block content %}
+<style>
+  .page { align-items: flex-start; }
+  .card { max-width: 1280px; margin-top: 24px; position: relative; }
+  .layout { display: grid; gap: 16px; }
+  .section-title { margin: 0 0 12px; font-size: 18px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .field { display: grid; gap: 6px; font-size: 13px; }
+  .muted { color: #6b7280; font-size: 12px; }
+  .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .table-wrap { overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
+  .ledger-table-wrap { max-height: 520px; overflow-y: auto; }
+  .ledger-table-wrap thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .pager {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .pager-left, .pager-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 920px; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid #eef2f7; text-align: left; vertical-align: top; }
+  th { background: #f8fafc; font-weight: 600; }
+  .td-clip { max-width: 260px; word-break: break-word; }
+  .td-extra { font-size: 12px; color: #4b5563; max-width: 280px; }
+  .status-pending-branch { background: #fee2e2; color: #991b1b; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
+  .status-created-branch { background: #dcfce7; color: #14532d; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
+  .gap-top { margin-top: 10px; }
+  .danger { color: #b91c1c; }
+  .notice { padding: 8px 10px; border-radius: 8px; background: #f8fafc; font-size: 13px; }
+  .hidden { display: none !important; }
+  .home-icon-link {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 34px;
+    height: 34px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    color: #1f75cb;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+  }
+  .home-icon-link:hover { background: #f8fafc; border-color: #94a3b8; }
+  .home-icon-link svg { width: 18px; height: 18px; display: block; }
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 2000;
+  }
+  .modal-panel {
+    width: min(960px, 100%);
+    max-height: 88vh;
+    overflow: auto;
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    padding: 16px;
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .modal-header h3 { margin: 0; font-size: 18px; }
+  .close-btn {
+    border: 0;
+    background: transparent;
+    font-size: 20px;
+    cursor: pointer;
+    color: #6b7280;
+  }
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 8px 12px;
+    font-size: 13px;
+  }
+  .detail-grid dt { color: #6b7280; margin: 0; }
+  .detail-grid dd { margin: 0; word-break: break-word; }
+</style>
+
+<section class="card layout">
+  <a class="home-icon-link" href="{% url 'dashboard' %}" title="返回主界面" aria-label="返回主界面">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M3 10.5L12 3l9 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path d="M6.75 9.75V21h10.5V9.75" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path d="M10 21v-6h4v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+  </a>
+  <h1 class="section-title">HOBO需求登记台账</h1>
+  <div class="notice">
+    规则：可查看全部记录；仅本人或超管可修改、删除。需求类型选 FIX / REQ / PUB，保存后系统自动生成分支名称（格式 ^(FIX|REQ|PUB)-日期-序号）。申请人、申请日期在新建时自动生成（申请人可改填）。依赖分支不填则按 master 处理。列表中可空字段无内容时不展示；点「查看」可看全部字段。
+  </div>
+
+  <div>
+    <h2 class="section-title">填写 / 编辑登记</h2>
+    <div class="toolbar">
+      <button id="btn-open-form" class="btn btn-primary" type="button">填写记录</button>
+      <button id="btn-refresh" class="btn btn-secondary" type="button">刷新列表</button>
+      <span id="tip" class="muted"></span>
+    </div>
+  </div>
+
+  <div id="entry-modal" class="modal-backdrop hidden">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <h3 id="modal-title">填写登记</h3>
+        <button id="btn-close-form" class="close-btn" type="button">×</button>
+      </div>
+      <div class="grid-3">
+        <label class="field">需求类型
+          <select id="requirement-type" class="form-input">
+            <option value="REQ">REQ</option>
+            <option value="FIX">FIX</option>
+            <option value="PUB">PUB</option>
+          </select>
+        </label>
+        <label class="field">分支名称
+          <input id="requirement-branch-display" class="form-input hidden" type="text" readonly>
+          <span id="branch-hint" class="muted" style="display:block;margin-top:4px;">保存后按需求类型自动生成，格式如 REQ-20260421-0001</span>
+        </label>
+        <label class="field">工程名称
+          <select id="project-id" class="form-input"></select>
+        </label>
+        <label class="field">申请人
+          <input id="applicant-name" class="form-input" placeholder="留空则自动填当前登录用户">
+        </label>
+        <label class="field">申请日期
+          <input id="applied-date" class="form-input" type="date" readonly>
+        </label>
+        <label class="field">依赖分支
+          <input id="base-branch" class="form-input" placeholder="默认 master">
+        </label>
+        <label class="field">依赖分支联系人
+          <input id="base-branch-contact" class="form-input" placeholder="可空">
+        </label>
+        <label class="field">流程图名称
+          <input id="flowchart-name" class="form-input" placeholder="可空">
+        </label>
+        <label class="field">提交 UAT 日期
+          <input id="uat-submit-date" class="form-input" type="date">
+        </label>
+        <label class="field">提交 REL 日期
+          <input id="rel-submit-date" class="form-input" type="date">
+        </label>
+        <label class="field">投产日期
+          <input id="production-date" class="form-input" type="date">
+        </label>
+        <label class="field" style="grid-column: 1 / -1;">需求描述
+          <textarea id="description" class="form-input" rows="4" placeholder="必填"></textarea>
+        </label>
+        <label class="field" style="grid-column: 1 / -1;">备注
+          <textarea id="remark" class="form-input" rows="2" placeholder="可空"></textarea>
+        </label>
+      </div>
+      <div class="toolbar gap-top">
+        <button id="btn-save-modal" class="btn btn-primary" type="button">保存</button>
+        <button id="btn-cancel-form" class="btn btn-secondary" type="button">关闭</button>
+        <span id="form-tip" class="muted"></span>
+      </div>
+    </div>
+  </div>
+
+  <div id="detail-modal" class="modal-backdrop hidden">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <h3>登记详情</h3>
+        <button id="btn-close-detail" class="close-btn" type="button">×</button>
+      </div>
+      <dl id="detail-body" class="detail-grid"></dl>
+      <div class="toolbar gap-top">
+        <button id="btn-cancel-detail" class="btn btn-secondary" type="button">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <h2 class="section-title">登记列表</h2>
+    <div class="toolbar gap-top">
+      <label class="field">开始日期
+        <input id="search-start-date" class="form-input" type="date">
+      </label>
+      <label class="field">结束日期
+        <input id="search-end-date" class="form-input" type="date">
+      </label>
+      <label class="field">需求描述（模糊）
+        <input id="search-description" class="form-input" placeholder="输入关键字">
+      </label>
+      <label class="field">需求类型
+        <select id="search-requirement-type" class="form-input">
+          <option value="">全部类型</option>
+          <option value="REQ">REQ</option>
+          <option value="FIX">FIX</option>
+          <option value="PUB">PUB</option>
+        </select>
+      </label>
+      <label class="field">工程名称
+        <select id="search-project-id" class="form-input">
+          <option value="">全部工程</option>
+        </select>
+      </label>
+      <button id="btn-search-items" class="btn btn-secondary" type="button">搜索</button>
+      <button id="btn-reset-search" class="btn btn-secondary" type="button">重置</button>
+    </div>
+    <div class="table-wrap ledger-table-wrap">
+      <table>
+        <thead>
+        <tr>
+          <th>分支名称</th>
+          <th>需求类型</th>
+          <th>工程名称</th>
+          <th>需求描述</th>
+          <th>申请人</th>
+          <th>申请日期</th>
+          <th>分支创建状态</th>
+          <th>补充信息</th>
+          <th>操作</th>
+        </tr>
+        </thead>
+        <tbody id="item-body"></tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <div class="pager-left">
+        <div class="muted" id="pager-info">共 0 条</div>
+        <label class="field" style="min-width: 120px;">
+          每页条数
+          <select id="page-size" class="form-input">
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+          </select>
+        </label>
+      </div>
+      <div class="pager-right">
+        <button id="btn-prev-page" class="btn btn-secondary" type="button">上一页</button>
+        <span class="muted" id="page-indicator">1 / 1</span>
+        <button id="btn-next-page" class="btn btn-secondary" type="button">下一页</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  const csrfToken = "{{ csrf_token }}";
+  const isSuperuser = {{ request.user.is_superuser|yesno:"true,false" }};
+  const currentRole = "{{ current_role|escapejs }}";
+  const canCreateDevRecord = {{ can_create_dev_record|yesno:"true,false" }};
+
+  let projectList = [];
+  let editingItemId = null;
+  let allItems = [];
+  let currentPage = 1;
+  let pageSize = 10;
+
+  function el(id) { return document.getElementById(id); }
+  function dateOffsetStr(days) {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  function setDefaultSearchDateRange() {
+    if (!el("search-start-date").value) el("search-start-date").value = dateOffsetStr(-30);
+    if (!el("search-end-date").value) el("search-end-date").value = dateOffsetStr(0);
+  }
+
+  function setTip(message, danger = false) {
+    const tip = el("tip");
+    tip.textContent = message || "";
+    tip.className = danger ? "muted danger" : "muted";
+  }
+
+  function setFormTip(message, danger = false) {
+    const tip = el("form-tip");
+    tip.textContent = message || "";
+    tip.className = danger ? "muted danger" : "muted";
+  }
+
+  function openFormModal() {
+    el("entry-modal").classList.remove("hidden");
+  }
+
+  function closeFormModal() {
+    el("entry-modal").classList.add("hidden");
+  }
+
+  function openDetailModal() {
+    el("detail-modal").classList.remove("hidden");
+  }
+
+  function closeDetailModal() {
+    el("detail-modal").classList.add("hidden");
+  }
+
+  async function request(url, method, payload) {
+    const formData = new FormData();
+    if (payload) Object.entries(payload).forEach(([k, v]) => formData.append(k, v ?? ""));
+    const resp = await fetch(url, {
+      method,
+      headers: { "X-CSRFToken": csrfToken },
+      body: method === "GET" ? null : formData
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw data;
+    return data;
+  }
+
+  function fillProjectOptions() {
+    const select = el("project-id");
+    const searchSelect = el("search-project-id");
+    select.innerHTML = "";
+    searchSelect.innerHTML = `<option value="">全部工程</option>`;
+    projectList.forEach((p) => {
+      const opt = document.createElement("option");
+      opt.value = p.id;
+      const label = p.project_name && p.project_name !== p.project_code
+        ? `${p.project_code}（${p.project_name}）`
+        : p.project_code;
+      opt.textContent = label;
+      select.appendChild(opt);
+      const opt2 = document.createElement("option");
+      opt2.value = p.id;
+      opt2.textContent = label;
+      searchSelect.appendChild(opt2);
+    });
+  }
+
+  function todayStr() {
+    const t = new Date();
+    const y = t.getFullYear();
+    const m = String(t.getMonth() + 1).padStart(2, "0");
+    const d = String(t.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  function setBranchCreateUi() {
+    el("branch-hint").style.display = "block";
+    el("requirement-branch-display").classList.add("hidden");
+  }
+
+  function setBranchEditUi(branchName) {
+    el("branch-hint").style.display = "none";
+    el("requirement-branch-display").classList.remove("hidden");
+    el("requirement-branch-display").value = branchName || "";
+  }
+
+  function applyFormEditableState() {
+    el("entry-modal").querySelector(".modal-panel").querySelectorAll("input, textarea, select").forEach((node) => {
+      if (node.id === "applied-date" || node.id === "requirement-branch-display") {
+        node.disabled = true;
+      } else {
+        node.disabled = false;
+      }
+    });
+  }
+
+  function clearForm() {
+    editingItemId = null;
+    el("modal-title").textContent = "填写登记";
+    el("requirement-type").value = "REQ";
+    el("requirement-type").disabled = false;
+    setBranchCreateUi();
+    el("applicant-name").value = "";
+    el("applied-date").value = todayStr();
+    el("base-branch").value = "master";
+    el("base-branch-contact").value = "";
+    el("flowchart-name").value = "";
+    el("uat-submit-date").value = "";
+    el("rel-submit-date").value = "";
+    el("production-date").value = "";
+    el("description").value = "";
+    el("remark").value = "";
+    if (projectList.length > 0) {
+      el("project-id").value = String(projectList[0].id);
+    }
+    applyFormEditableState();
+    el("btn-save-modal").style.display = "inline-block";
+    setFormTip("");
+  }
+
+  function fillFormByItem(item) {
+    editingItemId = item.id;
+    el("modal-title").textContent = "编辑登记";
+    setBranchEditUi(item.requirement_branch);
+    el("requirement-type").value = item.requirement_type || "REQ";
+    el("requirement-type").disabled = true;
+    el("requirement-branch-display").disabled = true;
+    el("project-id").value = String(item.project.id);
+    el("applicant-name").value = item.applicant_name || "";
+    el("applied-date").value = item.applied_date || "";
+    el("base-branch").value = item.base_branch || "master";
+    el("base-branch-contact").value = item.base_branch_contact || "";
+    el("flowchart-name").value = item.flowchart_name || "";
+    el("uat-submit-date").value = item.uat_submit_date || "";
+    el("rel-submit-date").value = item.rel_submit_date || "";
+    el("production-date").value = item.production_date || "";
+    el("description").value = item.description || "";
+    el("remark").value = item.remark || "";
+
+    const canEdit = item.editable;
+    el("project-id").disabled = !canEdit;
+    el("applicant-name").disabled = !canEdit;
+    el("base-branch").disabled = !canEdit;
+    el("base-branch-contact").disabled = !canEdit;
+    el("flowchart-name").disabled = !canEdit;
+    el("uat-submit-date").disabled = !canEdit;
+    el("rel-submit-date").disabled = !canEdit;
+    el("production-date").disabled = !canEdit;
+    el("description").disabled = !canEdit;
+    el("remark").disabled = !canEdit;
+    el("btn-save-modal").style.display = canEdit ? "inline-block" : "none";
+  }
+
+  function escapeHtml(s) {
+    const d = document.createElement("div");
+    d.textContent = s == null ? "" : String(s);
+    return d.innerHTML;
+  }
+
+  function optionalSummaryHtml(item) {
+    const parts = [];
+    if (item.base_branch && item.base_branch !== "master") {
+      parts.push(`依赖分支：${escapeHtml(item.base_branch)}`);
+    }
+    if (item.base_branch_contact) {
+      parts.push(`依赖分支联系人：${escapeHtml(item.base_branch_contact)}`);
+    }
+    if (item.flowchart_name) {
+      parts.push(`流程图名称：${escapeHtml(item.flowchart_name)}`);
+    }
+    if (item.uat_submit_date) {
+      parts.push(`提交UAT：${escapeHtml(item.uat_submit_date)}`);
+    }
+    if (item.rel_submit_date) {
+      parts.push(`提交REL：${escapeHtml(item.rel_submit_date)}`);
+    }
+    if (item.production_date) {
+      parts.push(`投产日期：${escapeHtml(item.production_date)}`);
+    }
+    if (item.remark) {
+      parts.push(`备注：${escapeHtml(item.remark)}`);
+    }
+    return parts.join("<br>");
+  }
+
+  function renderDetailBody(item) {
+    const body = el("detail-body");
+    body.innerHTML = "";
+    const rows = [
+      ["分支名称", item.requirement_branch],
+      ["需求类型", item.requirement_type],
+      ["工程名称", item.project.name],
+      ["需求描述", item.description],
+      ["申请人", item.applicant_name],
+      ["申请日期", item.applied_date],
+      ["依赖分支", item.base_branch || "master"],
+      ["依赖分支联系人", item.base_branch_contact],
+      ["流程图名称", item.flowchart_name],
+      ["提交 UAT 日期", item.uat_submit_date],
+      ["提交 REL 日期", item.rel_submit_date],
+      ["投产日期", item.production_date],
+      ["备注", item.remark],
+      ["分支创建状态", item.branch_created ? "已创建" : "未创建"],
+      ["创建失败原因", item.branch_create_error],
+      ["登记人账号", item.created_by],
+    ];
+    rows.forEach(([label, val]) => {
+      const dt = document.createElement("dt");
+      dt.textContent = label;
+      const dd = document.createElement("dd");
+      const t = val === undefined || val === null ? "" : String(val).trim();
+      dd.textContent = t || "—";
+      body.appendChild(dt);
+      body.appendChild(dd);
+    });
+  }
+
+  function renderItems(items) {
+    const body = el("item-body");
+    body.innerHTML = "";
+    items.forEach((item) => {
+      const tr = document.createElement("tr");
+      const projLabel = item.project.name;
+      const extra = optionalSummaryHtml(item);
+      const branchStatusHtml = item.branch_created
+        ? `<span class="status-created-branch">已创建</span>`
+        : `<span class="status-pending-branch">未创建</span>`;
+      tr.innerHTML = `
+        <td>${escapeHtml(item.requirement_branch || "")}</td>
+        <td>${escapeHtml(item.requirement_type || "")}</td>
+        <td>${escapeHtml(projLabel)}</td>
+        <td class="td-clip">${escapeHtml(item.description || "")}</td>
+        <td>${escapeHtml(item.applicant_name || "")}</td>
+        <td>${escapeHtml(item.applied_date || "")}</td>
+        <td>${branchStatusHtml}${item.branch_create_error ? `<div class="muted danger">${escapeHtml(item.branch_create_error)}</div>` : ""}</td>
+        <td class="td-extra">${extra}</td>
+        <td>
+          ${item.editable ? `<button class="btn btn-secondary btn-edit" type="button" data-id="${item.id}">编辑</button>` : ""}
+          <button class="btn btn-secondary btn-view" type="button" data-id="${item.id}">查看</button>
+          ${item.can_delete ? `<button class="btn btn-secondary btn-delete" type="button" data-id="${item.id}">删除</button>` : ""}
+        </td>
+      `;
+      body.appendChild(tr);
+    });
+
+    body.querySelectorAll(".btn-edit").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = allItems.find((i) => i.id === Number(btn.dataset.id));
+        if (target) {
+          fillFormByItem(target);
+          openFormModal();
+        }
+      });
+    });
+    body.querySelectorAll(".btn-view").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = allItems.find((i) => i.id === Number(btn.dataset.id));
+        if (target) {
+          renderDetailBody(target);
+          openDetailModal();
+        }
+      });
+    });
+    body.querySelectorAll(".btn-delete").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("确定删除这条登记吗？")) return;
+        try {
+          await request("/branch-create/hobo-ledger/api/items/delete/", "POST", { item_id: btn.dataset.id });
+          setTip("已删除");
+          await loadItems();
+        } catch (e) {
+          setTip(`删除失败：${e.error || "未知错误"}`, true);
+        }
+      });
+    });
+  }
+
+  function renderPagedItems() {
+    const total = allItems.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const start = (currentPage - 1) * pageSize;
+    const pageItems = allItems.slice(start, start + pageSize);
+    renderItems(pageItems);
+
+    el("pager-info").textContent = `共 ${total} 条，当前显示 ${total === 0 ? 0 : start + 1}-${Math.min(start + pageSize, total)} 条`;
+    el("page-indicator").textContent = `${currentPage} / ${totalPages}`;
+    el("btn-prev-page").disabled = currentPage <= 1;
+    el("btn-next-page").disabled = currentPage >= totalPages;
+  }
+
+  async function loadProjects() {
+    const data = await request("/branch-create/hobo-ledger/api/projects/", "GET");
+    projectList = data.projects || [];
+    fillProjectOptions();
+    if (!editingItemId && projectList.length > 0 && !el("project-id").value) {
+      el("project-id").value = String(projectList[0].id);
+    }
+  }
+
+  async function loadItems() {
+    try {
+      const query = new URLSearchParams({
+        start_date: el("search-start-date").value || "",
+        end_date: el("search-end-date").value || "",
+        description: el("search-description").value || "",
+        requirement_type: el("search-requirement-type").value || "",
+        project_id: el("search-project-id").value || "",
+      });
+      const resp = await fetch(`/branch-create/hobo-ledger/api/items/?${query.toString()}`);
+      const data = await resp.json();
+      if (!data.success) throw data;
+      allItems = data.items || [];
+      currentPage = 1;
+      renderPagedItems();
+    } catch (e) {
+      setTip(`加载失败：${e.error || "未知错误"}`, true);
+    }
+  }
+
+  el("btn-open-form").addEventListener("click", () => {
+    if (!canCreateDevRecord) {
+      setTip("当前账号无新建登记权限（需研发或超管）", true);
+      return;
+    }
+    clearForm();
+    openFormModal();
+  });
+
+  el("btn-refresh").addEventListener("click", async () => {
+    await loadProjects();
+    await loadItems();
+    setTip("已刷新");
+  });
+  el("btn-search-items").addEventListener("click", loadItems);
+  el("btn-reset-search").addEventListener("click", async () => {
+    el("search-start-date").value = dateOffsetStr(-30);
+    el("search-end-date").value = dateOffsetStr(0);
+    el("search-description").value = "";
+    el("search-requirement-type").value = "";
+    el("search-project-id").value = "";
+    await loadItems();
+  });
+  el("page-size").addEventListener("change", (event) => {
+    const parsed = Number(event.target.value);
+    pageSize = [10, 20, 50].includes(parsed) ? parsed : 10;
+    currentPage = 1;
+    renderPagedItems();
+  });
+  el("btn-prev-page").addEventListener("click", () => {
+    if (currentPage <= 1) return;
+    currentPage -= 1;
+    renderPagedItems();
+  });
+  el("btn-next-page").addEventListener("click", () => {
+    const totalPages = Math.max(1, Math.ceil(allItems.length / pageSize));
+    if (currentPage >= totalPages) return;
+    currentPage += 1;
+    renderPagedItems();
+  });
+
+  el("btn-close-form").addEventListener("click", closeFormModal);
+  el("btn-cancel-form").addEventListener("click", closeFormModal);
+  el("entry-modal").addEventListener("click", (event) => {
+    if (event.target.id === "entry-modal") closeFormModal();
+  });
+
+  el("btn-close-detail").addEventListener("click", closeDetailModal);
+  el("btn-cancel-detail").addEventListener("click", closeDetailModal);
+  el("detail-modal").addEventListener("click", (event) => {
+    if (event.target.id === "detail-modal") closeDetailModal();
+  });
+
+  el("btn-save-modal").addEventListener("click", async () => {
+    if (el("btn-save-modal").style.display === "none") return;
+    const payload = {
+      requirement_type: el("requirement-type").value,
+      project_id: el("project-id").value,
+      description: el("description").value,
+      applicant_name: el("applicant-name").value,
+      base_branch: el("base-branch").value,
+      base_branch_contact: el("base-branch-contact").value,
+      flowchart_name: el("flowchart-name").value,
+      uat_submit_date: el("uat-submit-date").value,
+      rel_submit_date: el("rel-submit-date").value,
+      production_date: el("production-date").value,
+      remark: el("remark").value,
+    };
+    try {
+      if (editingItemId) {
+        payload.item_id = editingItemId;
+        await request("/branch-create/hobo-ledger/api/items/update/", "POST", payload);
+        setFormTip("保存成功");
+      } else {
+        await request("/branch-create/hobo-ledger/api/items/create/", "POST", payload);
+        setFormTip("保存成功");
+      }
+      closeFormModal();
+      await loadItems();
+    } catch (e) {
+      setFormTip(`保存失败：${e.error || "未知错误"}`, true);
+    }
+  });
+
+  (async function init() {
+    try {
+      setDefaultSearchDateRange();
+      await loadProjects();
+      await loadItems();
+    } catch (e) {
+      setTip(`初始化失败：${e.error || "未知错误"}`, true);
+    }
+  })();
+</script>
+{% endblock %}

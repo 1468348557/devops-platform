@@ -1,0 +1,410 @@
+{% extends "base.html" %}
+
+{% block title %}权限配置 - DevOps Platform{% endblock %}
+
+{% block content %}
+<style>
+  .page { align-items: flex-start; padding-top: 28px; padding-bottom: 40px; }
+  .card { max-width: 1180px; margin-top: 0; border-radius: 14px; border: 1px solid #e5e7eb; position: relative; }
+  .nav-bread { font-size: 13px; color: #6b7280; margin-bottom: 14px; }
+  .nav-bread a { color: #1f75cb; text-decoration: none; }
+  .section {
+    margin-bottom: 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #fcfdff;
+    padding: 16px;
+  }
+  .section h2 { margin: 0; font-size: 17px; }
+  .section-desc { margin: 6px 0 12px; color: #6b7280; font-size: 13px; }
+  .config-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px 14px;
+  }
+  .accordion-stack { display: grid; gap: 10px; }
+  .config-accordion {
+    border: 1px solid #dbe2ea;
+    border-radius: 10px;
+    background: #fff;
+    overflow: hidden;
+  }
+  .config-accordion > summary {
+    list-style: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+    padding: 12px 14px;
+    background: #f8fafc;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .config-accordion > summary::-webkit-details-marker { display: none; }
+  .config-accordion > summary::after {
+    content: "展开";
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 500;
+  }
+  .config-accordion[open] > summary::after { content: "收起"; }
+  .accordion-body { padding: 14px; background: #fff; }
+  .accordion-hint { margin: 0 0 10px; color: #6b7280; font-size: 12px; }
+  .span-full { grid-column: 1 / -1; }
+  .check-row { display:flex; align-items:center; gap:8px; color:#334155; font-size:14px; }
+  .perm-group-title {
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px dashed #e5e7eb;
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+  .mini-btn {
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: #334155;
+    cursor: pointer;
+  }
+  .mini-btn:hover { border-color: #94a3b8; }
+  .field-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 2000;
+  }
+  .field-modal-panel {
+    width: min(880px, 100%);
+    max-height: 85vh;
+    overflow: auto;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .field-check-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px 12px;
+    margin-top: 8px;
+  }
+  .hidden { display: none !important; }
+  .home-icon-link {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 34px;
+    height: 34px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    color: #1f75cb;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+  }
+  .home-icon-link:hover { background: #f8fafc; border-color: #94a3b8; }
+  .home-icon-link svg { width: 18px; height: 18px; display: block; }
+  @media (max-width: 760px) {
+    .card { padding: 18px; }
+    .section { padding: 14px; }
+  }
+</style>
+
+<section class="card">
+  <a class="home-icon-link" href="{% url 'dashboard' %}" title="返回主界面" aria-label="返回主界面">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M3 10.5L12 3l9 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path d="M6.75 9.75V21h10.5V9.75" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path d="M10 21v-6h4v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+  </a>
+  <h1 class="card-title">角色权限范围</h1>
+  <p class="card-subtitle">仅超管可配置。保存后对运维/研发角色即时生效；超管始终保留全量权限。</p>
+
+  {% include "components/messages.html" %}
+
+  <div class="section">
+    <h2>角色管理</h2>
+    <p class="section-desc">可新建角色，并维护是否启用、是否允许注册、是否视为管理角色（staff）。</p>
+    <form method="post" class="config-form-grid" style="margin-bottom: 12px;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create_role">
+      <label class="form-label">
+        <span>角色标识（英文）</span>
+        <input class="form-input" name="role_key" placeholder="例如 qa_tester">
+      </label>
+      <label class="form-label">
+        <span>角色名称</span>
+        <input class="form-input" name="role_name" placeholder="例如 测试">
+      </label>
+      <label class="check-row">
+        <input type="checkbox" name="can_be_registered">
+        <span>允许注册时选择</span>
+      </label>
+      <label class="check-row">
+        <input type="checkbox" name="is_staff_role">
+        <span>管理角色（审核后赋 staff）</span>
+      </label>
+      <div class="span-full">
+        <button class="btn btn-primary" type="submit">新增角色</button>
+      </div>
+    </form>
+
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="update_roles">
+      <div class="table-wrap" style="overflow:auto; border:1px solid #e5e7eb; border-radius:8px;">
+        <table style="width:100%; border-collapse: collapse; min-width: 780px;">
+          <thead>
+            <tr>
+              <th style="padding:10px 12px; border-bottom:1px solid #eef2f7; text-align:left;">标识</th>
+              <th style="padding:10px 12px; border-bottom:1px solid #eef2f7; text-align:left;">名称</th>
+              <th style="padding:10px 12px; border-bottom:1px solid #eef2f7; text-align:left;">系统角色</th>
+              <th style="padding:10px 12px; border-bottom:1px solid #eef2f7; text-align:left;">启用</th>
+              <th style="padding:10px 12px; border-bottom:1px solid #eef2f7; text-align:left;">可注册</th>
+              <th style="padding:10px 12px; border-bottom:1px solid #eef2f7; text-align:left;">管理角色</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for role in role_definitions %}
+            <tr>
+              <td style="padding:10px 12px; border-bottom:1px solid #eef2f7;">{{ role.key }}</td>
+              <td style="padding:10px 12px; border-bottom:1px solid #eef2f7;">{{ role.name }}</td>
+              <td style="padding:10px 12px; border-bottom:1px solid #eef2f7;">{% if role.is_system %}是{% else %}否{% endif %}</td>
+              <td style="padding:10px 12px; border-bottom:1px solid #eef2f7;">
+                <input type="checkbox" name="role_{{ role.id }}__enabled" {% if role.enabled or role.is_system %}checked{% endif %} {% if role.is_system %}disabled{% endif %}>
+              </td>
+              <td style="padding:10px 12px; border-bottom:1px solid #eef2f7;">
+                <input type="checkbox" name="role_{{ role.id }}__can_be_registered" {% if role.can_be_registered %}checked{% endif %}>
+              </td>
+              <td style="padding:10px 12px; border-bottom:1px solid #eef2f7;">
+                <input type="checkbox" name="role_{{ role.id }}__is_staff_role" {% if role.is_staff_role %}checked{% endif %}>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top: 12px;">
+        <button class="btn btn-secondary" type="submit">保存角色属性</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="section">
+    <h2>权限策略</h2>
+    <p class="section-desc">分别维护运维与研发角色的菜单、操作与数据范围权限。</p>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save_role_permissions">
+      <div class="accordion-stack">
+        {% for section in role_policy_sections %}
+          <details class="config-accordion" {% if forloop.first %}open{% endif %}>
+            <summary>{{ section.role_name }} 权限策略</summary>
+            <div class="accordion-body">
+              <p class="accordion-hint">菜单控制决定功能卡片可见性；操作控制决定接口/动作可执行性。</p>
+              <div class="config-form-grid">
+                <div class="span-full">
+                  <strong style="font-size: 13px;">页面/菜单权限</strong>
+                </div>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__menu_release_track" {% if section.menu_fields.menu_release_track %}checked{% endif %}>
+                  <span>投产追版</span>
+                </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__menu_branch_create" {% if section.menu_fields.menu_branch_create %}checked{% endif %}>
+                  <span>查询所有新建分支</span>
+                </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__menu_release_entry" {% if section.menu_fields.menu_release_entry %}checked{% endif %}>
+                  <span>投产征集</span>
+                </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__menu_hobo_ledger" {% if section.menu_fields.menu_hobo_ledger %}checked{% endif %}>
+                  <span>HOBO需求登记</span>
+                </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__menu_sql_execute" {% if section.menu_fields.menu_sql_execute %}checked{% endif %}>
+                  <span>SQL执行申请</span>
+                </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__menu_notification" {% if section.menu_fields.menu_notification %}checked{% endif %}>
+                  <span>🔔 通知铃铛可见</span>
+                </label>
+
+                <div class="span-full" style="margin-top: 6px;">
+                  <strong style="font-size: 13px;">接口/操作权限</strong>
+                </div>
+
+                <div class="span-full perm-group-title">投产追版</div>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__action_release_track_use" {% if section.action_fields.action_release_track_use %}checked{% endif %}>
+                  <span>投产追版执行</span>
+                </label>
+
+                <div class="span-full perm-group-title">查询所有新建分支</div>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__action_branch_task_preview" {% if section.action_fields.action_branch_task_preview %}checked{% endif %}>
+                  <span>新建分支预览</span>
+                </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__action_branch_task_execute_release" {% if section.action_fields.action_branch_task_execute_release %}checked{% endif %}>
+                  <span>执行投产来源分支任务</span>
+                </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__action_branch_task_execute_hobo" {% if section.action_fields.action_branch_task_execute_hobo %}checked{% endif %}>
+                  <span>执行需求来源分支任务</span>
+                </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__action_schedule_manage" {% if section.action_fields.action_schedule_manage %}checked{% endif %}>
+                  <span>管理计划任务</span>
+                </label>
+
+                <div class="span-full perm-group-title">投产征集</div>
+                <div class="span-full" style="display:flex; justify-content:flex-end; margin-bottom: 4px;">
+                  <button
+                    class="mini-btn btn-open-field-modal"
+                    type="button"
+                    data-target-id="release-entry-field-modal-{{ section.role_id }}"
+                  >字段编辑权限</button>
+                </div>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__action_release_batch_manage" {% if section.action_fields.action_release_batch_manage %}checked{% endif %}>
+                  <span>管理投产批次</span>
+                </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__action_release_item_create" {% if section.action_fields.action_release_item_create %}checked{% endif %}>
+                  <span>新增投产征集记录</span>
+                </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__action_release_item_edit_others" {% if section.action_fields.action_release_item_edit_others %}checked{% endif %}>
+                  <span>编辑他人投产征集记录</span>
+                </label>
+
+                <div class="span-full perm-group-title">HOBO需求登记</div>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__action_hobo_item_create" {% if section.action_fields.action_hobo_item_create %}checked{% endif %}>
+                  <span>新增HOBO登记</span>
+                </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__action_hobo_item_edit_others" {% if section.action_fields.action_hobo_item_edit_others %}checked{% endif %}>
+                  <span>编辑他人HOBO登记</span>
+                </label>
+
+                <div class="span-full perm-group-title">SQL执行申请</div>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__action_sql_repo_sync" {% if section.action_fields.action_sql_repo_sync %}checked{% endif %}>
+                  <span>同步 SQL 仓库</span>
+                </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__action_sql_request_apply" {% if section.action_fields.action_sql_request_apply %}checked{% endif %}>
+                  <span>提交 SQL 执行申请</span>
+                </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__action_sql_request_approve" {% if section.action_fields.action_sql_request_approve %}checked{% endif %}>
+                  <span>审批 SQL 执行申请</span>
+                </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__action_sql_request_auto_approve" {% if section.action_fields.action_sql_request_auto_approve %}checked{% endif %}>
+                  <span>自动审批 SQL 执行申请（显示自动审批按钮）</span>
+                </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__action_sql_request_edit_others" {% if section.action_fields.action_sql_request_edit_others %}checked{% endif %}>
+                  <span>编辑他人 SQL 申请记录</span>
+                </label>
+
+                <div class="span-full" style="margin-top: 6px;">
+                  <strong style="font-size: 13px;">数据范围</strong>
+                </div>
+                <label class="form-label">
+                  <span>投产征集</span>
+                  <select class="form-input" name="role_{{ section.role_id }}__data_scope_release_entry">
+                    {% for scope_value, scope_label in data_scope_choices %}
+                      <option value="{{ scope_value }}" {% if section.data_scope_fields.data_scope_release_entry == scope_value %}selected{% endif %}>{{ scope_label }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <label class="form-label">
+                  <span>HOBO需求登记</span>
+                  <select class="form-input" name="role_{{ section.role_id }}__data_scope_hobo_ledger">
+                    {% for scope_value, scope_label in data_scope_choices %}
+                      <option value="{{ scope_value }}" {% if section.data_scope_fields.data_scope_hobo_ledger == scope_value %}selected{% endif %}>{{ scope_label }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <label class="form-label">
+                  <span>SQL申请记录</span>
+                  <select class="form-input" name="role_{{ section.role_id }}__data_scope_sql_requests">
+                    {% for scope_value, scope_label in data_scope_choices %}
+                      <option value="{{ scope_value }}" {% if section.data_scope_fields.data_scope_sql_requests == scope_value %}selected{% endif %}>{{ scope_label }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+              </div>
+            </div>
+          </details>
+
+          <div id="release-entry-field-modal-{{ section.role_id }}" class="field-modal-backdrop hidden">
+            <div class="field-modal-panel">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <h3 style="margin:0;font-size:16px;">{{ section.role_name }} - 投产征集字段编辑权限</h3>
+                <button
+                  class="mini-btn btn-close-field-modal"
+                  type="button"
+                  data-target-id="release-entry-field-modal-{{ section.role_id }}"
+                >关闭</button>
+              </div>
+              <p class="accordion-hint" style="margin-top: 6px;">勾选后该角色可编辑对应字段；未勾选则不可编辑。</p>
+              <div class="field-check-grid">
+                {% for field_key, field_label in release_entry_field_options %}
+                <label class="check-row">
+                  <input
+                    type="checkbox"
+                    name="role_{{ section.role_id }}__release_entry_editable_fields"
+                    value="{{ field_key }}"
+                    {% if field_key in section.release_entry_editable_fields %}checked{% endif %}
+                  >
+                  <span>{{ field_label }}</span>
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      <div style="margin-top: 12px;">
+        <button class="btn btn-primary" type="submit">保存角色权限范围</button>
+      </div>
+    </form>
+  </div>
+</section>
+<script>
+  document.querySelectorAll(".btn-open-field-modal").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const modal = document.getElementById(btn.dataset.targetId || "");
+      if (modal) modal.classList.remove("hidden");
+    });
+  });
+  document.querySelectorAll(".btn-close-field-modal").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const modal = document.getElementById(btn.dataset.targetId || "");
+      if (modal) modal.classList.add("hidden");
+    });
+  });
+  document.querySelectorAll(".field-modal-backdrop").forEach((modal) => {
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) modal.classList.add("hidden");
+    });
+  });
+</script>
+{% endblock %}

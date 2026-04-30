@@ -1,6 +1,48 @@
-# Distribution / offline build output (not synced to remote)
-dist/
-tmp/
-功能/
+# Distribution / offline build output (not synced to remote)# macOS
+.DS_Store
+**/.DS_Store
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+
+# Django / local runtime
+*.log
+logs/
+db.sqlite3
+test.sqlite3
+*.sqlite3
+media/
+staticfiles/
+
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.deploy.example
+
+# Cursor / local tools
 .vscode/.zsh_history
 .vscode/.zcompdump*
+.workbuddy/
+
+# Distribution / offline build output
+dist/
+tmp/
+*.tar.gz
+*.tar
+
+# Offline deploy runtime/generated files
+offline-deploy/.env
+offline-deploy/images/
+offline-deploy/.package-tmp/
+offline-deploy/compose/myproject/.env
+offline-deploy/compose/myproject/.runtime/
+offline-deploy/compose/myproject/db.sqlite3
+offline-deploy/compose/myproject/test.sqlite3
