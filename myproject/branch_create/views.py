@@ -71,6 +71,22 @@ def _cron_matches(expr: str, now) -> bool:
     )
 
 
+def _parse_days_back(raw, *, default=30, max_abs=3660):
+    """Parse schedule/preview days_back: positive = look back, negative = look forward."""
+    if raw is None:
+        return default, None
+    text = str(raw).strip()
+    if text == "":
+        return default, None
+    try:
+        value = int(text)
+    except (TypeError, ValueError):
+        return None, "回看天数必须是整数（正数查过去，负数查未来）"
+    if abs(value) > max_abs:
+        return None, f"回看天数绝对值不能超过 {max_abs}"
+    return value, None
+
+
 def _create_job_payload_file(prefix: str, payload: dict) -> Path:
     jobs_dir = Path(settings.BASE_DIR) / ".runtime" / "jobs"
     jobs_dir.mkdir(parents=True, exist_ok=True)
@@ -407,10 +423,14 @@ def branch_task_preview_api(request):
     if source_type in {"hobo", "both"} and not _can_view_hobo(request.user):
         return JsonResponse({"success": False, "error": "无需求分支查看权限"}, status=403)
 
+    days_back, days_err = _parse_days_back(request.POST.get("days_back"))
+    if days_err:
+        return JsonResponse({"success": False, "error": days_err}, status=400)
+
     filters = TaskQueryFilters(
         start_date=request.POST.get("start_date", ""),
         end_date=request.POST.get("end_date", ""),
-        days_back=int(request.POST.get("days_back", "30") or 30),
+        days_back=days_back,
         hobo_description=request.POST.get("hobo_description", ""),
         hobo_requirement_type=(request.POST.get("hobo_requirement_type", "") or "").upper(),
         hobo_project_id=request.POST.get("hobo_project_id", ""),
@@ -540,7 +560,9 @@ def schedule_save_api(request):
     name = (request.POST.get("name") or "").strip()
     cron_expr = (request.POST.get("cron_expr") or "").strip()
     source_type = (request.POST.get("source_type") or "both").strip().lower()
-    days_back = int(request.POST.get("days_back") or 30)
+    days_back, days_err = _parse_days_back(request.POST.get("days_back"))
+    if days_err:
+        return JsonResponse({"success": False, "error": days_err}, status=400)
     enabled = (request.POST.get("enabled") or "1") in {"1", "true", "on", "yes"}
 
     if not name or not cron_expr:

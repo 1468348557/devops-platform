@@ -319,7 +319,7 @@ class BranchCreateSchedule(models.Model):
     enabled = models.BooleanField(default=True)
     cron_expr = models.CharField(max_length=64)
     source_type = models.CharField(max_length=16, choices=SourceType.choices, default=SourceType.BOTH)
-    days_back = models.PositiveIntegerField(default=30)
+    days_back = models.IntegerField(default=30, verbose_name="回看天数")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,

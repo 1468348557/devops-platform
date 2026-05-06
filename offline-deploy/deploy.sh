@@ -173,6 +173,9 @@ MYSQL_PORT=3306
 # ─── MySQL 数据持久化目录 ───────────────────────────────────────────────────
 MYSQL_DATA_DIR=/docker/devops/mysql/data
 
+# ─── SQL 执行日志持久化目录 ──────────────────────────────────────────────────
+SQL_EXECUTE_RESULT_DIR=/docker/devops/mysql/mysql-excuse
+
 # ─── Django 超级管理员 ─────────────────────────────────────────────────────
 ADMIN_USERNAME=admin
 ADMIN_EMAIL=admin@devops.local
@@ -250,6 +253,12 @@ if command -v chown &>/dev/null; then
 fi
 
 ok "数据目录准备完成: $MYSQL_DATA_DIR"
+
+# 创建 SQL 执行日志持久化目录
+SQL_EXECUTE_RESULT_DIR=$(env_value SQL_EXECUTE_RESULT_DIR)
+SQL_EXECUTE_RESULT_DIR="${SQL_EXECUTE_RESULT_DIR:-/docker/devops/mysql/mysql-excuse}"
+mkdir -p "$SQL_EXECUTE_RESULT_DIR"
+ok "SQL 执行日志目录: $SQL_EXECUTE_RESULT_DIR"
 
 # ─── 步骤 4: 加载离线镜像 ────────────────────────────────────────────────────
 log "Step 4/11: 加载 Docker 镜像..."

@@ -1,5 +1,5 @@
 import json
-from datetime import timedelta
+from datetime import date, timedelta
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
@@ -15,7 +15,11 @@ from branch_create.models import (
     ReleaseBatchProject,
     ReleaseItem,
 )
-from branch_create.services.branch_tasks import TaskQueryFilters, collect_pending_tasks
+from branch_create.services.branch_tasks import (
+    TaskQueryFilters,
+    _resolve_date_range,
+    collect_pending_tasks,
+)
 
 
 class BranchExecuteStartTests(TestCase):
@@ -118,6 +122,41 @@ class BranchTaskQueryTests(TestCase):
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0]["source_id"], future_item.id)
         self.assertEqual(tasks[0]["date"], str(future_date))
+
+    def test_release_tasks_negative_days_back_includes_future(self):
+        """days_back < 0 queries from today through today + abs(days)."""
+        future_date = timezone.localdate() + timedelta(days=7)
+        future_item = self._create_release_item(future_date, "future-project")
+        self._create_release_item(timezone.localdate() - timedelta(days=10), "past-project")
+
+        tasks = collect_pending_tasks("release", TaskQueryFilters(days_back=-14))
+        ids = {t["source_id"] for t in tasks}
+        self.assertIn(future_item.id, ids)
+        self.assertEqual(len([t for t in tasks if "past-project" in t.get("project_code", "")]), 0)
+
+
+class ResolveDateRangeTests(TestCase):
+    @patch("branch_create.services.branch_tasks.timezone.localdate")
+    def test_positive_days_back(self, mock_localdate):
+        mock_localdate.return_value = date(2026, 5, 6)
+        start, end = _resolve_date_range("", "", 7)
+        self.assertEqual(start, date(2026, 4, 29))
+        self.assertEqual(end, date(2026, 5, 6))
+
+    @patch("branch_create.services.branch_tasks.timezone.localdate")
+    def test_negative_days_back(self, mock_localdate):
+        mock_localdate.return_value = date(2026, 5, 6)
+        start, end = _resolve_date_range("", "", -7)
+        self.assertEqual(start, date(2026, 5, 6))
+        self.assertEqual(end, date(2026, 5, 13))
+
+    @patch("branch_create.services.branch_tasks.timezone.localdate")
+    def test_zero_days_back(self, mock_localdate):
+        mock_localdate.return_value = date(2026, 5, 6)
+        start, end = _resolve_date_range("", "", 0)
+        d = date(2026, 5, 6)
+        self.assertEqual(start, d)
+        self.assertEqual(end, d)
 
 
 class ReleaseEntryCrossOwnerEditTests(TestCase):

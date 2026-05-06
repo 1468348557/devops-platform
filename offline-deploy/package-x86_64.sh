@@ -11,7 +11,7 @@
 #
 # 可选环境变量：
 #   WEB_IMAGE=devops-platform-web:latest
-#   MYSQL_IMAGE=mysql:8.4
+   MYSQL_IMAGE=mysql:8.4
 #   OUTPUT_DIR=../dist/offline
 #   PRIVATE_REGISTRY=registry.example.com
 #   BUILDER_NAME=desktop-linux

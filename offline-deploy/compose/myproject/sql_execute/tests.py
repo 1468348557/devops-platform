@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from accounts.models import RoleDefinition, RolePermissionPolicy, UserProfile
 from sql_execute.models import SqlExecutionRequest
-from sql_execute.services import _log_statement_result, execute_sql_request
+from sql_execute.services import _log_statement_result, _split_sql_statements, execute_sql_request
 from sql_execute.views import (
     _build_execution_parsed,
     _machine_review_sql_files,
@@ -66,6 +66,29 @@ class SqlStatementResultLogTests(TestCase):
             statement_total=1,
         )
         self.assertIn("影响行数: 3", "\n".join(log_lines))
+
+
+class SqlStatementSplitTests(TestCase):
+    def test_keeps_semicolon_inside_string_literal(self):
+        sql = (
+            "CREATE TABLE demo(\n"
+            "  send_status varchar(10) COMMENT '是否发送成功,0-待发送;1-发送成功;2-发送失败'\n"
+            ");\n"
+            "select 1;"
+        )
+
+        statements = _split_sql_statements(sql)
+
+        self.assertEqual(len(statements), 2)
+        self.assertIn("0-待发送;1-发送成功;2-发送失败", statements[0])
+        self.assertEqual(statements[1], "select 1")
+
+    def test_ignores_semicolon_inside_comments(self):
+        sql = "select 1; -- comment ;\n# comment ;\n/* block ; comment */\nselect 2;"
+
+        statements = _split_sql_statements(sql)
+
+        self.assertEqual(statements, ["select 1", "/* block ; comment */\nselect 2"])
 
 
 class SqlExecutionLogParserTests(TestCase):
@@ -574,6 +597,57 @@ class SqlApprovalPermissionTests(TestCase):
             "/sql-execute/api/request/action/",
             {"request_id": self.request_row.id, "action": "approve"},
         )
+        self.assertEqual(resp.status_code, 403)
+
+    def test_repo_sync_not_forbidden_when_has_sync_without_approve(self):
+        policy = RolePermissionPolicy.get_for_role(self.dev_role)
+        policy.menu_sql_execute = True
+        policy.action_sql_repo_sync = True
+        policy.action_sql_request_apply = True
+        policy.action_sql_request_approve = False
+        policy.save(
+            update_fields=[
+                "menu_sql_execute",
+                "action_sql_repo_sync",
+                "action_sql_request_apply",
+                "action_sql_request_approve",
+                "updated_at",
+            ]
+        )
+        self.client.force_login(self.dev_user)
+        resp = self.client.post("/sql-execute/api/repo/sync/", {})
+        self.assertNotEqual(resp.status_code, 403)
+
+    def test_repo_sync_forbidden_without_repo_sync_permission(self):
+        policy = RolePermissionPolicy.get_for_role(self.dev_role)
+        policy.menu_sql_execute = True
+        policy.action_sql_repo_sync = False
+        policy.action_sql_request_apply = True
+        policy.action_sql_request_approve = True
+        policy.save(
+            update_fields=[
+                "menu_sql_execute",
+                "action_sql_repo_sync",
+                "action_sql_request_apply",
+                "action_sql_request_approve",
+                "updated_at",
+            ]
+        )
+        self.client.force_login(self.dev_user)
+        resp = self.client.post("/sql-execute/api/repo/sync/", {})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_auto_approve_action_disabled_even_for_superuser(self):
+        self.client.force_login(self.superuser)
+        resp = self.client.post(
+            "/sql-execute/api/request/action/",
+            {"request_id": self.request_row.id, "action": "auto_approve"},
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    def test_auto_approve_all_disabled_even_for_superuser(self):
+        self.client.force_login(self.superuser)
+        resp = self.client.post("/sql-execute/api/request/auto-approve-all/", {})
         self.assertEqual(resp.status_code, 403)
 
     def test_user_with_sql_edit_others_can_view_other_request_progress(self):

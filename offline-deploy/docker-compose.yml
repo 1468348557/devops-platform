@@ -30,8 +30,11 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
+      SQL_EXECUTE_RESULT_DIR: ${SQL_EXECUTE_RESULT_DIR:-/docker/devops/mysql/mysql-excuse}
     ports:
       - "${WEB_PORT:-8000}:8000"
+    volumes:
+      - ${SQL_EXECUTE_RESULT_DIR:-/docker/devops/mysql/mysql-excuse}:/docker/devops/mysql/mysql-excuse
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import socket; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1',8000)); s.close()\""]
       interval: 20s

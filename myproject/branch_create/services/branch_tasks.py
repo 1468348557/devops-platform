@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Iterable
 
-from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
@@ -37,10 +36,22 @@ class TaskQueryFilters:
 
 
 def _resolve_date_range(start_date_raw: str, end_date_raw: str, days_back: int = 30):
+    """
+    Interpret days_back relative to today's local date:
+    - days_back > 0: query from (today - days_back) through today (inclusive).
+    - days_back == 0: query today only when no explicit start/end overrides.
+    - days_back < 0: query from today through (today + abs(days_back)).
+    """
     today = timezone.localdate()
-    default_start = today - timedelta(days=days_back)
+    if days_back > 0:
+        default_start, default_end = today - timedelta(days=days_back), today
+    elif days_back < 0:
+        default_start, default_end = today, today + timedelta(days=abs(days_back))
+    else:
+        default_start, default_end = today, today
+
     start_date = parse_date((start_date_raw or "").strip()) or default_start
-    end_date = parse_date((end_date_raw or "").strip()) or today
+    end_date = parse_date((end_date_raw or "").strip()) or default_end
     if start_date > end_date:
         start_date, end_date = end_date, start_date
     return start_date, end_date

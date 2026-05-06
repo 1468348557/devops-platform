@@ -27,4 +27,9 @@ urlpatterns = [
         views.sql_request_file_preview_api,
         name="sql_request_file_preview_api",
     ),
+    path(
+        "api/request/execution-detail/",
+        views.sql_request_execution_detail_api,
+        name="sql_request_execution_detail_api",
+    ),
 ]

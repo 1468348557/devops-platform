@@ -187,6 +187,7 @@
   .sql-g-k { color: #0d9488; min-width: 4.5em; flex-shrink: 0; }
   .sql-g-v { color: #0f172a; white-space: pre-wrap; word-break: break-word; flex: 1; }
   .sql-g-v.is-error, .sql-g-line.is-error .sql-g-v { color: #b91c1c; }
+  .sql-g-note { color: #6b7280; font-size: 11px; margin-top: 4px; }
   .status-cell, .status-header { white-space: nowrap; }
   .sql-file-toolbar {
     margin-top: 8px;
@@ -464,7 +465,7 @@
   </form>
 
   <div class="actions">
-    {% if can_approve %}
+    {% if can_repo_sync %}
       <button id="btn-sync-repo" class="btn btn-secondary" type="button">同步最新仓库</button>
     {% endif %}
     <span id="tip" class="muted">默认展示前后30天申请记录；仓库每10分钟自动同步一次</span>
@@ -574,6 +575,11 @@
                 class="btn-text btn-open-exec-result"
                 data-request-id="{{ row.id }}"
               >分文件详情</button>
+              <button
+                type="button"
+                class="btn-text btn-open-exec-detail-file"
+                data-request-id="{{ row.id }}"
+              >执行结果详情</button>
             </div>
           </td>
           <td class="action-cell">
@@ -626,10 +632,6 @@
       <aside id="sql-exec-file-list" class="sql-exec-file-list" aria-label="按文件切换"></aside>
       <div class="sql-exec-detail-wrap">
         <div id="sql-exec-detail" class="sql-exec-detail"></div>
-        <div id="sql-exec-orphan" class="sql-exec-orphan" style="display:none;">
-          <h5>未归类日志</h5>
-          <pre id="sql-exec-orphan-content" class="sql-exec-raw-log" style="max-height:140px; margin:0;"></pre>
-        </div>
       </div>
     </div>
   </div>
@@ -672,10 +674,10 @@
   const sqlExecSummaryEl = document.getElementById("sql-exec-summary");
   const sqlExecFileListEl = document.getElementById("sql-exec-file-list");
   const sqlExecDetailEl = document.getElementById("sql-exec-detail");
-  const sqlExecOrphanEl = document.getElementById("sql-exec-orphan");
-  const sqlExecOrphanContentEl = document.getElementById("sql-exec-orphan-content");
   const orderConfirmMaskEl = document.getElementById("order-confirm-mask");
-  const sqlExecState = { files: [], requestId: "", activeIdx: 0 };
+  const SQL_EXEC_DETAIL_VALUE_LIMIT = 4000;
+  const SQL_EXEC_ORPHAN_VALUE_LIMIT = 2500;
+  const sqlExecState = { files: [], orphanLog: "", requestId: "", activeIdx: 0 };
   const orderConfirmListEl = document.getElementById("order-confirm-list");
   const submitOrderConfirmBtn = document.getElementById("btn-submit-order-confirm");
   const orderConfirmAddSelectEl = document.getElementById("order-confirm-add-select");
@@ -870,6 +872,15 @@
     if (sqlExecResultMaskEl) sqlExecResultMaskEl.style.display = "flex";
   }
 
+  function limitDisplayText(raw, limit) {
+    const text = String(raw ?? "");
+    if (!limit || text.length <= limit) return { text, truncated: false };
+    return {
+      text: text.slice(0, limit),
+      truncated: true,
+    };
+  }
+
   function renderGStyleDetail(entry) {
     const title = entry.file_name
       ? `${entry.phase || ""} / ${entry.file_name}`.trim()
@@ -883,17 +894,36 @@
         const isErr =
           f.key === "log" && /(\[ERROR\])|回滚前阶段失败|回滚失败|WORKER_ERROR/i.test(raw);
         const k = escapeHtml(f.label);
-        const v = escapeHtml(raw);
+        const limit = f.key === "log" ? SQL_EXEC_DETAIL_VALUE_LIMIT : 1200;
+        const limited = limitDisplayText(raw, limit);
+        const v = escapeHtml(limited.text);
+        const note = limited.truncated
+          ? `<div class="sql-g-note">已截断，仅展示前 ${limit} 字；完整内容请点“执行结果详情”。</div>`
+          : "";
         return `<div class="sql-g-line${
           isErr ? " is-error" : ""
-        }"><span class="sql-g-k">${k}:</span><span class="sql-g-v${isErr ? " is-error" : ""}">${v}</span></div>`;
+        }"><span class="sql-g-k">${k}:</span><span class="sql-g-v${isErr ? " is-error" : ""}">${v}${note}</span></div>`;
       })
       .join("");
     return `<div class="sql-g-block"><div class="sql-g-banner">${escapeHtml(banner)}</div>${lineHtml}</div>`;
   }
 
+  function renderSqlExecOrphanDetail() {
+    const limited = limitDisplayText(sqlExecState.orphanLog || "", SQL_EXEC_ORPHAN_VALUE_LIMIT);
+    const note = limited.truncated
+      ? `\n\n[已截断，仅展示前 ${SQL_EXEC_ORPHAN_VALUE_LIMIT} 字；完整内容请点“执行结果详情”。]`
+      : "";
+    return `<div class="sql-g-block"><div class="sql-g-banner">${escapeHtml(
+      "*************************** 未归类日志 ***************************"
+    )}</div><pre class="sql-exec-raw-log" style="max-height:360px">${escapeHtml(limited.text + note)}</pre></div>`;
+  }
+
   function renderSqlExecActiveDetail() {
     if (!sqlExecDetailEl) return;
+    if (sqlExecState.activeIdx === -1) {
+      sqlExecDetailEl.innerHTML = renderSqlExecOrphanDetail();
+      return;
+    }
     const entry = sqlExecState.files[sqlExecState.activeIdx];
     if (!entry) {
       sqlExecDetailEl.innerHTML =
@@ -908,12 +938,14 @@
     sqlExecFileListEl.innerHTML = "";
     const files = sqlExecState.files || [];
     if (files.length === 0) {
-      const p = document.createElement("p");
-      p.className = "muted";
-      p.style.padding = "8px";
-      p.textContent = "无分文件条目";
-      sqlExecFileListEl.appendChild(p);
-      return;
+      if (!(sqlExecState.orphanLog && String(sqlExecState.orphanLog).trim())) {
+        const p = document.createElement("p");
+        p.className = "muted";
+        p.style.padding = "8px";
+        p.textContent = "无分文件条目";
+        sqlExecFileListEl.appendChild(p);
+        return;
+      }
     }
     files.forEach((f, idx) => {
       const btn = document.createElement("button");
@@ -927,9 +959,23 @@
       )}</span>`;
       sqlExecFileListEl.appendChild(btn);
     });
+    if (sqlExecState.orphanLog && String(sqlExecState.orphanLog).trim()) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "sql-exec-file-item" + (sqlExecState.activeIdx === -1 ? " is-active" : "");
+      btn.dataset.idx = "-1";
+      btn.innerHTML = '<span class="file-main">未归类日志</span><span class="file-sub">任务提交、后台启动等全局日志</span>';
+      sqlExecFileListEl.appendChild(btn);
+    }
   }
 
   function setSqlExecActiveIdx(idx) {
+    if (idx === -1 && sqlExecState.orphanLog && String(sqlExecState.orphanLog).trim()) {
+      sqlExecState.activeIdx = -1;
+      renderSqlExecFileList();
+      renderSqlExecActiveDetail();
+      return;
+    }
     const n = sqlExecState.files.length;
     if (n === 0) return;
     sqlExecState.activeIdx = Math.max(0, Math.min(idx, n - 1));
@@ -941,12 +987,12 @@
     if (!requestId) return;
     sqlExecState.requestId = requestId;
     sqlExecState.files = [];
+    sqlExecState.orphanLog = "";
     sqlExecState.activeIdx = 0;
     if (sqlExecResultTitleEl) sqlExecResultTitleEl.textContent = `SQL 分文件执行结果 #${requestId}`;
     if (sqlExecSummaryEl) sqlExecSummaryEl.innerHTML = "<strong>整体状态</strong>：加载中…";
     if (sqlExecDetailEl) sqlExecDetailEl.innerHTML = "";
     if (sqlExecFileListEl) sqlExecFileListEl.innerHTML = "";
-    if (sqlExecOrphanEl) sqlExecOrphanEl.style.display = "none";
     openSqlExecResult();
     try {
       const resp = await fetch(`/sql-execute/api/request/progress/?request_id=${encodeURIComponent(requestId)}`);
@@ -961,10 +1007,11 @@
         )}`;
       }
       sqlExecState.files = parsed.files || [];
-      if (sqlExecState.files.length > 0) sqlExecState.activeIdx = 0;
-      if (sqlExecOrphanContentEl) sqlExecOrphanContentEl.textContent = parsed.orphan_log || "";
-      if (sqlExecOrphanEl) {
-        sqlExecOrphanEl.style.display = parsed.orphan_log && String(parsed.orphan_log).trim() ? "block" : "none";
+      sqlExecState.orphanLog = parsed.orphan_log || "";
+      if (sqlExecState.files.length > 0) {
+        sqlExecState.activeIdx = 0;
+      } else if (sqlExecState.orphanLog && String(sqlExecState.orphanLog).trim()) {
+        sqlExecState.activeIdx = -1;
       }
       renderSqlExecFileList();
       renderSqlExecActiveDetail();
@@ -975,6 +1022,30 @@
         )}）`;
       }
       if (sqlExecDetailEl) sqlExecDetailEl.innerHTML = "";
+    }
+  }
+
+  async function loadSqlExecDetailFile(requestId) {
+    if (!requestId) return;
+    if (sqlPreviewTitleEl) sqlPreviewTitleEl.textContent = `SQL 执行结果详情 #${requestId}`;
+    if (sqlPreviewContentEl) sqlPreviewContentEl.textContent = "加载中…";
+    openSqlPreview();
+    try {
+      const resp = await fetch(`/sql-execute/api/request/execution-detail/?request_id=${encodeURIComponent(requestId)}`);
+      const data = await resp.json();
+      if (!resp.ok || !data.success) throw data;
+      const meta = [
+        `文件：${data.file_path || data.file_name || "-"}`,
+        `大小：${data.size != null ? data.size : "-"} bytes`,
+        data.truncated ? "页面展示：已截断" : "页面展示：完整",
+      ].join("\n");
+      if (sqlPreviewContentEl) {
+        sqlPreviewContentEl.textContent = `${meta}\n\n${data.content || ""}`;
+      }
+    } catch (e) {
+      if (sqlPreviewContentEl) {
+        sqlPreviewContentEl.textContent = e.error || "执行结果详情加载失败";
+      }
     }
   }
 
@@ -1420,6 +1491,14 @@
       const requestId = btn.dataset.requestId || "";
       if (!requestId) return;
       loadSqlExecResult(requestId);
+    });
+  });
+
+  document.querySelectorAll(".btn-open-exec-detail-file").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const requestId = btn.dataset.requestId || "";
+      if (!requestId) return;
+      loadSqlExecDetailFile(requestId);
     });
   });
 

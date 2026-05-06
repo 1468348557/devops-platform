@@ -255,8 +255,8 @@
             <option value="release">投产征集</option>
           </select>
         </label>
-        <label class="field">回看天数
-          <input id="schedule-days" class="form-input" type="number" min="1" value="30">
+        <label class="field">范围天数<span class="muted">（正数回看过去，负数往前查未来，如 -7）</span>
+          <input id="schedule-days" class="form-input" type="number" value="30" placeholder="30 或 -7">
         </label>
         <label class="field">启用
           <select id="schedule-enabled" class="form-input"><option value="1">是</option><option value="0">否</option></select>
@@ -271,7 +271,7 @@
         <table>
           <thead>
             <tr>
-              <th>名称</th><th>Cron</th><th>来源</th><th>回看天数</th><th>启用</th><th>最近执行</th><th>创建人</th><th>操作</th>
+              <th>名称</th><th>Cron</th><th>来源</th><th>范围天数</th><th>启用</th><th>最近执行</th><th>创建人</th><th>操作</th>
             </tr>
           </thead>
           <tbody id="schedule-body"></tbody>
@@ -306,11 +306,12 @@
 
 
   function setDefaultDateRange() {
-    const now = new Date();
     const start = new Date();
-    start.setDate(start.getDate() - 30);
+    const end = new Date();
+    start.setDate(start.getDate() - 14);
+    end.setDate(end.getDate() + 14);
     el('start-date').value = ymd(start);
-    el('end-date').value = ymd(now);
+    el('end-date').value = ymd(end);
   }
 
   async function requestForm(url, payload) {

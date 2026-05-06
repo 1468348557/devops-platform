@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import re
 from typing import Any
 import subprocess
@@ -35,6 +36,10 @@ from .services import ProgressEvent, execute_sql_request
 
 _MAX_EXECUTION_LOG_CHARS = 100_000
 _MAX_SQL_PREVIEW_CHARS = 200_000
+_MAX_SQL_EXECUTION_DETAIL_CHARS = 1_000_000
+_SQL_EXECUTION_RESULT_DIR = Path(
+    os.getenv("SQL_EXECUTE_RESULT_DIR", "/docker/devops/mysql/mysql-excuse")
+)
 _SQL_REPO_BRANCH = "rel执行且投产SQL"
 _DEFAULT_DDL_KEYWORDS = "ddl"
 _DEFAULT_BACKUP_KEYWORDS = "backup,bak,备份"
@@ -58,6 +63,50 @@ def _truncate_execution_log(text: str) -> str:
     marker = "...[日志已截断]\n"
     keep = _MAX_EXECUTION_LOG_CHARS - len(marker)
     return marker + text[-keep:]
+
+
+def _sql_execution_result_file_path(request_id: int) -> Path:
+    return _SQL_EXECUTION_RESULT_DIR / f"sql_request_{request_id}.log"
+
+
+def _write_sql_execution_result_file(request_id: int, text: str) -> tuple[bool, str]:
+    try:
+        _SQL_EXECUTION_RESULT_DIR.mkdir(parents=True, exist_ok=True)
+        result_path = _sql_execution_result_file_path(request_id)
+        tmp_path = result_path.with_suffix(result_path.suffix + ".tmp")
+        tmp_path.write_text(text or "", encoding="utf-8")
+        tmp_path.replace(result_path)
+        return True, str(result_path)
+    except OSError as exc:
+        return False, f"写入 SQL 执行结果文件失败：{exc}"
+
+
+def _safe_read_sql_execution_result_file(row: SqlExecutionRequest) -> tuple[bool, dict[str, Any]]:
+    result_path = _sql_execution_result_file_path(row.id)
+    try:
+        resolved_base = _SQL_EXECUTION_RESULT_DIR.resolve()
+        resolved_path = result_path.resolve()
+        resolved_path.relative_to(resolved_base)
+    except (OSError, ValueError):
+        return False, {"error": "执行结果文件路径非法"}
+    if not resolved_path.exists() or not resolved_path.is_file():
+        return False, {"error": "执行结果文件不存在，请确认任务已执行完成"}
+    try:
+        content = resolved_path.read_text(encoding="utf-8", errors="replace")
+        size = resolved_path.stat().st_size
+    except OSError as exc:
+        return False, {"error": f"读取执行结果文件失败：{exc}"}
+    truncated = False
+    if len(content) > _MAX_SQL_EXECUTION_DETAIL_CHARS:
+        content = content[:_MAX_SQL_EXECUTION_DETAIL_CHARS] + "\n\n[执行结果过长，页面展示已截断]"
+        truncated = True
+    return True, {
+        "file_path": str(resolved_path),
+        "file_name": resolved_path.name,
+        "size": size,
+        "truncated": truncated,
+        "content": content,
+    }
 
 
 _LOG_HEADER_RE = re.compile(r"^\[([^\]]+)\]\s*(.*)$")
@@ -259,8 +308,13 @@ def _can_approve(user) -> bool:
     return can_do_action(user, "sql_request_approve")
 
 
+def _can_repo_sync(user) -> bool:
+    return can_do_action(user, "sql_repo_sync")
+
+
 def _can_auto_approve(user) -> bool:
-    return can_do_action(user, "sql_request_auto_approve")
+    # 产品已全局关闭自动审批能力（不再由角色策略控制）
+    return False
 
 
 def _can_view_request_progress(user, row: SqlExecutionRequest) -> bool:
@@ -462,6 +516,18 @@ def _nearest_future_release_date_str(release_dates: list, today) -> str:
     return str(min(on_or_after))
 
 
+def _resolve_relative_folder(row: SqlExecutionRequest) -> str:
+    """返回 folder_path 相对于 repo 根目录的路径，用于前端目录下拉框匹配"""
+    repo_path = _get_repo_path()
+    folder_path = Path(row.folder_path or "")
+    if repo_path:
+        try:
+            return str(folder_path.resolve().relative_to(repo_path.resolve()))
+        except ValueError:
+            pass
+    return folder_path.name
+
+
 def _serialize_request(row: SqlExecutionRequest) -> dict:
     selected_files = _request_selected_files(row)
     selected_files_display = _request_selected_files_display(row, selected_files)
@@ -476,6 +542,10 @@ def _serialize_request(row: SqlExecutionRequest) -> dict:
         "selected_files": selected_files,
         "selected_files_display": selected_files_display,
         "selected_file_items": selected_file_items,
+        "folder_relative": _resolve_relative_folder(row),
+        "selected_file_basenames_json": json.dumps(
+            [Path(f).name for f in selected_files], ensure_ascii=False
+        ),
         "status": row.status,
         "status_label": row.get_status_display(),
         "execution_result": row.execution_result,
@@ -887,6 +957,9 @@ def _sql_execute_worker(request_id: int) -> None:
             row.selected_files_json,
             progress_callback=on_progress,
         )
+        detail_ok, detail_message = _write_sql_execution_result_file(request_id, log_text)
+        if not detail_ok:
+            log_text = f"{log_text.rstrip()}\n[WARN] {detail_message}\n"
         final_tip = "执行完成" if success else "执行失败"
         SqlExecutionRequest.objects.filter(pk=request_id).update(
             status=SqlExecutionRequest.Status.SUCCESS
@@ -902,6 +975,10 @@ def _sql_execute_worker(request_id: int) -> None:
         current = SqlExecutionRequest.objects.filter(pk=request_id).first()
         err_tail = f"\n[WORKER_ERROR] {exc}\n"
         merged_log = _truncate_execution_log((current.execution_log if current else "") + err_tail)
+        _write_sql_execution_result_file(
+            request_id,
+            (current.execution_log if current else "") + err_tail,
+        )
         SqlExecutionRequest.objects.filter(pk=request_id).update(
             status=SqlExecutionRequest.Status.FAILED,
             execution_result=str(exc)[:255],
@@ -937,6 +1014,7 @@ def sql_execute_page(request):
     applicant_raw = (request.GET.get("applicant") or "").strip()
     folder_raw = (request.GET.get("folder") or "").strip()
     release_date_raw = (request.GET.get("release_date") or "").strip()
+    apply_selected_release_date = release_date_raw if release_date_raw else apply_default_release_date
     status_raw = (request.GET.get("status") or "").strip().lower()
     allowed_status_filters = {
         SqlExecutionRequest.Status.PENDING,
@@ -973,10 +1051,12 @@ def sql_execute_page(request):
         {
             "can_apply": _can_apply(request.user),
             "can_approve": _can_approve(request.user),
+            "can_repo_sync": _can_repo_sync(request.user),
             "can_auto_approve": _can_auto_approve(request.user),
             "current_user_id": request.user.id,
             "release_date_options": release_date_options,
             "apply_default_release_date": apply_default_release_date,
+            "apply_selected_release_date": apply_selected_release_date,
             "rows": rows,
             "filters": {
                 "start_date": str(start_date),
@@ -993,7 +1073,7 @@ def sql_execute_page(request):
 @login_required
 @require_http_methods(["POST"])
 def sql_repo_sync_api(request):
-    if not _can_approve(request.user):
+    if not _can_repo_sync(request.user):
         return JsonResponse({"success": False, "error": "无仓库同步权限"}, status=403)
     config = GitPlatformConfig.get_solo_safe()
     configured_raw = (config.sql_repo_path or "").strip()
@@ -1242,6 +1322,25 @@ def sql_request_file_preview_api(request):
             "content": result,
         }
     )
+
+
+@login_required
+@require_http_methods(["GET"])
+def sql_request_execution_detail_api(request):
+    request_id_raw = (request.GET.get("request_id") or "").strip()
+    if not request_id_raw.isdigit():
+        return JsonResponse({"success": False, "error": "request_id 非法"}, status=400)
+    row = SqlExecutionRequest.objects.select_related("requested_by", "approved_by").filter(
+        pk=int(request_id_raw)
+    ).first()
+    if not row:
+        return JsonResponse({"success": False, "error": "申请不存在"}, status=404)
+    if not _can_view_request_progress(request.user, row):
+        return JsonResponse({"success": False, "error": "无权限查看"}, status=403)
+    ok, payload = _safe_read_sql_execution_result_file(row)
+    if not ok:
+        return JsonResponse({"success": False, "error": payload["error"]}, status=404)
+    return JsonResponse({"success": True, "request_id": row.id, **payload})
 
 
 @login_required

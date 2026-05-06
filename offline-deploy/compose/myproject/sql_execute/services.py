@@ -29,14 +29,94 @@ def parse_selected_files(raw: str) -> list[str]:
 
 
 def _split_sql_statements(content: str) -> list[str]:
-    normalized = content.replace("\r\n", "\n")
-    chunks = normalized.split(";")
+    normalized = content.replace("\r\n", "\n").replace("\r", "\n")
+    chunks: list[str] = []
+    current: list[str] = []
+    quote: str | None = None
+    in_line_comment = False
+    in_block_comment = False
+    i = 0
+
+    while i < len(normalized):
+        char = normalized[i]
+        next_char = normalized[i + 1] if i + 1 < len(normalized) else ""
+
+        if in_line_comment:
+            current.append(char)
+            if char == "\n":
+                in_line_comment = False
+            i += 1
+            continue
+
+        if in_block_comment:
+            current.append(char)
+            if char == "*" and next_char == "/":
+                current.append(next_char)
+                in_block_comment = False
+                i += 2
+            else:
+                i += 1
+            continue
+
+        if quote:
+            current.append(char)
+            if char == "\\" and quote in {"'", '"'} and next_char:
+                current.append(next_char)
+                i += 2
+                continue
+            if char == quote:
+                if next_char == quote:
+                    current.append(next_char)
+                    i += 2
+                    continue
+                quote = None
+            i += 1
+            continue
+
+        if char in {"'", '"', "`"}:
+            quote = char
+            current.append(char)
+            i += 1
+            continue
+
+        if char == "-" and next_char == "-" and (
+            i + 2 >= len(normalized) or normalized[i + 2].isspace()
+        ):
+            in_line_comment = True
+            current.append(char)
+            current.append(next_char)
+            i += 2
+            continue
+
+        if char == "#":
+            in_line_comment = True
+            current.append(char)
+            i += 1
+            continue
+
+        if char == "/" and next_char == "*":
+            in_block_comment = True
+            current.append(char)
+            current.append(next_char)
+            i += 2
+            continue
+
+        if char == ";":
+            chunks.append("".join(current))
+            current = []
+            i += 1
+            continue
+
+        current.append(char)
+        i += 1
+
+    chunks.append("".join(current))
     statements: list[str] = []
     for chunk in chunks:
         lines = []
         for line in chunk.splitlines():
             stripped = line.strip()
-            if not stripped or stripped.startswith("--"):
+            if not stripped or stripped.startswith("--") or stripped.startswith("#"):
                 continue
             lines.append(line)
         statement = "\n".join(lines).strip()
