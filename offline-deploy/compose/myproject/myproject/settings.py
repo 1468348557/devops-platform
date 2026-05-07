@@ -62,6 +62,8 @@ RUNNING_TESTS = len(sys.argv) > 1 and sys.argv[1] == "test"
 
 # SECURITY WARNING: keep the secret key used in production secret.
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only-insecure-secret-key")
+if IS_PRODUCTION and SECRET_KEY == "dev-only-insecure-secret-key":
+    raise RuntimeError("生产环境必须配置 DJANGO_SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production.
 DEBUG = env_bool("DJANGO_DEBUG", default=not IS_PRODUCTION)
@@ -146,8 +148,8 @@ if RUNNING_TESTS and env_bool("DJANGO_TEST_USE_SQLITE", default=True):
         "NAME": BASE_DIR / "test.sqlite3",
     }
 
-
-
+if IS_PRODUCTION and not DATABASES["default"]["PASSWORD"]:
+    raise RuntimeError("生产环境必须配置 MYSQL_PASSWORD")
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

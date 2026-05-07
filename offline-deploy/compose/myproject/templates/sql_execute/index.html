@@ -486,7 +486,7 @@
         <select id="apply-release-date" class="form-input">
           <option value="">请选择</option>
           {% for d in release_date_options %}
-            <option value="{{ d }}" {% if apply_default_release_date == d %}selected{% endif %}>{{ d }}</option>
+            <option value="{{ d }}" {% if apply_selected_release_date == d %}selected{% endif %}>{{ d }}</option>
           {% endfor %}
         </select>
       </label>
@@ -544,7 +544,8 @@
       </thead>
       <tbody>
       {% for row in rows %}
-        <tr data-sql-id="{{ row.id }}" data-sql-status="{{ row.status }}">
+        <tr data-sql-id="{{ row.id }}" data-sql-status="{{ row.status }}"
+            data-sql-folder-relative="{{ row.folder_relative }}">
           <td>{{ row.id }}</td>
           <td>{{ row.release_date }}</td>
           <td class="td-wrap">
@@ -591,6 +592,15 @@
             {% elif can_apply and row.status == "pending" and row.requested_by_id == current_user_id %}
               <div class="action-stack">
                 <button class="btn-op warn btn-withdraw" data-id="{{ row.id }}" type="button">撤回申请</button>
+              </div>
+            {% elif can_apply and row.requested_by_id == current_user_id and row.status == "failed" or can_apply and row.requested_by_id == current_user_id and row.status == "success" %}
+              <div class="action-stack">
+                <button class="btn-op primary btn-resubmit"
+                        data-id="{{ row.id }}"
+                        data-release-date="{{ row.release_date }}"
+                        data-folder-relative="{{ row.folder_relative }}"
+                        data-file-names='{{ row.selected_file_basenames_json|safe }}'
+                        type="button">重新提交</button>
               </div>
             {% else %}
               <span class="muted">-</span>
@@ -1326,7 +1336,6 @@
 
   applyReleaseDateEl?.addEventListener("change", async () => {
     try {
-      await loadFolders();
       const selectedReleaseDate = applyReleaseDateEl?.value || "";
       if (filterReleaseDateEl) {
         filterReleaseDateEl.value = selectedReleaseDate;
@@ -1337,10 +1346,12 @@
       } else {
         targetUrl.searchParams.delete("release_date");
       }
-      if (targetUrl.toString() !== window.location.href) {
+      const urlChanged = targetUrl.toString() !== window.location.href;
+      if (urlChanged) {
         window.location.href = targetUrl.toString();
         return;
       }
+      await loadFolders();
       if (tipEl) tipEl.textContent = "目录及 SQL 文件已按投产日期刷新";
     } catch (e) {
       if (tipEl) tipEl.textContent = `目录加载失败：${e.error || "未知错误"}`;
@@ -1457,6 +1468,78 @@
     });
   });
 
+  // ---- 重新提交 ----
+  async function handleResubmit(btn) {
+    try {
+      const releaseDate = btn.dataset.releaseDate || "";
+      const folderRelative = btn.dataset.folderRelative || "";
+      const fileNamesRaw = btn.dataset.fileNames || "[]";
+      if (!releaseDate || !folderRelative) {
+        tipEl.textContent = "重新提交失败：缺少原始申请数据";
+        return;
+      }
+
+      let originalFileNames = [];
+      try {
+        originalFileNames = JSON.parse(fileNamesRaw);
+      } catch (e) { /* keep empty */ }
+      if (originalFileNames.length === 0) {
+        tipEl.textContent = "重新提交失败：原始文件列表为空";
+        return;
+      }
+
+      // 1) 更新 URL 避免 release-date change handler 触发页面跳转
+      const url = new URL(window.location.href);
+      url.searchParams.set("release_date", releaseDate);
+      history.replaceState(null, "", url.toString());
+
+      // 2) 设置投产日期
+      if (applyReleaseDateEl) applyReleaseDateEl.value = releaseDate;
+
+      // 3) 加载目录列表
+      await loadFolders();
+
+      // 4) 切换到原始目录
+      if (!folderSelect) return;
+      const match = Array.from(folderSelect.options).find(o => o.value === folderRelative);
+      if (!match) {
+        tipEl.textContent = "重新提交失败：原始 SQL 目录已不存在，请手动选择";
+        return;
+      }
+      folderSelect.value = folderRelative;
+      await loadFiles();
+
+      // 5) 直接跳转到顺序确认弹窗，保持原始文件顺序和数量（含重复项）
+      const folder = folderSelect.value;
+      pendingSubmitPayload = {
+        releaseDate,
+        folder,
+        selectedFiles: originalFileNames,
+      };
+      renderOrderConfirmList(originalFileNames);
+      renderOrderConfirmAddOptions(sqlFileState.allFiles);
+      openOrderConfirm();
+
+    } catch (e) {
+      tipEl.textContent = `重新提交加载失败：${e.error || e.message || "未知错误"}`;
+    }
+  }
+
+  document.querySelectorAll(".btn-resubmit").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      try {
+        await handleResubmit(btn);
+      } catch(e) {
+        console.error("[重新提交] 事件处理异常:", e);
+        tipEl.textContent = `重新提交失败：${e.error || e.message || "未知错误"}`;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+  // ---- 重新提交 end ----
+
   document.querySelectorAll(".btn-open-request-sql").forEach((btn) => {
     btn.addEventListener("click", async () => {
       try {
@@ -1560,6 +1643,14 @@
 
   function initApplyReleaseDateSelect() {
     if (!applyReleaseDateEl) return;
+    const serverSelected = "{{ apply_selected_release_date|default:''|escapejs }}";
+    if (
+      serverSelected &&
+      Array.from(applyReleaseDateEl.options).some((o) => o.value === serverSelected)
+    ) {
+      applyReleaseDateEl.value = serverSelected;
+      return;
+    }
     const serverDefault = "{{ apply_default_release_date|default:''|escapejs }}";
     if (
       serverDefault &&

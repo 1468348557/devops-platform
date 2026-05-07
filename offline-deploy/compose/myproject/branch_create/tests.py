@@ -126,8 +126,9 @@ class BranchTaskQueryTests(TestCase):
     def test_release_tasks_negative_days_back_includes_future(self):
         """days_back < 0 queries from today through today + abs(days)."""
         future_date = timezone.localdate() + timedelta(days=7)
+        today = timezone.localdate()
         future_item = self._create_release_item(future_date, "future-project")
-        self._create_release_item(timezone.localdate() - timedelta(days=10), "past-project")
+        self._create_release_item(today - timedelta(days=10), "past-project")
 
         tasks = collect_pending_tasks("release", TaskQueryFilters(days_back=-14))
         ids = {t["source_id"] for t in tasks}

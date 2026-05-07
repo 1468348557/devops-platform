@@ -516,6 +516,18 @@ def _nearest_future_release_date_str(release_dates: list, today) -> str:
     return str(min(on_or_after))
 
 
+def _resolve_relative_folder(row: SqlExecutionRequest) -> str:
+    """返回 folder_path 相对于 repo 根目录的路径，用于前端目录下拉框匹配"""
+    repo_path = _get_repo_path()
+    folder_path = Path(row.folder_path or "")
+    if repo_path:
+        try:
+            return str(folder_path.resolve().relative_to(repo_path.resolve()))
+        except ValueError:
+            pass
+    return folder_path.name
+
+
 def _serialize_request(row: SqlExecutionRequest) -> dict:
     selected_files = _request_selected_files(row)
     selected_files_display = _request_selected_files_display(row, selected_files)
@@ -530,6 +542,10 @@ def _serialize_request(row: SqlExecutionRequest) -> dict:
         "selected_files": selected_files,
         "selected_files_display": selected_files_display,
         "selected_file_items": selected_file_items,
+        "folder_relative": _resolve_relative_folder(row),
+        "selected_file_basenames_json": json.dumps(
+            [Path(f).name for f in selected_files], ensure_ascii=False
+        ),
         "status": row.status,
         "status_label": row.get_status_display(),
         "execution_result": row.execution_result,
@@ -998,6 +1014,7 @@ def sql_execute_page(request):
     applicant_raw = (request.GET.get("applicant") or "").strip()
     folder_raw = (request.GET.get("folder") or "").strip()
     release_date_raw = (request.GET.get("release_date") or "").strip()
+    apply_selected_release_date = release_date_raw if release_date_raw else apply_default_release_date
     status_raw = (request.GET.get("status") or "").strip().lower()
     allowed_status_filters = {
         SqlExecutionRequest.Status.PENDING,
@@ -1039,6 +1056,7 @@ def sql_execute_page(request):
             "current_user_id": request.user.id,
             "release_date_options": release_date_options,
             "apply_default_release_date": apply_default_release_date,
+            "apply_selected_release_date": apply_selected_release_date,
             "rows": rows,
             "filters": {
                 "start_date": str(start_date),
