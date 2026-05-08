@@ -802,14 +802,6 @@ def release_track_api_run_start(request):
     except ValueError:
         return JsonResponse({"success": False, "error": "batch_id 非法"}, status=400)
 
-    config_text = (request.POST.get("config_text") or "").strip()
-    config_file = (request.POST.get("config_file") or "").strip() or _default_release_track_config_file()
-    if not config_text:
-        try:
-            config_text = build_config_text_from_file(config_file)
-        except Exception as exc:  # noqa: BLE001
-            return JsonResponse({"success": False, "error": str(exc)}, status=400)
-
     selected_projects_raw = request.POST.get("selected_projects")
     selected_projects = _parse_selected_projects(selected_projects_raw)
     if selected_projects_raw is not None and not selected_projects:
@@ -828,12 +820,23 @@ def release_track_api_run_start(request):
         )
     skip_tag = _parse_bool(request.POST.get("skip_tag"), default=False)
     tag_name = "" if skip_tag else (request.POST.get("tag_name") or "").strip()
+    merge_message = (request.POST.get("merge_message") or "").strip()
     tag_message = "" if skip_tag else (request.POST.get("tag_message") or "").strip()
+    config_text = (request.POST.get("config_text") or "").strip()
+    config_file_raw = (request.POST.get("config_file") or "").strip()
+    config_file = config_file_raw or _default_release_track_config_file()
+    if not config_text:
+        config_path = Path(config_file)
+        if config_path.exists():
+            config_text = build_config_text_from_file(config_file)
+        elif config_file_raw:
+            return JsonResponse({"success": False, "error": f"配置文件不存在: {config_file}"}, status=400)
+
     options = ReleaseTrackOptions(
         batch_id=batch_id,
         config_text=config_text,
         tag_name=tag_name,
-        merge_message=(request.POST.get("merge_message") or "").strip(),
+        merge_message=merge_message,
         tag_message=tag_message,
         auto_merge_mr=False,
         force_tag=False,
