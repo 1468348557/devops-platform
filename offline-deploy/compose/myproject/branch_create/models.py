@@ -4,6 +4,7 @@ from django.db import models, transaction
 from django.utils import timezone
 
 BRANCH_REGEX = r"^(FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}$"
+HOBO_BRANCH_REGEX = r"^(FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}(-[\w-]{1,50})?$"
 
 
 class ProjectCatalog(models.Model):
@@ -240,9 +241,9 @@ class HoboRequirementLedger(models.Model):
         verbose_name="需求类型",
     )
     requirement_branch = models.CharField(
-        max_length=32,
+        max_length=68,
         unique=True,
-        validators=[RegexValidator(regex=BRANCH_REGEX, message="分支名称格式不正确")],
+        validators=[RegexValidator(regex=HOBO_BRANCH_REGEX, message="分支名称格式不正确")],
         verbose_name="分支名称",
     )
     project = models.ForeignKey(

@@ -1,3 +1,4 @@
+import re
 from typing import Optional
 from datetime import timedelta
 
@@ -10,6 +11,8 @@ from django.views.decorators.http import require_http_methods
 
 from accounts.permissions import apply_data_scope, can_access_menu, can_do_action
 from .models import HoboRequirementLedger, ProjectCatalog, ReleaseItem
+
+BRANCH_SUFFIX_REGEX = re.compile(r"^[\w-]{1,50}$")
 
 
 @login_required
@@ -93,6 +96,25 @@ def _parse_optional_date(raw: Optional[str]):
     return parse_date(s)
 
 
+def _parse_branch_suffix(request):
+    enabled = (request.POST.get("custom_branch_suffix_enabled") or "").lower() in {
+        "1",
+        "true",
+        "on",
+        "yes",
+    }
+    suffix = (request.POST.get("custom_branch_suffix") or "").strip()
+    if not enabled:
+        return "", None
+    if not suffix:
+        return "", "请填写额外分支名称"
+    if len(suffix) > 50:
+        return "", "额外分支名称最多 50 个字"
+    if not BRANCH_SUFFIX_REGEX.match(suffix):
+        return "", "额外分支名称仅支持中文、字母、数字、下划线和中划线"
+    return suffix, None
+
+
 @login_required
 @require_http_methods(["GET"])
 def hobo_ledger_project_list(request):
@@ -128,6 +150,7 @@ def hobo_ledger_item_list(request):
         start_date, end_date = end_date, start_date
 
     description_kw = (request.GET.get("description") or "").strip()
+    applicant_kw = (request.GET.get("applicant_name") or "").strip()
     requirement_type = (request.GET.get("requirement_type") or "").strip().upper()
     project_id = (request.GET.get("project_id") or "").strip()
 
@@ -144,6 +167,8 @@ def hobo_ledger_item_list(request):
     )
     if description_kw:
         items = items.filter(description__icontains=description_kw)
+    if applicant_kw:
+        items = items.filter(applicant_name__icontains=applicant_kw)
     if requirement_type in {c.value for c in HoboRequirementLedger.BranchPrefix}:
         items = items.filter(requirement_type=requirement_type)
     if project_id:
@@ -158,6 +183,7 @@ def hobo_ledger_item_list(request):
                 "start_date": str(start_date),
                 "end_date": str(end_date),
                 "description": description_kw,
+                "applicant_name": applicant_kw,
                 "requirement_type": requirement_type,
                 "project_id": project_id,
             },
@@ -193,8 +219,14 @@ def hobo_ledger_item_create(request):
     except ProjectCatalog.DoesNotExist:
         return JsonResponse({"success": False, "error": "工程不存在或已禁用"}, status=400)
 
+    branch_suffix, branch_suffix_error = _parse_branch_suffix(request)
+    if branch_suffix_error:
+        return JsonResponse({"success": False, "error": branch_suffix_error}, status=400)
+
     base_branch = (request.POST.get("base_branch") or "").strip() or "master"
     requirement_branch = ReleaseItem._next_requirement_branch(requirement_type)
+    if branch_suffix:
+        requirement_branch = f"{requirement_branch}-{branch_suffix}"
     entry = HoboRequirementLedger(
         requirement_type=requirement_type,
         requirement_branch=requirement_branch,

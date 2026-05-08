@@ -310,3 +310,229 @@ class HoboCrossOwnerEditTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.entry.refresh_from_db()
         self.assertEqual(self.entry.description, "new desc")
+
+
+class HoboCustomBranchSuffixTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="hobo_admin",
+            email="hobo_admin@example.com",
+            password="pass1234",
+        )
+        self.project = ProjectCatalog.objects.create(
+            project_code="hobo-suffix-project",
+            project_name="HOBO Suffix Project",
+            enabled=True,
+        )
+
+    def _create_payload(self, suffix):
+        return {
+            "requirement_type": "REQ",
+            "project_id": str(self.project.id),
+            "description": "custom branch suffix",
+            "base_branch": "master",
+            "custom_branch_suffix_enabled": "1",
+            "custom_branch_suffix": suffix,
+        }
+
+    def test_create_hobo_item_appends_custom_branch_suffix(self):
+        self.client.force_login(self.user)
+        resp = self.client.post(
+            "/branch-create/hobo-ledger/api/items/create/",
+            self._create_payload("额外名称"),
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["success"])
+        self.assertRegex(data["item"]["requirement_branch"], r"^REQ-\d{8}-\d{4}-额外名称$")
+
+    def test_create_hobo_item_rejects_long_custom_branch_suffix(self):
+        self.client.force_login(self.user)
+        resp = self.client.post(
+            "/branch-create/hobo-ledger/api/items/create/",
+            self._create_payload("名" * 51),
+        )
+
+        self.assertEqual(resp.status_code, 400)
+        data = resp.json()
+        self.assertFalse(data["success"])
+        self.assertIn("最多 50 个字", data["error"])
+
+
+class ApplicantSearchTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="search_admin",
+            email="search_admin@example.com",
+            password="pass1234",
+        )
+        self.project = ProjectCatalog.objects.create(
+            project_code="search-project",
+            project_name="Search Project",
+            enabled=True,
+        )
+
+    def test_hobo_ledger_filters_by_applicant_name(self):
+        HoboRequirementLedger.objects.create(
+            requirement_type=HoboRequirementLedger.BranchPrefix.REQ,
+            requirement_branch="REQ-20260422-9101",
+            project=self.project,
+            description="match applicant",
+            applicant_name="张三",
+            applied_date=timezone.localdate(),
+            base_branch="master",
+            created_by=self.user,
+        )
+        HoboRequirementLedger.objects.create(
+            requirement_type=HoboRequirementLedger.BranchPrefix.REQ,
+            requirement_branch="REQ-20260422-9102",
+            project=self.project,
+            description="other applicant",
+            applicant_name="李四",
+            applied_date=timezone.localdate(),
+            base_branch="master",
+            created_by=self.user,
+        )
+
+        self.client.force_login(self.user)
+        resp = self.client.get(
+            "/branch-create/hobo-ledger/api/items/",
+            {"applicant_name": "张", "start_date": str(timezone.localdate()), "end_date": str(timezone.localdate())},
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(len(data["items"]), 1)
+        self.assertEqual(data["items"][0]["applicant_name"], "张三")
+
+    def test_release_entry_filters_by_applicant_name(self):
+        matched_user = User.objects.create_user(
+            username="matched_developer",
+            first_name="王",
+            last_name="五",
+            password="pass1234",
+        )
+        other_user = User.objects.create_user(username="other_developer", password="pass1234")
+        batch = ReleaseBatch.objects.create(
+            release_date=timezone.localdate(),
+            release_type=ReleaseBatch.ReleaseType.RELEASE,
+            release_branch="release-search",
+            status=ReleaseBatch.Status.OPEN,
+            created_by=self.user,
+        )
+        batch_project = ReleaseBatchProject.objects.create(
+            batch=batch,
+            project_code="search-project",
+            project_name="Search Project",
+            enabled=True,
+        )
+        ReleaseItem.objects.create(
+            batch=batch,
+            project=batch_project,
+            flow_name="matched flow",
+            biz_category="biz",
+            release_branch=batch.release_branch,
+            tech_owner="tech",
+            biz_owner="biz",
+            developer=matched_user,
+        )
+        ReleaseItem.objects.create(
+            batch=batch,
+            project=batch_project,
+            flow_name="other flow",
+            biz_category="biz",
+            release_branch=batch.release_branch,
+            tech_owner="tech",
+            biz_owner="biz",
+            developer=other_user,
+        )
+
+        self.client.force_login(self.user)
+        resp = self.client.get(
+            "/branch-create/release-entry/api/items/",
+            {"batch_id": str(batch.id), "applicant_name": "王"},
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(len(data["items"]), 1)
+        self.assertEqual(data["items"][0]["developer"], "matched_developer")
+
+    def test_branch_task_query_filters_by_applicant_name(self):
+        matched_user = User.objects.create_user(
+            username="task_matched_developer",
+            first_name="赵",
+            last_name="六",
+            password="pass1234",
+        )
+        other_user = User.objects.create_user(username="task_other_developer", password="pass1234")
+        today = timezone.localdate()
+        HoboRequirementLedger.objects.create(
+            requirement_type=HoboRequirementLedger.BranchPrefix.REQ,
+            requirement_branch="REQ-20260422-9201",
+            project=self.project,
+            description="matched hobo",
+            applicant_name="赵六",
+            applied_date=today,
+            base_branch="master",
+            created_by=self.user,
+        )
+        HoboRequirementLedger.objects.create(
+            requirement_type=HoboRequirementLedger.BranchPrefix.REQ,
+            requirement_branch="REQ-20260422-9202",
+            project=self.project,
+            description="other hobo",
+            applicant_name="孙七",
+            applied_date=today,
+            base_branch="master",
+            created_by=self.user,
+        )
+        batch = ReleaseBatch.objects.create(
+            release_date=today,
+            release_type=ReleaseBatch.ReleaseType.RELEASE,
+            release_branch="release-task-search",
+            status=ReleaseBatch.Status.OPEN,
+            created_by=self.user,
+        )
+        batch_project = ReleaseBatchProject.objects.create(
+            batch=batch,
+            project_code="task-search-project",
+            project_name="Task Search Project",
+            enabled=True,
+        )
+        ReleaseItem.objects.create(
+            batch=batch,
+            project=batch_project,
+            flow_name="matched task flow",
+            biz_category="biz",
+            release_branch=batch.release_branch,
+            tech_owner="tech",
+            biz_owner="biz",
+            developer=matched_user,
+        )
+        ReleaseItem.objects.create(
+            batch=batch,
+            project=batch_project,
+            flow_name="other task flow",
+            biz_category="biz",
+            release_branch=batch.release_branch,
+            tech_owner="tech",
+            biz_owner="biz",
+            developer=other_user,
+        )
+
+        tasks = collect_pending_tasks(
+            "both",
+            TaskQueryFilters(
+                start_date=str(today),
+                end_date=str(today),
+                applicant_name="赵",
+            ),
+        )
+
+        self.assertEqual(len(tasks), 2)
+        self.assertEqual({task["source_type"] for task in tasks}, {"hobo", "release"})
+        self.assertTrue(all("赵" in task["applicant_name"] for task in tasks))

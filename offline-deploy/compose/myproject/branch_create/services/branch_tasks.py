@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Iterable
 
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
@@ -32,6 +33,7 @@ class TaskQueryFilters:
     hobo_project_id: str = ""
     release_flow_name: str = ""
     release_project_id: str = ""
+    applicant_name: str = ""
     include_created: bool = False
 
 
@@ -67,6 +69,8 @@ def _hobo_tasks(filters: TaskQueryFilters):
         qs = qs.filter(branch_created=False)
     if filters.hobo_description:
         qs = qs.filter(description__icontains=filters.hobo_description.strip())
+    if filters.applicant_name:
+        qs = qs.filter(applicant_name__icontains=filters.applicant_name.strip())
     if filters.hobo_requirement_type in {c.value for c in HoboRequirementLedger.BranchPrefix}:
         qs = qs.filter(requirement_type=filters.hobo_requirement_type)
     if str(filters.hobo_project_id).strip():
@@ -83,6 +87,7 @@ def _hobo_tasks(filters: TaskQueryFilters):
             "new_branch": row.requirement_branch,
             "base_branch": row.base_branch or "master",
             "title": row.description,
+            "applicant_name": row.applicant_name,
             "date": str(row.applied_date),
             "status": "created" if row.branch_created else "pending",
             "error": row.branch_create_error,
@@ -93,7 +98,7 @@ def _hobo_tasks(filters: TaskQueryFilters):
 
 def _release_tasks(filters: TaskQueryFilters):
     start_date, end_date = _resolve_date_range(filters.start_date, filters.end_date, filters.days_back)
-    qs = ReleaseItem.objects.select_related("project", "batch").filter(
+    qs = ReleaseItem.objects.select_related("project", "batch", "developer").filter(
         batch__status=ReleaseBatch.Status.OPEN,
         batch__release_date__gte=start_date,
         batch__release_date__lte=end_date,
@@ -102,6 +107,13 @@ def _release_tasks(filters: TaskQueryFilters):
         qs = qs.filter(branch_created=False)
     if filters.release_flow_name:
         qs = qs.filter(flow_name__icontains=filters.release_flow_name.strip())
+    if filters.applicant_name:
+        applicant_kw = filters.applicant_name.strip()
+        qs = qs.filter(
+            Q(developer__username__icontains=applicant_kw)
+            | Q(developer__first_name__icontains=applicant_kw)
+            | Q(developer__last_name__icontains=applicant_kw)
+        )
     if str(filters.release_project_id).strip():
         qs = qs.filter(project_id=filters.release_project_id)
 
@@ -116,6 +128,7 @@ def _release_tasks(filters: TaskQueryFilters):
             "new_branch": row.release_branch,
             "base_branch": "master",
             "title": row.flow_name,
+            "applicant_name": row.developer.get_full_name().strip() or row.developer.username,
             "date": str(row.batch.release_date),
             "status": "created" if row.branch_created else "pending",
             "error": row.branch_create_error,

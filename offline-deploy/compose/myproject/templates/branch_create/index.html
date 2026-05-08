@@ -32,6 +32,13 @@
     gap: 10px;
     margin-bottom: 12px;
   }
+  .branch-filter-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    align-items: end;
+    gap: 10px;
+  }
+  .branch-filter-row .field { min-width: 0; }
   .action-row {
     display: flex;
     flex-wrap: wrap;
@@ -90,7 +97,7 @@
   .home-icon-link:hover { background: #f8fafc; border-color: #94a3b8; }
   .home-icon-link svg { width: 18px; height: 18px; display: block; }
   .table-wrap { overflow: auto; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; max-height: 520px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 980px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1080px; }
   th, td { border-bottom: 1px solid #e5e7eb; padding: 8px 10px; text-align: left; vertical-align: top; }
   th { background: #f8fafc; font-weight: 600; position: sticky; top: 0; z-index: 1; }
   .pager { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
@@ -140,7 +147,7 @@
       {% if can_view_hobo and can_view_release %}<button id="tab-both" class="tab-btn" type="button">两者</button>{% endif %}
     </div>
 
-    <div class="filter-grid">
+    <div class="filter-grid branch-filter-row">
       <label class="field">开始日期
         <input id="start-date" class="form-input" type="date">
       </label>
@@ -173,6 +180,9 @@
           <option value="{{ p.id }}">{{ p.project_code }}{% if p.project_name and p.project_name != p.project_code %} ({{ p.project_name }}){% endif %}</option>
           {% endfor %}
         </select>
+      </label>
+      <label class="field">申请人
+        <input id="applicant-name" class="form-input" placeholder="输入申请人">
       </label>
     </div>
 
@@ -207,6 +217,7 @@
           <th>工程名称</th>
           <th>基准分支</th>
           <th>描述/流程</th>
+          <th>申请人</th>
           <th>日期</th>
           <th>状态</th>
           <th>错误</th>
@@ -371,6 +382,7 @@
         <td>${escapeHtml(t.project_name || t.project_code)}</td>
         <td>${escapeHtml(t.base_branch || 'master')}</td>
         <td>${escapeHtml(t.title || '')}</td>
+        <td>${escapeHtml(t.applicant_name || '')}</td>
         <td>${escapeHtml(t.date || '')}</td>
         <td>${statusHtml}</td>
         <td>${escapeHtml(t.error || '')}</td>
@@ -449,6 +461,7 @@
         hobo_project_id: el('hobo-project-id').value,
         release_flow_name: el('release-flow-name').value,
         release_project_id: el('release-project-id').value,
+        applicant_name: el('applicant-name').value,
         include_created: el('include-created').checked ? '1' : '0',
       });
       renderTasks(data.tasks || []);
@@ -580,6 +593,7 @@
     el('hobo-project-id').value = '';
     el('release-flow-name').value = '';
     el('release-project-id').value = '';
+    el('applicant-name').value = '';
     el('include-created').checked = false;
   });
   if (el('btn-execute')) {

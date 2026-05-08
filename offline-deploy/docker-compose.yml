@@ -31,6 +31,8 @@ services:
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
       SQL_EXECUTE_RESULT_DIR: ${SQL_EXECUTE_RESULT_DIR:-/docker/devops/mysql/mysql-excuse}
+      GIT_USER_NAME: ${GIT_USER_NAME:-devops}
+      GIT_USER_EMAIL: ${GIT_USER_EMAIL:-devops@localhost}
     ports:
       - "${WEB_PORT:-8000}:8000"
     volumes:

@@ -12,6 +12,21 @@
   .field { display: grid; gap: 6px; font-size: 13px; }
   .muted { color: #6b7280; font-size: 12px; }
   .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .search-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: end;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .search-row .field { min-width: 140px; }
+  .search-row .field:nth-child(3),
+  .search-row .field:nth-child(5),
+  .search-row .field:nth-child(6) { min-width: 170px; }
+  .search-actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+  .search-actions,
+  .search-row .btn { flex: 0 0 auto; }
   .table-wrap { overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
   .ledger-table-wrap { max-height: 520px; overflow-y: auto; }
   .ledger-table-wrap thead th {
@@ -44,6 +59,7 @@
   .danger { color: #b91c1c; }
   .notice { padding: 8px 10px; border-radius: 8px; background: #f8fafc; font-size: 13px; }
   .hidden { display: none !important; }
+  .inline-check { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; }
   .home-icon-link {
     position: absolute;
     top: 14px;
@@ -114,7 +130,7 @@
   </a>
   <h1 class="section-title">HOBO需求登记台账</h1>
   <div class="notice">
-    规则：可查看全部记录；仅本人或超管可修改、删除。需求类型选 FIX / REQ / PUB，保存后系统自动生成分支名称（格式 ^(FIX|REQ|PUB)-日期-序号）。申请人、申请日期在新建时自动生成（申请人可改填）。依赖分支不填则按 master 处理。列表中可空字段无内容时不展示；点「查看」可看全部字段。
+    规则：可查看全部记录；仅本人或超管可修改、删除。需求类型选 FIX / REQ / PUB，保存后系统自动生成分支名称（格式 ^(FIX|REQ|PUB)-日期-序号），可勾选添加最多 50 个字的额外名称作为后缀。申请人、申请日期在新建时自动生成（申请人可改填）。依赖分支不填则按 master 处理。列表中可空字段无内容时不展示；点「查看」可看全部字段。
   </div>
 
   <div>
@@ -142,7 +158,13 @@
         </label>
         <label class="field">分支名称
           <input id="requirement-branch-display" class="form-input hidden" type="text" readonly>
-          <span id="branch-hint" class="muted" style="display:block;margin-top:4px;">保存后按需求类型自动生成，格式如 REQ-20260421-0001</span>
+          <span id="branch-hint" class="muted" style="display:block;margin-top:4px;">保存后按需求类型自动生成分支名称，一般无需点击下面的按钮</span>
+          <label id="branch-suffix-toggle-wrap" class="inline-check">
+            <input id="custom-branch-suffix-enabled" type="checkbox">
+            分支添加额外名称
+          </label>
+          <input id="custom-branch-suffix" class="form-input hidden" maxlength="50">
+          <span id="branch-suffix-hint" class="muted hidden">最终格式：REQ-20260421-0001-额外名称</span>
         </label>
         <label class="field">工程名称
           <select id="project-id" class="form-input"></select>
@@ -201,7 +223,7 @@
 
   <div>
     <h2 class="section-title">登记列表</h2>
-    <div class="toolbar gap-top">
+    <div class="search-row gap-top">
       <label class="field">开始日期
         <input id="search-start-date" class="form-input" type="date">
       </label>
@@ -224,8 +246,13 @@
           <option value="">全部工程</option>
         </select>
       </label>
-      <button id="btn-search-items" class="btn btn-secondary" type="button">搜索</button>
-      <button id="btn-reset-search" class="btn btn-secondary" type="button">重置</button>
+      <label class="field">申请人
+        <input id="search-applicant-name" class="form-input" placeholder="输入申请人">
+      </label>
+      <div class="search-actions">
+        <button id="btn-search-items" class="btn btn-secondary" type="button">搜索</button>
+        <button id="btn-reset-search" class="btn btn-secondary" type="button">重置</button>
+      </div>
     </div>
     <div class="table-wrap ledger-table-wrap">
       <table>
@@ -364,12 +391,20 @@
   function setBranchCreateUi() {
     el("branch-hint").style.display = "block";
     el("requirement-branch-display").classList.add("hidden");
+    el("branch-suffix-toggle-wrap").classList.remove("hidden");
+    el("custom-branch-suffix-enabled").checked = false;
+    el("custom-branch-suffix").value = "";
+    el("custom-branch-suffix").classList.add("hidden");
+    el("branch-suffix-hint").classList.add("hidden");
   }
 
   function setBranchEditUi(branchName) {
     el("branch-hint").style.display = "none";
     el("requirement-branch-display").classList.remove("hidden");
     el("requirement-branch-display").value = branchName || "";
+    el("branch-suffix-toggle-wrap").classList.add("hidden");
+    el("custom-branch-suffix").classList.add("hidden");
+    el("branch-suffix-hint").classList.add("hidden");
   }
 
   function applyFormEditableState() {
@@ -437,6 +472,17 @@
     el("description").disabled = !canEdit;
     el("remark").disabled = !canEdit;
     el("btn-save-modal").style.display = canEdit ? "inline-block" : "none";
+  }
+
+  function toggleBranchSuffixInput() {
+    const enabled = el("custom-branch-suffix-enabled").checked;
+    el("custom-branch-suffix").classList.toggle("hidden", !enabled);
+    el("branch-suffix-hint").classList.toggle("hidden", !enabled);
+    if (!enabled) {
+      el("custom-branch-suffix").value = "";
+      return;
+    }
+    el("custom-branch-suffix").focus();
   }
 
   function escapeHtml(s) {
@@ -594,6 +640,7 @@
         start_date: el("search-start-date").value || "",
         end_date: el("search-end-date").value || "",
         description: el("search-description").value || "",
+        applicant_name: el("search-applicant-name").value || "",
         requirement_type: el("search-requirement-type").value || "",
         project_id: el("search-project-id").value || "",
       });
@@ -627,6 +674,7 @@
     el("search-start-date").value = dateOffsetStr(-30);
     el("search-end-date").value = dateOffsetStr(0);
     el("search-description").value = "";
+    el("search-applicant-name").value = "";
     el("search-requirement-type").value = "";
     el("search-project-id").value = "";
     await loadItems();
@@ -648,6 +696,7 @@
     currentPage += 1;
     renderPagedItems();
   });
+  el("custom-branch-suffix-enabled").addEventListener("change", toggleBranchSuffixInput);
 
   el("btn-close-form").addEventListener("click", closeFormModal);
   el("btn-cancel-form").addEventListener("click", closeFormModal);
@@ -668,6 +717,8 @@
       project_id: el("project-id").value,
       description: el("description").value,
       applicant_name: el("applicant-name").value,
+      custom_branch_suffix_enabled: el("custom-branch-suffix-enabled").checked ? "1" : "",
+      custom_branch_suffix: el("custom-branch-suffix").value,
       base_branch: el("base-branch").value,
       base_branch_contact: el("base-branch-contact").value,
       flowchart_name: el("flowchart-name").value,

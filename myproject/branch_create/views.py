@@ -436,6 +436,7 @@ def branch_task_preview_api(request):
         hobo_project_id=request.POST.get("hobo_project_id", ""),
         release_flow_name=request.POST.get("release_flow_name", ""),
         release_project_id=request.POST.get("release_project_id", ""),
+        applicant_name=request.POST.get("applicant_name", ""),
         include_created=str(request.POST.get("include_created", "")).strip().lower() in {"1", "true", "yes", "on"},
     )
     try:

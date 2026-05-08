@@ -3,6 +3,7 @@ from datetime import timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError
+from django.db.models import Q
 from django.db.models.deletion import ProtectedError
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -434,6 +435,7 @@ def release_entry_item_list(request):
         start_date, end_date = end_date, start_date
 
     flow_name_kw = (request.GET.get("flow_name") or "").strip()
+    applicant_kw = (request.GET.get("applicant_name") or "").strip()
     project_id = (request.GET.get("project_id") or "").strip()
 
     items = (
@@ -450,6 +452,12 @@ def release_entry_item_list(request):
     )
     if flow_name_kw:
         items = items.filter(flow_name__icontains=flow_name_kw)
+    if applicant_kw:
+        items = items.filter(
+            Q(developer__username__icontains=applicant_kw)
+            | Q(developer__first_name__icontains=applicant_kw)
+            | Q(developer__last_name__icontains=applicant_kw)
+        )
     if project_id:
         items = items.filter(project_id=project_id)
 
@@ -462,6 +470,7 @@ def release_entry_item_list(request):
                 "start_date": str(start_date),
                 "end_date": str(end_date),
                 "flow_name": flow_name_kw,
+                "applicant_name": applicant_kw,
                 "project_id": project_id,
             },
         }

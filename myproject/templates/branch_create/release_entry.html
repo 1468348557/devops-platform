@@ -13,6 +13,21 @@
   .field { display: grid; gap: 6px; font-size: 13px; }
   .muted { color: #6b7280; font-size: 12px; }
   .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .search-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: end;
+    gap: 10px;
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .search-row .field { min-width: 150px; }
+  .search-row .field:nth-of-type(1) { min-width: 220px; }
+  .search-actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+  .search-actions,
+  .search-row .btn,
+  .search-row .relative { flex: 0 0 auto; }
   .records-section { min-width: 0; }
   .records-headbar {
     display: flex;
@@ -590,7 +605,7 @@
   <div class="records-section">
     <h2 class="section-title">当前批次记录</h2>
     <div class="records-headbar gap-top">
-      <div class="toolbar">
+      <div class="search-row">
       <button id="btn-show-project-lines" class="btn btn-secondary" type="button">本次投产工程</button>
       <label class="field">流程/功能名称（模糊）
         <input id="search-flow-name" class="form-input" placeholder="输入关键字">
@@ -600,8 +615,13 @@
           <option value="">全部工程</option>
         </select>
       </label>
-      <button id="btn-search-items" class="btn btn-secondary" type="button">搜索</button>
-      <button id="btn-reset-search" class="btn btn-secondary" type="button">重置</button>
+      <label class="field">申请人
+        <input id="search-applicant-name" class="form-input" placeholder="输入申请人">
+      </label>
+      <div class="search-actions">
+        <button id="btn-search-items" class="btn btn-secondary" type="button">搜索</button>
+        <button id="btn-reset-search" class="btn btn-secondary" type="button">重置</button>
+      </div>
       {% if can_bulk_update_ops_fields %}
       <label class="field">批量字段
         <select id="bulk-field-name" class="form-input">
@@ -1346,6 +1366,7 @@
         batch_id: String(currentBatch.id),
         flow_name: el("search-flow-name").value || "",
         project_id: el("search-project-id").value || "",
+        applicant_name: el("search-applicant-name").value || "",
       });
       const resp = await fetch(`/branch-create/release-entry/api/items/?${query.toString()}`);
       const data = await resp.json();
@@ -1487,6 +1508,7 @@
   el("btn-reset-search").addEventListener("click", async () => {
     el("search-flow-name").value = "";
     el("search-project-id").value = "";
+    el("search-applicant-name").value = "";
     await loadItems();
   });
   if (canBulkUpdateOpsFields) {

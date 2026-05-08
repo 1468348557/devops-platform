@@ -7,6 +7,13 @@ if [ "$#" -gt 0 ]; then
     exec "$@"
 fi
 
+# 配置 git 全局用户信息
+if [ -n "$GIT_USER_NAME" ] && [ -n "$GIT_USER_EMAIL" ]; then
+    echo "Configuring git global user..."
+    git config --global user.name "$GIT_USER_NAME"
+    git config --global user.email "$GIT_USER_EMAIL"
+fi
+
 # 收集静态文件
 echo "Collecting static files..."
 python manage.py collectstatic --noinput --verbosity=1
