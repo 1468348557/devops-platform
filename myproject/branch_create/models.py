@@ -3,7 +3,6 @@ from django.core.validators import RegexValidator
 from django.db import models, transaction
 from django.utils import timezone
 
-BRANCH_REGEX = r"^(FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}$"
 HOBO_BRANCH_REGEX = r"^(FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}(-[\w-]{1,50})?$"
 
 
@@ -107,10 +106,10 @@ class ReleaseItem(models.Model):
         default=ReleaseBranchSequence.BranchType.REQ,
     )
     requirement_branch = models.CharField(
-        max_length=32,
+        max_length=68,
         null=True,
         blank=True,
-        validators=[RegexValidator(regex=BRANCH_REGEX, message="需求分支格式不正确")],
+        validators=[RegexValidator(regex=HOBO_BRANCH_REGEX, message="需求分支格式不正确")],
     )
     sql_only_release = models.BooleanField(default=False)
     batch = models.ForeignKey(ReleaseBatch, on_delete=models.CASCADE, related_name="items")
