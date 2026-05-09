@@ -35,6 +35,7 @@ urlpatterns = [
     path("release-entry/api/items/bulk-update/", release_entry_views.release_entry_item_bulk_update, name="release_entry_item_bulk_update"),
     # HOBO 需求登记台账
     path("hobo-ledger/", hobo_ledger_views.hobo_ledger_page, name="hobo_ledger_page"),
+    path("hobo-ledger/export.xls", hobo_ledger_views.hobo_ledger_export_xls, name="hobo_ledger_export_xls"),
     path("hobo-ledger/api/projects/", hobo_ledger_views.hobo_ledger_project_list, name="hobo_ledger_project_list"),
     path("hobo-ledger/api/items/", hobo_ledger_views.hobo_ledger_item_list, name="hobo_ledger_item_list"),
     path("hobo-ledger/api/items/create/", hobo_ledger_views.hobo_ledger_item_create, name="hobo_ledger_item_create"),

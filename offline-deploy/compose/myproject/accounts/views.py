@@ -180,6 +180,7 @@ def _build_role_policy_view_model(role: RoleDefinition, policy: RolePermissionPo
             "action_hobo_item_edit_own": policy.action_hobo_item_edit_own,
             "action_hobo_item_edit_others": policy.action_hobo_item_edit_others,
             "action_hobo_item_delete_own": policy.action_hobo_item_delete_own,
+            "action_hobo_ledger_export": policy.action_hobo_ledger_export,
             "action_sql_repo_sync": policy.action_sql_repo_sync,
             "action_sql_request_apply": policy.action_sql_request_apply,
             "action_sql_request_approve": policy.action_sql_request_approve,

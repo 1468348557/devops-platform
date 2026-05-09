@@ -304,6 +304,10 @@
                   <input type="checkbox" name="role_{{ section.role_id }}__action_hobo_item_edit_others" {% if section.action_fields.action_hobo_item_edit_others %}checked{% endif %}>
                   <span>编辑他人HOBO登记</span>
                 </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__action_hobo_ledger_export" {% if section.action_fields.action_hobo_ledger_export %}checked{% endif %}>
+                  <span>导出 HOBO 需求登记（Excel .xls）</span>
+                </label>
 
                 <div class="span-full perm-group-title">SQL执行申请</div>
                 <label class="check-row">

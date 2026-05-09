@@ -271,10 +271,16 @@
         <input id="search-applicant-name" class="form-input" placeholder="输入申请人">
       </label>
       <div class="search-actions">
+        {% if can_export_hobo_ledger %}
+        <a class="btn btn-secondary" href="{% url 'branch_create:hobo_ledger_export_xls' %}">导出 Excel（全部）</a>
+        {% endif %}
         <button id="btn-search-items" class="btn btn-secondary" type="button">搜索</button>
         <button id="btn-reset-search" class="btn btn-secondary" type="button">重置</button>
       </div>
     </div>
+    {% if can_export_hobo_ledger %}
+    <p class="muted" style="margin: 8px 0 0;">导出为当前账号数据权限下的全部登记记录，不受上方日期与筛选条件限制。</p>
+    {% endif %}
     <div class="table-wrap ledger-table-wrap">
       <table>
         <thead>

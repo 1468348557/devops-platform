@@ -207,6 +207,9 @@ class RolePermissionPolicy(models.Model):
     action_hobo_item_edit_own = models.BooleanField(default=False)
     action_hobo_item_edit_others = models.BooleanField(default=False)
     action_hobo_item_delete_own = models.BooleanField(default=False)
+    action_hobo_ledger_export = models.BooleanField(
+        default=False, verbose_name="导出 HOBO 需求登记 Excel"
+    )
     action_sql_repo_sync = models.BooleanField(default=False)
     action_sql_request_apply = models.BooleanField(default=False)
     action_sql_request_approve = models.BooleanField(default=False)
@@ -269,6 +272,7 @@ class RolePermissionPolicy(models.Model):
                 "action_hobo_item_edit_own": False,
                 "action_hobo_item_edit_others": False,
                 "action_hobo_item_delete_own": False,
+                "action_hobo_ledger_export": True,
                 "action_sql_repo_sync": False,
                 "action_sql_request_apply": False,
                 "action_sql_request_approve": False,
@@ -303,6 +307,7 @@ class RolePermissionPolicy(models.Model):
             "action_hobo_item_edit_own": True,
             "action_hobo_item_edit_others": False,
             "action_hobo_item_delete_own": True,
+            "action_hobo_ledger_export": True,
             "action_sql_repo_sync": False,
             "action_sql_request_apply": True,
             "action_sql_request_approve": False,
@@ -331,6 +336,7 @@ class RolePermissionPolicy(models.Model):
                 "action_hobo_item_create": False,
                 "action_hobo_item_edit_own": False,
                 "action_hobo_item_delete_own": False,
+                "action_hobo_ledger_export": False,
                 "action_sql_request_apply": False,
                 "release_entry_editable_fields": [],
             }

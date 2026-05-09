@@ -31,6 +31,7 @@ ACTION_FIELD_MAP = {
     "hobo_item_edit_own": "action_hobo_item_edit_own",
     "hobo_item_edit_others": "action_hobo_item_edit_others",
     "hobo_item_delete_own": "action_hobo_item_delete_own",
+    "hobo_ledger_export": "action_hobo_ledger_export",
     "sql_repo_sync": "action_sql_repo_sync",
     "sql_request_apply": "action_sql_request_apply",
     "sql_request_approve": "action_sql_request_approve",

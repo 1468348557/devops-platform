@@ -1,9 +1,10 @@
+import io
 import re
 from typing import Optional
 from datetime import timedelta
 
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponseForbidden, JsonResponse
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -27,6 +28,7 @@ def hobo_ledger_page(request):
         {
             "current_role": role,
             "can_create_dev_record": can_do_action(request.user, "hobo_item_create"),
+            "can_export_hobo_ledger": can_do_action(request.user, "hobo_ledger_export"),
         },
     )
 
@@ -102,6 +104,71 @@ def _parse_optional_date(raw: Optional[str]):
     if not s:
         return None
     return parse_date(s)
+
+
+def _hobo_ledger_xls_bytes(items: list[HoboRequirementLedger]) -> bytes:
+    import xlwt
+
+    headers = [
+        "需求类型",
+        "分支名称",
+        "工程编码",
+        "工程名称",
+        "需求描述",
+        "申请人",
+        "申请日期",
+        "依赖分支",
+        "依赖分支联系人",
+        "流程图名称",
+        "提交 UAT 日期",
+        "提交 REL 日期",
+        "投产日期",
+        "备注",
+        "是否已建分支",
+        "建分支时间",
+        "建分支操作人",
+        "创建失败原因",
+        "登记人账号",
+    ]
+
+    book = xlwt.Workbook(encoding="utf-8")
+    sheet = book.add_sheet("HOBO需求登记")
+
+    for col, title in enumerate(headers):
+        sheet.write(0, col, title)
+
+    for row_idx, entry in enumerate(items, start=1):
+        proj_name = entry.project.project_name or entry.project.project_code
+        branch_by = ""
+        if entry.branch_created_by_id:
+            branch_by = entry.branch_created_by.username
+        values = [
+            entry.requirement_type,
+            entry.requirement_branch,
+            entry.project.project_code,
+            proj_name,
+            entry.description,
+            entry.applicant_name,
+            str(entry.applied_date),
+            entry.base_branch,
+            entry.base_branch_contact,
+            entry.flowchart_name,
+            str(entry.uat_submit_date) if entry.uat_submit_date else "",
+            str(entry.rel_submit_date) if entry.rel_submit_date else "",
+            str(entry.production_date) if entry.production_date else "",
+            entry.remark,
+            "是" if entry.branch_created else "否",
+            entry.branch_created_at.strftime("%Y-%m-%d %H:%M:%S") if entry.branch_created_at else "",
+            branch_by,
+            entry.branch_create_error or "",
+            entry.created_by.username,
+        ]
+        for col_idx, cell in enumerate(values):
+            sheet.write(row_idx, col_idx, cell)
+
+    buf = io.BytesIO()
+    book.save(buf)
+    return buf.getvalue()
 
 
 def _parse_branch_suffix(request):
@@ -197,6 +264,38 @@ def hobo_ledger_item_list(request):
             },
         }
     )
+
+
+@login_required
+@require_http_methods(["GET"])
+def hobo_ledger_export_xls(request):
+    if not _can_use_ledger(request.user):
+        return HttpResponse("无权限访问", status=403, content_type="text/plain; charset=utf-8")
+    if not can_do_action(request.user, "hobo_ledger_export"):
+        return HttpResponse("无导出权限", status=403, content_type="text/plain; charset=utf-8")
+
+    items_qs = (
+        HoboRequirementLedger.objects.select_related(
+            "project", "created_by", "branch_created_by"
+        ).order_by("-applied_date", "-id")
+    )
+    items_qs = apply_data_scope(
+        items_qs,
+        request.user,
+        scope_key="hobo_ledger",
+        owner_field="created_by",
+    )
+    items = list(items_qs)
+
+    raw_name = f"hobo_requirement_ledger_{timezone.localdate().isoformat()}.xls"
+    safe_name = re.sub(r"[^\w.\-]+", "_", raw_name)
+    if not safe_name.lower().endswith(".xls"):
+        safe_name = f"{safe_name}.xls"
+
+    payload = _hobo_ledger_xls_bytes(items)
+    response = HttpResponse(payload, content_type="application/vnd.ms-excel")
+    response["Content-Disposition"] = f'attachment; filename="{safe_name}"'
+    return response
 
 
 @login_required

@@ -442,6 +442,83 @@ class ApplicantSearchTests(TestCase):
         self.assertEqual(len(data["items"]), 1)
         self.assertEqual(data["items"][0]["applicant_name"], "张三")
 
+    def test_hobo_ledger_export_includes_all_dates_not_list_filters(self):
+        old_date = timezone.localdate() - timedelta(days=100)
+        HoboRequirementLedger.objects.create(
+            requirement_type=HoboRequirementLedger.BranchPrefix.REQ,
+            requirement_branch="REQ-20990101-7101",
+            project=self.project,
+            description="old window row",
+            applicant_name="exporter",
+            applied_date=old_date,
+            base_branch="",
+            created_by=self.user,
+        )
+        HoboRequirementLedger.objects.create(
+            requirement_type=HoboRequirementLedger.BranchPrefix.FIX,
+            requirement_branch="FIX-20990101-7102",
+            project=self.project,
+            description="today row",
+            applicant_name="exporter",
+            applied_date=timezone.localdate(),
+            base_branch="",
+            created_by=self.user,
+        )
+
+        self.client.force_login(self.user)
+        list_resp = self.client.get(
+            "/branch-create/hobo-ledger/api/items/",
+            {
+                "start_date": str(timezone.localdate()),
+                "end_date": str(timezone.localdate()),
+            },
+        )
+        self.assertEqual(list_resp.status_code, 200)
+        self.assertEqual(len(list_resp.json()["items"]), 1)
+
+        export_resp = self.client.get("/branch-create/hobo-ledger/export.xls")
+        self.assertEqual(export_resp.status_code, 200)
+        self.assertEqual(export_resp["Content-Type"], "application/vnd.ms-excel")
+        body = export_resp.content
+        self.assertIn(b"REQ-20990101-7101", body)
+        self.assertIn(b"FIX-20990101-7102", body)
+
+    def test_hobo_ledger_export_forbidden_without_export_action(self):
+        role = RoleDefinition.objects.create(
+            key="hobo_no_export_role",
+            name="HOBO无导出角色",
+            enabled=True,
+            can_be_registered=False,
+            is_staff_role=False,
+        )
+        policy = RolePermissionPolicy.get_for_role(role)
+        policy.menu_hobo_ledger = True
+        policy.data_scope_hobo_ledger = RolePermissionPolicy.DataScope.ALL
+        policy.action_hobo_ledger_export = False
+        policy.save(
+            update_fields=[
+                "menu_hobo_ledger",
+                "data_scope_hobo_ledger",
+                "action_hobo_ledger_export",
+                "updated_at",
+            ]
+        )
+        user = User.objects.create_user(
+            username="hobo_no_export",
+            email="hobo_no_export@example.com",
+            password="pass1234",
+        )
+        UserProfile.objects.create(
+            user=user,
+            role=role,
+            approval_status=UserProfile.ApprovalStatus.APPROVED,
+        )
+
+        self.client.force_login(user)
+        resp = self.client.get("/branch-create/hobo-ledger/export.xls")
+        self.assertEqual(resp.status_code, 403)
+        self.assertIn("无导出权限", resp.content.decode())
+
     def test_release_entry_filters_by_applicant_name(self):
         matched_user = User.objects.create_user(
             username="matched_developer",
