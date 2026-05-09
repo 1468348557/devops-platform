@@ -205,6 +205,7 @@ def _item_to_dict(item: ReleaseItem, user) -> dict:
         "need_esf": item.need_esf,
         "need_trade_tuning": item.need_trade_tuning,
         "need_release_verify": item.need_release_verify,
+        "need_config_release": item.need_config_release,
         "common_component_branch": item.common_component_branch,
         "rel_deployed": item.rel_deployed,
         "deploy_status": item.deploy_status,
@@ -220,6 +221,35 @@ def _item_to_dict(item: ReleaseItem, user) -> dict:
         "missing_fields": missing_fields,
         "incomplete_count": len(missing_fields),
     }
+
+
+# 「引用上次填写」API 返回字段：与 _item_to_dict 对齐，避免与列表接口漂移或遗漏键。
+_QUOTE_LAST_ITEM_KEYS = (
+    "flow_name",
+    "biz_category",
+    "tech_owner",
+    "biz_owner",
+    "common_component_branch",
+    "flow_definition_name",
+    "implementation_unit_no",
+    "remark",
+    "need_param_release",
+    "param_confirmed",
+    "need_menu",
+    "menu_added",
+    "need_difs",
+    "need_flowchart",
+    "flowchart_checked",
+    "need_event_platform",
+    "need_task_pool",
+    "need_bpmp",
+    "need_image",
+    "need_esf",
+    "need_trade_tuning",
+    "need_release_verify",
+    "need_config_release",
+    "rel_test_status",
+)
 
 
 def _apply_item_fields(
@@ -256,6 +286,7 @@ def _apply_item_fields(
             "need_esf",
             "need_trade_tuning",
             "need_release_verify",
+            "need_config_release",
         )
         for field in bool_fields:
             if field not in editable_fields:
@@ -510,33 +541,15 @@ def release_entry_item_last_by_project(request):
     if not last_item:
         return JsonResponse({"success": True, "item": None})
 
+    quote_payload = {
+        k: v
+        for k, v in _item_to_dict(last_item, request.user).items()
+        if k in _QUOTE_LAST_ITEM_KEYS
+    }
     return JsonResponse(
         {
             "success": True,
-            "item": {
-                "flow_name": last_item.flow_name,
-                "biz_category": last_item.biz_category,
-                "tech_owner": last_item.tech_owner,
-                "biz_owner": last_item.biz_owner,
-                "common_component_branch": last_item.common_component_branch,
-                "flow_definition_name": last_item.flow_definition_name,
-                "implementation_unit_no": last_item.implementation_unit_no,
-                "remark": last_item.remark,
-                "need_param_release": last_item.need_param_release,
-                "param_confirmed": last_item.param_confirmed,
-                "need_menu": last_item.need_menu,
-                "menu_added": last_item.menu_added,
-                "need_difs": last_item.need_difs,
-                "need_flowchart": last_item.need_flowchart,
-                "flowchart_checked": last_item.flowchart_checked,
-                "need_event_platform": last_item.need_event_platform,
-                "need_task_pool": last_item.need_task_pool,
-                "need_bpmp": last_item.need_bpmp,
-                "need_image": last_item.need_image,
-                "need_esf": last_item.need_esf,
-                "need_trade_tuning": last_item.need_trade_tuning,
-                "need_release_verify": last_item.need_release_verify,
-            },
+            "item": quote_payload,
             "source": {
                 "item_id": last_item.id,
                 "project_code": last_item.project.project_code,

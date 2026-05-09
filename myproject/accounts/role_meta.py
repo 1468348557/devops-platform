@@ -25,6 +25,7 @@ RELEASE_ENTRY_FIELD_OPTIONS = [
     ("need_esf", "需要 ESF"),
     ("need_trade_tuning", "需要交易调优"),
     ("need_release_verify", "需要投产验证"),
+    ("need_config_release", "是否涉及配置文件投产"),
     ("rel_test_status", "REL 测试状态"),
     ("rel_deployed", "REL 是否已部署"),
     ("deploy_status", "部署状态"),
@@ -57,6 +58,7 @@ RELEASE_ENTRY_DEV_FIELD_KEYS = {
     "need_esf",
     "need_trade_tuning",
     "need_release_verify",
+    "need_config_release",
     "rel_test_status",
 }
 

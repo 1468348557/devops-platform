@@ -557,6 +557,9 @@
           <label class="field">涉及投产验证
             <select id="need-release-verify" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
           </label>
+          <label class="field">涉及配置文件投产
+            <select id="need-config-release" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
+          </label>
           <label class="field">REL 测试状态
             <select id="rel-test-status" class="form-input">
               <option value="">未填写</option>
@@ -701,6 +704,7 @@
     "implementation-unit-no","remark",
     "need-param-release","param-confirmed","need-menu","menu-added","need-difs","need-flowchart","flowchart-checked",
     "need-event-platform","need-task-pool","need-bpmp","need-image","need-esf","need-trade-tuning","need-release-verify",
+    "need-config-release",
     "rel-deployed","deploy-status","rel-test-status"
   ];
   const missingLabelMap = {
@@ -711,6 +715,7 @@
     need_event_platform: "是否涉及事件平台", need_task_pool: "是否涉及统一任务池", need_bpmp: "是否涉及BPMP",
     need_image: "是否涉及影像", need_esf: "是否涉及ESF", need_trade_tuning: "是否涉及交易申调",
     need_release_verify: "是否涉及投产验证",
+    need_config_release: "是否涉及配置文件投产",
     requirement_branch: "需求分支",
     rel_test_status: "REL测试状态"
   };
@@ -731,7 +736,7 @@
   const checkItemColumnIds = new Set([
     "need_param_release","param_confirmed","need_menu","menu_added","need_difs","need_flowchart",
     "flowchart_checked","need_event_platform","need_task_pool","need_bpmp","need_image","need_esf",
-    "need_trade_tuning","need_release_verify","rel_test_status",
+    "need_trade_tuning","need_release_verify","need_config_release","rel_test_status",
   ]);
   const columnDefs = [
     { id: "flow_name", label: "流程/功能", render: (item) => escapeHtml(item.flow_name || "-") },
@@ -790,6 +795,7 @@
     { id: "need_esf", label: "涉及 ESF", render: (item) => escapeHtml(normalizeBool(item.need_esf) || "-") },
     { id: "need_trade_tuning", label: "涉及交易申调", render: (item) => escapeHtml(normalizeBool(item.need_trade_tuning) || "-") },
     { id: "need_release_verify", label: "涉及投产验证", render: (item) => escapeHtml(normalizeBool(item.need_release_verify) || "-") },
+    { id: "need_config_release", label: "涉及配置文件投产", render: (item) => escapeHtml(normalizeBool(item.need_config_release) || "-") },
     {
       id: "actions",
       label: "操作",
@@ -1014,6 +1020,8 @@
 
   function normalizeBool(value) {
     if (value === null || value === undefined || value === "") return "";
+    if (value === true || value === "true" || value === "True") return "是";
+    if (value === false || value === "false" || value === "False") return "否";
     return value ? "是" : "否";
   }
 
@@ -1126,6 +1134,7 @@
     el("need-esf").value = normalizeBool(item.need_esf);
     el("need-trade-tuning").value = normalizeBool(item.need_trade_tuning);
     el("need-release-verify").value = normalizeBool(item.need_release_verify);
+    el("need-config-release").value = normalizeBool(item.need_config_release);
     el("rel-test-status").value = normalizeYesNoChoice(item.rel_test_status);
     if (canEditOpsFields) {
       el("rel-deployed").value = normalizeBool(item.rel_deployed);
@@ -1140,8 +1149,15 @@
     if (!item) return;
     const setValue = (id, value) => {
       const node = el(id);
-      if (!node || node.disabled) return;
-      node.value = value ?? "";
+      if (!node) return;
+      // 控件被禁用时仍可安全写入显示值（用于「引用上次」）；禁止因 disabled 而跳过检查项。
+      const prev = node.disabled;
+      if (prev) node.disabled = false;
+      try {
+        node.value = value ?? "";
+      } finally {
+        if (prev) node.disabled = true;
+      }
     };
 
     setValue("flow-name", item.flow_name || "");
@@ -1166,6 +1182,8 @@
     setValue("need-esf", normalizeBool(item.need_esf));
     setValue("need-trade-tuning", normalizeBool(item.need_trade_tuning));
     setValue("need-release-verify", normalizeBool(item.need_release_verify));
+    setValue("need-config-release", normalizeBool(item.need_config_release));
+    setValue("rel-test-status", normalizeYesNoChoice(item.rel_test_status));
     saveDraftToLocal();
   }
 
@@ -1179,6 +1197,7 @@
       "implementation-unit-no",
       "need-menu","menu-added","need-difs","need-flowchart","flowchart-checked","need-event-platform",
       "need-task-pool","need-bpmp","need-image","need-esf","need-trade-tuning","need-release-verify",
+      "need-config-release",
       "rel-test-status"
     ];
     const opsIds = ["rel-deployed","deploy-status"];
@@ -1341,6 +1360,7 @@
       ["涉及 ESF", normalizeBool(item.need_esf)],
       ["涉及交易申调", normalizeBool(item.need_trade_tuning)],
       ["涉及投产验证", normalizeBool(item.need_release_verify)],
+      ["涉及配置文件投产", normalizeBool(item.need_config_release)],
       ["REL测试状态", item.rel_test_status],
       ["REL是否已部署", item.rel_deployed === null || item.rel_deployed === undefined ? "" : (item.rel_deployed ? "是" : "否")],
       ["投产状态", item.deploy_status],
@@ -1720,6 +1740,7 @@
       need_esf: denormalizeBool(el("need-esf").value),
       need_trade_tuning: denormalizeBool(el("need-trade-tuning").value),
       need_release_verify: denormalizeBool(el("need-release-verify").value),
+      need_config_release: denormalizeBool(el("need-config-release").value),
       rel_test_status: el("rel-test-status").value
     };
     if (canEditOpsFields) {

@@ -140,6 +140,7 @@ class ReleaseItem(models.Model):
     need_esf = models.BooleanField(null=True, blank=True)
     need_trade_tuning = models.BooleanField(null=True, blank=True)
     need_release_verify = models.BooleanField(null=True, blank=True)
+    need_config_release = models.BooleanField(null=True, blank=True)
     common_component_branch = models.CharField(max_length=64, blank=True, default="")
 
     rel_deployed = models.BooleanField(null=True, blank=True)
@@ -200,9 +201,10 @@ class ReleaseItem(models.Model):
             "need_bpmp": self.need_bpmp,
             "need_image": self.need_image,
             "need_esf": self.need_esf,
-            "need_trade_tuning": self.need_trade_tuning,
-            "need_release_verify": self.need_release_verify,
-            "rel_test_status": self.rel_test_status,
+        "need_trade_tuning": self.need_trade_tuning,
+        "need_release_verify": self.need_release_verify,
+        "need_config_release": self.need_config_release,
+        "rel_test_status": self.rel_test_status,
         }
         for name, value in required_values.items():
             if value in ("", None):
