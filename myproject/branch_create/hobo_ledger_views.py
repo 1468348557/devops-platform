@@ -87,6 +87,14 @@ def _item_to_dict(entry: HoboRequirementLedger, user) -> dict:
     }
 
 
+def _hobo_dependency_fields_error(base_branch: str, base_branch_contact: str) -> str | None:
+    bb = (base_branch or "").strip()
+    cc = (base_branch_contact or "").strip()
+    if bb and not cc:
+        return "已填写依赖分支时，必须填写依赖分支联系人"
+    return None
+
+
 def _parse_optional_date(raw: Optional[str]):
     if raw is None:
         return None
@@ -223,7 +231,12 @@ def hobo_ledger_item_create(request):
     if branch_suffix_error:
         return JsonResponse({"success": False, "error": branch_suffix_error}, status=400)
 
-    base_branch = (request.POST.get("base_branch") or "").strip() or "master"
+    base_branch = (request.POST.get("base_branch") or "").strip()
+    base_branch_contact = (request.POST.get("base_branch_contact") or "").strip()
+    dep_err = _hobo_dependency_fields_error(base_branch, base_branch_contact)
+    if dep_err:
+        return JsonResponse({"success": False, "error": dep_err}, status=400)
+
     requirement_branch = ReleaseItem._next_requirement_branch(requirement_type)
     if branch_suffix:
         requirement_branch = f"{requirement_branch}-{branch_suffix}"
@@ -235,7 +248,7 @@ def hobo_ledger_item_create(request):
         applicant_name=_resolve_applicant_name(request.user, applicant_raw or ""),
         applied_date=timezone.localdate(),
         base_branch=base_branch,
-        base_branch_contact=(request.POST.get("base_branch_contact") or "").strip(),
+        base_branch_contact=base_branch_contact,
         flowchart_name=(request.POST.get("flowchart_name") or "").strip(),
         uat_submit_date=_parse_optional_date(request.POST.get("uat_submit_date")),
         rel_submit_date=_parse_optional_date(request.POST.get("rel_submit_date")),
@@ -287,7 +300,7 @@ def hobo_ledger_item_update(request):
 
     base_branch = request.POST.get("base_branch")
     if base_branch is not None:
-        entry.base_branch = base_branch.strip() or "master"
+        entry.base_branch = base_branch.strip()
 
     for field, post_key in (
         ("base_branch_contact", "base_branch_contact"),
@@ -305,6 +318,10 @@ def hobo_ledger_item_update(request):
     ):
         if request.POST.get(post_key) is not None:
             setattr(entry, field, _parse_optional_date(request.POST.get(post_key)))
+
+    dep_err = _hobo_dependency_fields_error(entry.base_branch, entry.base_branch_contact)
+    if dep_err:
+        return JsonResponse({"success": False, "error": dep_err}, status=400)
 
     entry.save()
     return JsonResponse({"success": True, "item": _item_to_dict(entry, request.user)})

@@ -118,6 +118,27 @@
   }
   .detail-grid dt { color: #6b7280; margin: 0; }
   .detail-grid dd { margin: 0; word-break: break-word; }
+  .field-label-with-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .field-tooltip-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 50%;
+    background: #e0e7ff;
+    color: #3730a3;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: help;
+    line-height: 1;
+  }
 </style>
 
 <section class="card layout">
@@ -130,7 +151,7 @@
   </a>
   <h1 class="section-title">HOBO需求登记台账</h1>
   <div class="notice">
-    规则：可查看全部记录；仅本人或超管可修改、删除。需求类型选 FIX / REQ / PUB，保存后系统自动生成分支名称（格式 ^(FIX|REQ|PUB)-日期-序号），可勾选添加最多 50 个字的额外名称作为后缀。申请人、申请日期在新建时自动生成（申请人可改填）。依赖分支不填则按 master 处理。列表中可空字段无内容时不展示；点「查看」可看全部字段。
+    规则：可查看全部记录；仅本人或超管可修改、删除。需求类型选 FIX / REQ / PUB，保存后系统自动生成分支名称（格式 ^(FIX|REQ|PUB)-日期-序号），可勾选添加最多 50 个字的额外名称作为后缀。申请人、申请日期在新建时自动生成（申请人可改填）。「新建分支」任务始终从远端 <strong>master</strong> 拉取基准，不读取下方的依赖分支；依赖分支仅供登记协同上线信息，<strong>可留空</strong>，若填写了依赖分支名称则必须填写依赖分支联系人。列表中可空字段无内容时不展示；点「查看」可看全部字段。
   </div>
 
   <div>
@@ -175,11 +196,11 @@
         <label class="field">申请日期
           <input id="applied-date" class="form-input" type="date" readonly>
         </label>
-        <label class="field">依赖分支
-          <input id="base-branch" class="form-input" placeholder="默认 master">
+        <label class="field"><span class="field-label-with-hint">依赖分支<span class="field-tooltip-icon" tabindex="0" title="依赖分支是指：同一需求涉及多个开发分支，且这些分支必须同步上线，否则可能引发问题。因此需登记相关依赖分支及对应联系人。说明：通过本系统进行「新建分支」时始终以 master 为 Git 基准，不会使用此处填写的分支名。">!</span></span>
+          <input id="base-branch" class="form-input" placeholder="可留空（与新建分支的 Git 基准无关）">
         </label>
         <label class="field">依赖分支联系人
-          <input id="base-branch-contact" class="form-input" placeholder="可空">
+          <input id="base-branch-contact" class="form-input" placeholder="填写了依赖分支时必填">
         </label>
         <label class="field">流程图名称
           <input id="flowchart-name" class="form-input" placeholder="可空">
@@ -425,7 +446,7 @@
     setBranchCreateUi();
     el("applicant-name").value = "";
     el("applied-date").value = todayStr();
-    el("base-branch").value = "master";
+    el("base-branch").value = "";
     el("base-branch-contact").value = "";
     el("flowchart-name").value = "";
     el("uat-submit-date").value = "";
@@ -451,7 +472,7 @@
     el("project-id").value = String(item.project.id);
     el("applicant-name").value = item.applicant_name || "";
     el("applied-date").value = item.applied_date || "";
-    el("base-branch").value = item.base_branch || "master";
+    el("base-branch").value = item.base_branch ? item.base_branch : "";
     el("base-branch-contact").value = item.base_branch_contact || "";
     el("flowchart-name").value = item.flowchart_name || "";
     el("uat-submit-date").value = item.uat_submit_date || "";
@@ -493,10 +514,10 @@
 
   function optionalSummaryHtml(item) {
     const parts = [];
-    if (item.base_branch && item.base_branch !== "master") {
+    if ((item.base_branch || "").trim()) {
       parts.push(`依赖分支：${escapeHtml(item.base_branch)}`);
     }
-    if (item.base_branch_contact) {
+    if ((item.base_branch_contact || "").trim()) {
       parts.push(`依赖分支联系人：${escapeHtml(item.base_branch_contact)}`);
     }
     if (item.flowchart_name) {
@@ -527,7 +548,7 @@
       ["需求描述", item.description],
       ["申请人", item.applicant_name],
       ["申请日期", item.applied_date],
-      ["依赖分支", item.base_branch || "master"],
+      ["依赖分支", (item.base_branch || "").trim()],
       ["依赖分支联系人", item.base_branch_contact],
       ["流程图名称", item.flowchart_name],
       ["提交 UAT 日期", item.uat_submit_date],
@@ -712,6 +733,14 @@
 
   el("btn-save-modal").addEventListener("click", async () => {
     if (el("btn-save-modal").style.display === "none") return;
+
+    const bb = el("base-branch").value.trim();
+    const bc = el("base-branch-contact").value.trim();
+    if (bb && !bc) {
+      setFormTip("已填写依赖分支时，必须填写依赖分支联系人", true);
+      return;
+    }
+
     const payload = {
       requirement_type: el("requirement-type").value,
       project_id: el("project-id").value,

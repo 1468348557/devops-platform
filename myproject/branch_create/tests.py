@@ -294,7 +294,7 @@ class HoboCrossOwnerEditTests(TestCase):
             description="old desc",
             applicant_name="owner",
             applied_date=timezone.localdate(),
-            base_branch="master",
+            base_branch="",
             created_by=self.owner,
         )
 
@@ -330,7 +330,6 @@ class HoboCustomBranchSuffixTests(TestCase):
             "requirement_type": "REQ",
             "project_id": str(self.project.id),
             "description": "custom branch suffix",
-            "base_branch": "master",
             "custom_branch_suffix_enabled": "1",
             "custom_branch_suffix": suffix,
         }
@@ -359,6 +358,42 @@ class HoboCustomBranchSuffixTests(TestCase):
         self.assertFalse(data["success"])
         self.assertIn("最多 50 个字", data["error"])
 
+    def test_create_hobo_rejects_dependency_branch_without_contact(self):
+        self.client.force_login(self.user)
+        resp = self.client.post(
+            "/branch-create/hobo-ledger/api/items/create/",
+            {
+                "requirement_type": "REQ",
+                "project_id": str(self.project.id),
+                "description": "needs contact when dep set",
+                "base_branch": "feature/other",
+                "base_branch_contact": "",
+            },
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("联系人", resp.json().get("error", ""))
+
+    def test_pending_hobo_tasks_git_base_always_master(self):
+        user = User.objects.create_user(username="ledger_owner", password="pass1234")
+        today = timezone.localdate()
+        HoboRequirementLedger.objects.create(
+            requirement_type=HoboRequirementLedger.BranchPrefix.REQ,
+            requirement_branch="REQ-20990101-0001",
+            project=self.project,
+            description="dep branch for ledger only",
+            applicant_name="u",
+            applied_date=today,
+            base_branch="team/custom-base",
+            base_branch_contact="someone",
+            created_by=user,
+        )
+        tasks = collect_pending_tasks(
+            "hobo",
+            TaskQueryFilters(start_date=str(today), end_date=str(today), include_created=True),
+        )
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0]["base_branch"], "master")
+
 
 class ApplicantSearchTests(TestCase):
     def setUp(self):
@@ -381,7 +416,7 @@ class ApplicantSearchTests(TestCase):
             description="match applicant",
             applicant_name="张三",
             applied_date=timezone.localdate(),
-            base_branch="master",
+            base_branch="",
             created_by=self.user,
         )
         HoboRequirementLedger.objects.create(
@@ -391,7 +426,7 @@ class ApplicantSearchTests(TestCase):
             description="other applicant",
             applicant_name="李四",
             applied_date=timezone.localdate(),
-            base_branch="master",
+            base_branch="",
             created_by=self.user,
         )
 
@@ -477,7 +512,7 @@ class ApplicantSearchTests(TestCase):
             description="matched hobo",
             applicant_name="赵六",
             applied_date=today,
-            base_branch="master",
+            base_branch="",
             created_by=self.user,
         )
         HoboRequirementLedger.objects.create(
@@ -487,7 +522,7 @@ class ApplicantSearchTests(TestCase):
             description="other hobo",
             applicant_name="孙七",
             applied_date=today,
-            base_branch="master",
+            base_branch="",
             created_by=self.user,
         )
         batch = ReleaseBatch.objects.create(

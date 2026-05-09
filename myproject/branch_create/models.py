@@ -263,7 +263,8 @@ class HoboRequirementLedger(models.Model):
     applied_date = models.DateField(verbose_name="申请日期")
     base_branch = models.CharField(
         max_length=128,
-        default="master",
+        blank=True,
+        default="",
         verbose_name="依赖分支",
     )
     base_branch_contact = models.CharField(

@@ -85,7 +85,8 @@ def _hobo_tasks(filters: TaskQueryFilters):
             "project_code": row.project.project_code,
             "project_name": row.project.project_name or row.project.project_code,
             "new_branch": row.requirement_branch,
-            "base_branch": row.base_branch or "master",
+            # HOBO 新建分支任务固定从 master 拉取；依赖分支仅用于台账协同说明
+            "base_branch": "master",
             "title": row.description,
             "applicant_name": row.applicant_name,
             "date": str(row.applied_date),
