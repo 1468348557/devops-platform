@@ -1,3 +1,4 @@
+import io
 import re
 from datetime import timedelta
 
@@ -5,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError
 from django.db.models import Q
 from django.db.models.deletion import ProtectedError
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -45,6 +46,7 @@ def release_entry_page(request):
             "can_manage_batch": can_manage_batch,
             "can_create_dev_record": can_do_action(request.user, "release_item_create"),
             "can_bulk_update_ops_fields": _can_bulk_update_ops_fields(request.user),
+            "can_export_release_entry": can_do_action(request.user, "release_entry_export"),
         },
     )
 
@@ -83,6 +85,173 @@ def _get_release_entry_editable_fields(user) -> set[str]:
         for field_key in (policy.release_entry_editable_fields or [])
         if field_key in valid_keys
     }
+
+
+def _tri_state_sheet_bool(value) -> str:
+    if value is True:
+        return "是"
+    if value is False:
+        return "否"
+    return "未填写"
+
+
+def _release_entry_list_queryset(request):
+    """与列表 API 相同的筛选与数据范围，供列表与导出共用。"""
+    batch_id = request.GET.get("batch_id")
+    if not batch_id:
+        return "batch_id 必填", None, None
+
+    today = timezone.localdate()
+    default_start = today - timedelta(days=30)
+    start_date = parse_date((request.GET.get("start_date") or "").strip()) or default_start
+    end_date = parse_date((request.GET.get("end_date") or "").strip()) or today
+    if start_date > end_date:
+        start_date, end_date = end_date, start_date
+
+    flow_name_kw = (request.GET.get("flow_name") or "").strip()
+    applicant_kw = (request.GET.get("applicant_name") or "").strip()
+    project_id = (request.GET.get("project_id") or "").strip()
+
+    items = (
+        ReleaseItem.objects.select_related("project", "developer", "batch")
+        .filter(batch_id=batch_id)
+        .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
+        .order_by("-updated_at", "-id")
+    )
+    items = apply_data_scope(
+        items,
+        request.user,
+        scope_key="release_entry",
+        owner_field="developer",
+    )
+    if flow_name_kw:
+        items = items.filter(flow_name__icontains=flow_name_kw)
+    if applicant_kw:
+        items = items.filter(
+            Q(developer__username__icontains=applicant_kw)
+            | Q(developer__first_name__icontains=applicant_kw)
+            | Q(developer__last_name__icontains=applicant_kw)
+        )
+    if project_id:
+        items = items.filter(project_id=project_id)
+
+    filters_meta = {
+        "start_date": str(start_date),
+        "end_date": str(end_date),
+        "flow_name": flow_name_kw,
+        "applicant_name": applicant_kw,
+        "project_id": project_id,
+    }
+    return None, items, filters_meta
+
+
+def _release_entry_xls_bytes(batch: ReleaseBatch, items: list[ReleaseItem]) -> bytes:
+    import xlwt
+
+    headers = [
+        "批次投产日期",
+        "批次投产分支",
+        "工程编码",
+        "工程名称",
+        "分支类型",
+        "需求分支",
+        "仅SQL上线",
+        "流程/功能名称",
+        "业务种类",
+        "行项投产分支",
+        "科技联系人",
+        "业务联系人",
+        "公共组件分支",
+        "需要参数投产",
+        "参数已确认",
+        "需要菜单",
+        "菜单已新增",
+        "需要DIFS",
+        "需要流程图",
+        "流程图已核对",
+        "流程定义名称",
+        "实施单元编号",
+        "备注",
+        "需要事件平台",
+        "需要任务池",
+        "需要BPMP",
+        "需要镜像",
+        "需要ESF",
+        "需要交易申调",
+        "需要投产验证",
+        "需要配置文件投产",
+        "REL测试状态",
+        "REL是否已部署",
+        "投产状态",
+        "行状态",
+        "分支是否已创建",
+        "创建失败原因",
+        "填写人",
+    ]
+
+    book = xlwt.Workbook(encoding="utf-8")
+    sheet = book.add_sheet("投产征集")
+
+    for col, title in enumerate(headers):
+        sheet.write(0, col, title)
+
+    for row_idx, item in enumerate(items, start=1):
+        req_branch = ""
+        if item.sql_only_release:
+            req_branch = "仅SQL上线（无需需求分支）"
+        elif item.requirement_branch:
+            req_branch = item.requirement_branch
+
+        values = [
+            str(batch.release_date),
+            batch.release_branch,
+            item.project.project_code,
+            item.project.project_name,
+            item.get_branch_type_display(),
+            req_branch,
+            "是" if item.sql_only_release else "否",
+            item.flow_name,
+            item.biz_category,
+            item.release_branch,
+            item.tech_owner,
+            item.biz_owner,
+            item.common_component_branch,
+            _tri_state_sheet_bool(item.need_param_release),
+            _tri_state_sheet_bool(item.param_confirmed),
+            _tri_state_sheet_bool(item.need_menu),
+            _tri_state_sheet_bool(item.menu_added),
+            _tri_state_sheet_bool(item.need_difs),
+            _tri_state_sheet_bool(item.need_flowchart),
+            _tri_state_sheet_bool(item.flowchart_checked),
+            item.flow_definition_name,
+            item.implementation_unit_no,
+            item.remark,
+            _tri_state_sheet_bool(item.need_event_platform),
+            _tri_state_sheet_bool(item.need_task_pool),
+            _tri_state_sheet_bool(item.need_bpmp),
+            _tri_state_sheet_bool(item.need_image),
+            _tri_state_sheet_bool(item.need_esf),
+            _tri_state_sheet_bool(item.need_trade_tuning),
+            _tri_state_sheet_bool(item.need_release_verify),
+            _tri_state_sheet_bool(item.need_config_release),
+            (item.rel_test_status or "").strip(),
+            (
+                ""
+                if item.rel_deployed is None
+                else ("是" if item.rel_deployed else "否")
+            ),
+            (item.deploy_status or "").strip(),
+            item.get_line_status_display(),
+            "已创建" if item.branch_created else "未创建",
+            item.branch_create_error or "",
+            item.developer.username,
+        ]
+        for col_idx, cell in enumerate(values):
+            sheet.write(row_idx, col_idx, cell)
+
+    buf = io.BytesIO()
+    book.save(buf)
+    return buf.getvalue()
 
 
 def _can_bulk_update_ops_fields(user) -> bool:
@@ -454,58 +623,40 @@ def release_entry_item_create(request):
 @login_required
 @require_http_methods(["GET"])
 def release_entry_item_list(request):
-    batch_id = request.GET.get("batch_id")
-    if not batch_id:
-        return JsonResponse({"success": False, "error": "batch_id 必填"}, status=400)
-
-    today = timezone.localdate()
-    default_start = today - timedelta(days=30)
-    start_date = parse_date((request.GET.get("start_date") or "").strip()) or default_start
-    end_date = parse_date((request.GET.get("end_date") or "").strip()) or today
-    if start_date > end_date:
-        start_date, end_date = end_date, start_date
-
-    flow_name_kw = (request.GET.get("flow_name") or "").strip()
-    applicant_kw = (request.GET.get("applicant_name") or "").strip()
-    project_id = (request.GET.get("project_id") or "").strip()
-
-    items = (
-        ReleaseItem.objects.select_related("project", "developer")
-        .filter(batch_id=batch_id)
-        .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
-        .order_by("-updated_at", "-id")
-    )
-    items = apply_data_scope(
-        items,
-        request.user,
-        scope_key="release_entry",
-        owner_field="developer",
-    )
-    if flow_name_kw:
-        items = items.filter(flow_name__icontains=flow_name_kw)
-    if applicant_kw:
-        items = items.filter(
-            Q(developer__username__icontains=applicant_kw)
-            | Q(developer__first_name__icontains=applicant_kw)
-            | Q(developer__last_name__icontains=applicant_kw)
-        )
-    if project_id:
-        items = items.filter(project_id=project_id)
+    err, items, filters_meta = _release_entry_list_queryset(request)
+    if err:
+        return JsonResponse({"success": False, "error": err}, status=400)
 
     data = [_item_to_dict(item, request.user) for item in items]
-    return JsonResponse(
-        {
-            "success": True,
-            "items": data,
-            "filters": {
-                "start_date": str(start_date),
-                "end_date": str(end_date),
-                "flow_name": flow_name_kw,
-                "applicant_name": applicant_kw,
-                "project_id": project_id,
-            },
-        }
-    )
+    return JsonResponse({"success": True, "items": data, "filters": filters_meta})
+
+
+@login_required
+@require_http_methods(["GET"])
+def release_entry_export_xls(request):
+    if not can_do_action(request.user, "release_entry_export"):
+        return HttpResponse("无导出权限", status=403, content_type="text/plain; charset=utf-8")
+
+    err, items_qs, _filters_meta = _release_entry_list_queryset(request)
+    if err:
+        return HttpResponse(err, status=400, content_type="text/plain; charset=utf-8")
+
+    items = list(items_qs)
+    batch_id = request.GET.get("batch_id")
+    try:
+        batch = ReleaseBatch.objects.get(pk=int(batch_id))
+    except (ValueError, ReleaseBatch.DoesNotExist):
+        return HttpResponse("批次不存在", status=404, content_type="text/plain; charset=utf-8")
+
+    raw_name = f"release_entry_{batch.release_date}_{batch.release_branch}.xls"
+    safe_name = re.sub(r"[^\w.\-]+", "_", raw_name)
+    if not safe_name.lower().endswith(".xls"):
+        safe_name = f"{safe_name}.xls"
+
+    payload = _release_entry_xls_bytes(batch, items)
+    response = HttpResponse(payload, content_type="application/vnd.ms-excel")
+    response["Content-Disposition"] = f'attachment; filename="{safe_name}"'
+    return response
 
 
 @login_required

@@ -25,6 +25,7 @@ ACTION_FIELD_MAP = {
     "release_item_edit_dev_fields": "action_release_item_edit_dev_fields",
     "release_item_edit_ops_fields": "action_release_item_edit_ops_fields",
     "release_item_edit_others": "action_release_item_edit_others",
+    "release_entry_export": "action_release_entry_export",
     "release_item_delete_own": "action_release_item_delete_own",
     "hobo_item_create": "action_hobo_item_create",
     "hobo_item_edit_own": "action_hobo_item_edit_own",

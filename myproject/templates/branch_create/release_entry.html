@@ -463,6 +463,9 @@
     <h2 class="section-title">填写 / 编辑记录</h2>
     <div class="toolbar">
       <button id="btn-open-form" class="btn btn-primary">填写记录</button>
+      {% if can_export_release_entry %}
+      <button id="btn-export-xls" class="btn btn-secondary" type="button">导出 Excel（.xls）</button>
+      {% endif %}
       <span class="muted">点击后弹出悬浮页面填写</span>
     </div>
   </div>
@@ -698,6 +701,7 @@
   const canBulkUpdateOpsFields = {{ can_bulk_update_ops_fields|yesno:"true,false" }};
   const currentRole = "{{ current_role|escapejs }}";
   const canCreateDevRecord = {{ can_create_dev_record|yesno:"true,false" }};
+  const canExportReleaseEntry = {{ can_export_release_entry|yesno:"true,false" }};
   const currentUsername = "{{ request.user.username|escapejs }}";
   const fields = [
     "project-id","requirement-branch","release-branch","flow-name","biz-category","tech-owner","biz-owner","common-component-branch","flow-definition-name",
@@ -1525,6 +1529,21 @@
     closeColumnPanel();
   });
   el("btn-search-items").addEventListener("click", loadItems);
+  if (canExportReleaseEntry) {
+    el("btn-export-xls").addEventListener("click", () => {
+      if (!currentBatch) {
+        setTip("请先选择批次", true);
+        return;
+      }
+      const query = new URLSearchParams({
+        batch_id: String(currentBatch.id),
+        flow_name: el("search-flow-name").value || "",
+        project_id: el("search-project-id").value || "",
+        applicant_name: el("search-applicant-name").value || "",
+      });
+      window.location.href = `/branch-create/release-entry/export.xls?${query.toString()}`;
+    });
+  }
   el("btn-reset-search").addEventListener("click", async () => {
     el("search-flow-name").value = "";
     el("search-project-id").value = "";

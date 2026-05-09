@@ -174,6 +174,7 @@ def _build_role_policy_view_model(role: RoleDefinition, policy: RolePermissionPo
             "action_release_item_edit_dev_fields": policy.action_release_item_edit_dev_fields,
             "action_release_item_edit_ops_fields": policy.action_release_item_edit_ops_fields,
             "action_release_item_edit_others": policy.action_release_item_edit_others,
+            "action_release_entry_export": policy.action_release_entry_export,
             "action_release_item_delete_own": policy.action_release_item_delete_own,
             "action_hobo_item_create": policy.action_hobo_item_create,
             "action_hobo_item_edit_own": policy.action_hobo_item_edit_own,

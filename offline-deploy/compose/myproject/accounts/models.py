@@ -199,6 +199,9 @@ class RolePermissionPolicy(models.Model):
     action_release_item_edit_dev_fields = models.BooleanField(default=False)
     action_release_item_edit_ops_fields = models.BooleanField(default=False)
     action_release_item_edit_others = models.BooleanField(default=False)
+    action_release_entry_export = models.BooleanField(
+        default=False, verbose_name="导出投产征集 Excel"
+    )
     action_release_item_delete_own = models.BooleanField(default=False)
     action_hobo_item_create = models.BooleanField(default=False)
     action_hobo_item_edit_own = models.BooleanField(default=False)
@@ -260,6 +263,7 @@ class RolePermissionPolicy(models.Model):
                 "action_release_item_edit_dev_fields": False,
                 "action_release_item_edit_ops_fields": True,
                 "action_release_item_edit_others": False,
+                "action_release_entry_export": True,
                 "action_release_item_delete_own": False,
                 "action_hobo_item_create": False,
                 "action_hobo_item_edit_own": False,
@@ -293,6 +297,7 @@ class RolePermissionPolicy(models.Model):
             "action_release_item_edit_dev_fields": True,
             "action_release_item_edit_ops_fields": False,
             "action_release_item_edit_others": False,
+            "action_release_entry_export": True,
             "action_release_item_delete_own": True,
             "action_hobo_item_create": True,
             "action_hobo_item_edit_own": True,
@@ -321,6 +326,7 @@ class RolePermissionPolicy(models.Model):
                 "menu_sql_execute": False,
                 "action_release_item_create": False,
                 "action_release_item_edit_dev_fields": False,
+                "action_release_entry_export": False,
                 "action_release_item_delete_own": False,
                 "action_hobo_item_create": False,
                 "action_hobo_item_edit_own": False,
