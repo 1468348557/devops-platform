@@ -31,12 +31,16 @@ services:
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
       SQL_EXECUTE_RESULT_DIR: ${SQL_EXECUTE_RESULT_DIR:-/docker/devops/mysql/mysql-excuse}
+      HOBO_EXPORT_DIR: ${HOBO_EXPORT_DIR:-/docker/devops/hobo-需求登记台账}
+      RELEASE_ENTRY_EXPORT_DIR: ${RELEASE_ENTRY_EXPORT_DIR:-/docker/devops/投产征集}
       GIT_USER_NAME: ${GIT_USER_NAME:-devops}
       GIT_USER_EMAIL: ${GIT_USER_EMAIL:-devops@localhost}
     ports:
       - "${WEB_PORT:-8000}:8000"
     volumes:
       - ${SQL_EXECUTE_RESULT_DIR:-/docker/devops/mysql/mysql-excuse}:/docker/devops/mysql/mysql-excuse
+      - ${HOBO_EXPORT_DIR:-/docker/devops/hobo-需求登记台账}:/docker/devops/hobo-需求登记台账
+      - ${RELEASE_ENTRY_EXPORT_DIR:-/docker/devops/投产征集}:/docker/devops/投产征集
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import socket; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1',8000)); s.close()\""]
       interval: 20s

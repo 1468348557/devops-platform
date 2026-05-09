@@ -176,6 +176,10 @@ MYSQL_DATA_DIR=/docker/devops/mysql/data
 # ─── SQL 执行日志持久化目录 ──────────────────────────────────────────────────
 SQL_EXECUTE_RESULT_DIR=/docker/devops/mysql/mysql-excuse
 
+# ─── 定时导出持久化目录 ───────────────────────────────────────────────────
+HOBO_EXPORT_DIR=/docker/devops/hobo-需求登记台账
+RELEASE_ENTRY_EXPORT_DIR=/docker/devops/投产征集
+
 # ─── Django 超级管理员 ─────────────────────────────────────────────────────
 ADMIN_USERNAME=admin
 ADMIN_EMAIL=admin@devops.local
@@ -259,6 +263,17 @@ SQL_EXECUTE_RESULT_DIR=$(env_value SQL_EXECUTE_RESULT_DIR)
 SQL_EXECUTE_RESULT_DIR="${SQL_EXECUTE_RESULT_DIR:-/docker/devops/mysql/mysql-excuse}"
 mkdir -p "$SQL_EXECUTE_RESULT_DIR"
 ok "SQL 执行日志目录: $SQL_EXECUTE_RESULT_DIR"
+
+# 创建定时导出持久化目录
+HOBO_EXPORT_DIR=$(env_value HOBO_EXPORT_DIR)
+HOBO_EXPORT_DIR="${HOBO_EXPORT_DIR:-/docker/devops/hobo-需求登记台账}"
+mkdir -p "$HOBO_EXPORT_DIR"
+ok "HOBO 导出目录: $HOBO_EXPORT_DIR"
+
+RELEASE_ENTRY_EXPORT_DIR=$(env_value RELEASE_ENTRY_EXPORT_DIR)
+RELEASE_ENTRY_EXPORT_DIR="${RELEASE_ENTRY_EXPORT_DIR:-/docker/devops/投产征集}"
+mkdir -p "$RELEASE_ENTRY_EXPORT_DIR"
+ok "投产征集导出目录: $RELEASE_ENTRY_EXPORT_DIR"
 
 # ─── 步骤 4: 加载离线镜像 ────────────────────────────────────────────────────
 log "Step 4/11: 加载 Docker 镜像..."

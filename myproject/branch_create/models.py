@@ -426,3 +426,33 @@ class BranchTaskExecuteRunItem(models.Model):
     class Meta:
         db_table = "branch_task_execute_run_item"
         ordering = ["seq", "id"]
+
+
+class ExportSchedule(models.Model):
+    class ExportType(models.TextChoices):
+        HOBO_LEDGER = "hobo_ledger", "HOBO需求登记台账"
+        RELEASE_ENTRY = "release_entry", "投产征集"
+
+    name = models.CharField(max_length=64, unique=True)
+    enabled = models.BooleanField(default=True)
+    cron_expr = models.CharField(max_length=64)
+    export_type = models.CharField(
+        max_length=32,
+        choices=ExportType.choices,
+        verbose_name="导出类型",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="export_schedules",
+    )
+    last_run_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "export_schedule"
+        ordering = ["-updated_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.get_export_type_display()})"

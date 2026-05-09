@@ -171,6 +171,9 @@ MYSQL_PASSWORD=replace-devops-password
 MYSQL_PORT=3306
 MYSQL_DATA_DIR=/docker/devops/mysql/data
 
+HOBO_EXPORT_DIR=/docker/devops/hobo-需求登记台账
+RELEASE_ENTRY_EXPORT_DIR=/docker/devops/投产征集
+
 ADMIN_USERNAME=admin
 ADMIN_EMAIL=admin@devops.local
 ADMIN_PASSWORD=replace-admin-password

@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 from . import release_entry_views
 from . import hobo_ledger_views
+from . import export_schedule_views
 
 app_name = "branch_create"
 
@@ -41,4 +42,10 @@ urlpatterns = [
     path("hobo-ledger/api/items/create/", hobo_ledger_views.hobo_ledger_item_create, name="hobo_ledger_item_create"),
     path("hobo-ledger/api/items/update/", hobo_ledger_views.hobo_ledger_item_update, name="hobo_ledger_item_update"),
     path("hobo-ledger/api/items/delete/", hobo_ledger_views.hobo_ledger_item_delete, name="hobo_ledger_item_delete"),
+    # 定时导出计划
+    path("export-schedules/", export_schedule_views.export_schedule_page, name="export_schedule_page"),
+    path("api/export-schedules/", export_schedule_views.export_schedule_list_api, name="export_schedule_list_api"),
+    path("api/export-schedules/save/", export_schedule_views.export_schedule_save_api, name="export_schedule_save_api"),
+    path("api/export-schedules/delete/", export_schedule_views.export_schedule_delete_api, name="export_schedule_delete_api"),
+    path("api/export-schedules/run-now/", export_schedule_views.export_schedule_run_now_api, name="export_schedule_run_now_api"),
 ]

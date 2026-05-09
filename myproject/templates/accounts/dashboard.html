@@ -196,7 +196,7 @@
         <a class="btn btn-secondary" href="{% url 'my_password' %}">修改我的密码</a>
     </div>
 
-    {% if can_menu_release_track or can_menu_branch_create or can_menu_release_entry or can_menu_hobo_ledger or can_menu_sql_execute or can_menu_admin_config %}
+    {% if can_menu_release_track or can_menu_branch_create or can_menu_release_entry or can_menu_hobo_ledger or can_menu_sql_execute or can_menu_admin_config or can_menu_export_schedule %}
     <div class="dashboard-grid">
         {% if can_menu_release_track %}
         <a class="feature-card" href="{% url 'release_track:index' %}">
@@ -243,6 +243,14 @@
             <div class="icon">⚙️</div>
             <div class="name">管理员配置</div>
             <p class="desc">修改个人密码并维护工程名称配置</p>
+        </a>
+        {% endif %}
+
+        {% if can_menu_export_schedule %}
+        <a class="feature-card" href="{% url 'branch_create:export_schedule_page' %}">
+            <div class="icon">📅</div>
+            <div class="name">定时导出配置</div>
+            <p class="desc">配置 CRON 计划任务，定时自动导出 HOBO 台账和投产征集数据</p>
         </a>
         {% endif %}
 

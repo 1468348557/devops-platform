@@ -241,6 +241,10 @@
                   <input type="checkbox" name="role_{{ section.role_id }}__menu_notification" {% if section.menu_fields.menu_notification %}checked{% endif %}>
                   <span>🔔 通知铃铛可见</span>
                 </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__menu_export_schedule" {% if section.menu_fields.menu_export_schedule %}checked{% endif %}>
+                  <span>📅 定时导出配置</span>
+                </label>
 
                 <div class="span-full" style="margin-top: 6px;">
                   <strong style="font-size: 13px;">接口/操作权限</strong>
@@ -294,6 +298,10 @@
                   <input type="checkbox" name="role_{{ section.role_id }}__action_release_entry_export" {% if section.action_fields.action_release_entry_export %}checked{% endif %}>
                   <span>导出投产征集（Excel .xls）</span>
                 </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__action_auto_export_release_entry" {% if section.action_fields.action_auto_export_release_entry %}checked{% endif %}>
+                  <span>投产征集定时导出（CRON 计划任务）</span>
+                </label>
 
                 <div class="span-full perm-group-title">HOBO需求登记</div>
                 <label class="check-row">
@@ -307,6 +315,10 @@
                 <label class="check-row">
                   <input type="checkbox" name="role_{{ section.role_id }}__action_hobo_ledger_export" {% if section.action_fields.action_hobo_ledger_export %}checked{% endif %}>
                   <span>导出 HOBO 需求登记（Excel .xls）</span>
+                </label>
+                <label class="check-row">
+                  <input type="checkbox" name="role_{{ section.role_id }}__action_auto_export_hobo_ledger" {% if section.action_fields.action_auto_export_hobo_ledger %}checked{% endif %}>
+                  <span>HOBO需求登记定时导出（CRON 计划任务）</span>
                 </label>
 
                 <div class="span-full perm-group-title">SQL执行申请</div>

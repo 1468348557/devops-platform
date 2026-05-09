@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block title %}定时导出配置 - DevOps Platform{% endblock %}
+
+{% block content %}
+<style>
+  .page { align-items: flex-start; padding-top: 28px; padding-bottom: 40px; }
+  .card { max-width: 1100px; margin-top: 0; border-radius: 14px; border: 1px solid #e5e7eb; position: relative; padding: 22px; }
+  .nav-bread { font-size: 13px; color: #6b7280; margin-bottom: 14px; }
+  .nav-bread a { color: #1f75cb; text-decoration: none; }
+  .feature-header h1 { margin: 0 0 4px; font-size: 22px; }
+  .feature-header p { margin: 0; color: #6b7280; font-size: 13px; }
+  .home-icon-link {
+    position: absolute; top: 14px; right: 14px;
+    width: 34px; height: 34px;
+    border: 1px solid #d1d5db; border-radius: 8px;
+    background: #fff; color: #1f75cb;
+    display: inline-flex; align-items: center; justify-content: center;
+    text-decoration: none;
+  }
+  .home-icon-link:hover { background: #f8fafc; border-color: #94a3b8; }
+  .home-icon-link svg { width: 18px; height: 18px; display: block; }
+  .tabs {
+    display: inline-flex; gap: 6px; margin-bottom: 14px; align-items: center;
+    padding: 4px; background: #eef2ff; border: 1px solid #dbeafe; border-radius: 10px;
+  }
+  .tab-btn {
+    border: 1px solid transparent; border-radius: 8px;
+    background: transparent; color: #334155;
+    padding: 6px 12px; cursor: pointer; font-weight: 500;
+  }
+  .tab-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+  .panel {
+    border: 1px solid #e5e7eb; border-radius: 10px;
+    background: #f8fafc; padding: 14px; margin-bottom: 14px;
+  }
+  .filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px; margin-bottom: 12px;
+  }
+  .field { display: grid; gap: 4px; min-width: 160px; }
+  .action-row {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 0;
+  }
+  .table-wrap {
+    overflow: auto; border: 1px solid #e5e7eb; border-radius: 10px;
+    background: #fff; max-height: 420px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 720px; }
+  th, td { border-bottom: 1px solid #e5e7eb; padding: 8px 10px; text-align: left; }
+  th { background: #f8fafc; font-weight: 600; position: sticky; top: 0; z-index: 1; }
+  tbody tr:nth-child(even) { background: #fcfdff; }
+  tbody tr:hover { background: #f3f7ff; }
+  .muted { color: #6b7280; font-size: 12px; }
+  .cron-tip { margin: 0 0 10px; padding: 10px 12px; background: #fffbe6; border: 1px solid #fde68a; border-radius: 8px; font-size: 12px; color: #92400e; }
+</style>
+
+<section class="card">
+  <a class="home-icon-link" href="{% url 'dashboard' %}" title="返回主界面" aria-label="返回主界面">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M3 10.5L12 3l9 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path d="M6.75 9.75V21h10.5V9.75" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path d="M10 21v-6h4v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+  </a>
+
+  <div class="feature-header">
+    <h1>定时导出配置</h1>
+    <p>配置 CRON 计划任务，定时自动导出 HOBO 需求登记台账和投产征集数据到服务器持久化目录。</p>
+  </div>
+
+  <div class="tabs">
+    {% if can_manage_hobo %}
+    <button id="tab-hobo" class="tab-btn active" type="button">HOBO需求登记台账</button>
+    {% endif %}
+    {% if can_manage_release %}
+    <button id="tab-release" class="tab-btn {% if not can_manage_hobo %}active{% endif %}" type="button">投产征集</button>
+    {% endif %}
+  </div>
+
+  <div class="panel">
+    <div class="cron-tip" id="cron-tip">
+      <strong id="export-type-label">HOBO需求登记台账</strong> 导出目录：
+      <code id="export-dir-label">/docker/devops/hobo-需求登记台账</code>，
+      文件名：<code id="export-filename-label">HOBO需求登记台账-{时间戳}.xls</code>
+    </div>
+
+    <input id="schedule-id" type="hidden">
+    <input id="export-type" type="hidden" value="{% if can_manage_hobo %}hobo_ledger{% else %}release_entry{% endif %}">
+    <div class="filter-grid">
+      <label class="field">任务名称
+        <input id="schedule-name" class="form-input" placeholder="例如：每日凌晨导出HOBO台账">
+      </label>
+      <label class="field">Cron 表达式
+        <input id="schedule-cron" class="form-input" placeholder="0 2 * * *">
+      </label>
+      <label class="field">启用
+        <select id="schedule-enabled" class="form-input">
+          <option value="1">是</option>
+          <option value="0">否</option>
+        </select>
+      </label>
+    </div>
+    <div class="action-row">
+      <button id="btn-save-schedule" class="btn btn-primary" type="button">保存计划</button>
+      <button id="btn-clear-schedule" class="btn btn-secondary" type="button">清空</button>
+      <span id="schedule-tip" class="muted"></span>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>名称</th>
+          <th>Cron</th>
+          <th>导出类型</th>
+          <th>启用</th>
+          <th>最近执行</th>
+          <th>创建人</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="schedule-body"></tbody>
+    </table>
+  </div>
+</section>
+
+<script>
+  const canManageHobo = {% if can_manage_hobo %}true{% else %}false{% endif %};
+  const canManageRelease = {% if can_manage_release %}true{% else %}false{% endif %};
+  let currentExportType = el('export-type').value;
+
+  function el(id) { return document.getElementById(id); }
+  function escapeHtml(v) {
+    const d = document.createElement('div');
+    d.textContent = v == null ? '' : String(v);
+    return d.innerHTML;
+  }
+  function exportTypeLabel(v) {
+    if (v === 'hobo_ledger') return 'HOBO需求登记台账';
+    if (v === 'release_entry') return '投产征集';
+    return v || '';
+  }
+
+  function switchTab(type) {
+    currentExportType = type;
+    el('export-type').value = type;
+    ['tab-hobo','tab-release'].forEach(id => { if (el(id)) el(id).classList.remove('active'); });
+    const tab = el('tab-' + (type === 'hobo_ledger' ? 'hobo' : 'release'));
+    if (tab) tab.classList.add('active');
+
+    if (type === 'hobo_ledger') {
+      el('export-type-label').textContent = 'HOBO需求登记台账';
+      el('export-dir-label').textContent = '/docker/devops/hobo-需求登记台账';
+      el('export-filename-label').textContent = 'HOBO需求登记台账-{时间戳}.xls';
+    } else {
+      el('export-type-label').textContent = '投产征集';
+      el('export-dir-label').textContent = '/docker/devops/投产征集';
+      el('export-filename-label').textContent = '{yyyy-mm-dd}-投产征集.xls';
+    }
+    clearScheduleForm();
+    loadSchedules();
+  }
+
+  function clearScheduleForm() {
+    el('schedule-id').value = '';
+    el('schedule-name').value = '';
+    el('schedule-cron').value = '';
+    el('schedule-enabled').value = '1';
+  }
+
+  async function requestForm(url, payload) {
+    const fd = new FormData();
+    Object.entries(payload || {}).forEach(([k,v]) => fd.append(k, v == null ? '' : String(v)));
+    const resp = await fetch(url, { method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}'}, body: fd });
+    const contentType = resp.headers.get('content-type') || '';
+    let data = null;
+    if (contentType.includes('application/json')) {
+      data = await resp.json();
+    } else {
+      const text = await resp.text();
+      data = { success: false, error: text ? text.slice(0, 300) : `HTTP ${resp.status}` };
+    }
+    if (!resp.ok || !data.success) throw data || { error: `HTTP ${resp.status}` };
+    return data;
+  }
+
+  function renderSchedules(rows) {
+    const body = el('schedule-body');
+    body.innerHTML = '';
+    (rows || []).forEach((s) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(s.name)}</td>
+        <td><code>${escapeHtml(s.cron_expr)}</code></td>
+        <td>${escapeHtml(exportTypeLabel(s.export_type))}</td>
+        <td>${s.enabled ? '是' : '否'}</td>
+        <td>${escapeHtml(s.last_run_at || '-')}</td>
+        <td>${escapeHtml(s.created_by)}</td>
+        <td>
+          <button class="btn btn-secondary btn-edit-s" type="button" data-id="${s.id}">编辑</button>
+          <button class="btn btn-secondary btn-run-s" type="button" data-id="${s.id}">立即执行</button>
+          <button class="btn btn-secondary btn-del-s" type="button" data-id="${s.id}">删除</button>
+        </td>
+      `;
+      body.appendChild(tr);
+    });
+
+    body.querySelectorAll('.btn-edit-s').forEach((btn) => btn.addEventListener('click', () => {
+      const s = (rows || []).find((i) => i.id === Number(btn.dataset.id));
+      if (!s) return;
+      el('schedule-id').value = s.id;
+      el('schedule-name').value = s.name;
+      el('schedule-cron').value = s.cron_expr;
+      el('schedule-enabled').value = s.enabled ? '1' : '0';
+    }));
+    body.querySelectorAll('.btn-run-s').forEach((btn) => btn.addEventListener('click', async () => {
+      try {
+        const data = await requestForm('/branch-create/api/export-schedules/run-now/', { schedule_id: btn.dataset.id });
+        el('schedule-tip').textContent = data.message || '已触发';
+      } catch (e) {
+        el('schedule-tip').textContent = `执行失败：${e.error || '未知错误'}`;
+      }
+    }));
+    body.querySelectorAll('.btn-del-s').forEach((btn) => btn.addEventListener('click', async () => {
+      if (!confirm('确认删除该计划任务吗？')) return;
+      try {
+        await requestForm('/branch-create/api/export-schedules/delete/', { schedule_id: btn.dataset.id });
+        el('schedule-tip').textContent = '已删除';
+        await loadSchedules();
+      } catch (e) {
+        el('schedule-tip').textContent = `删除失败：${e.error || '未知错误'}`;
+      }
+    }));
+  }
+
+  async function loadSchedules() {
+    try {
+      const resp = await fetch('/branch-create/api/export-schedules/?export_type=' + encodeURIComponent(currentExportType));
+      const data = await resp.json();
+      if (!data.success) throw data;
+      renderSchedules(data.schedules || []);
+    } catch (e) {
+      el('schedule-tip').textContent = `加载失败：${e.error || '未知错误'}`;
+    }
+  }
+
+  document.getElementById('btn-save-schedule').addEventListener('click', async () => {
+    try {
+      await requestForm('/branch-create/api/export-schedules/save/', {
+        schedule_id: el('schedule-id').value,
+        name: el('schedule-name').value,
+        cron_expr: el('schedule-cron').value,
+        export_type: currentExportType,
+        enabled: el('schedule-enabled').value,
+      });
+      el('schedule-tip').textContent = '保存成功';
+      clearScheduleForm();
+      await loadSchedules();
+    } catch (e) {
+      el('schedule-tip').textContent = `保存失败：${e.error || '未知错误'}`;
+    }
+  });
+
+  document.getElementById('btn-clear-schedule').addEventListener('click', clearScheduleForm);
+
+  if (el('tab-hobo')) el('tab-hobo').addEventListener('click', () => switchTab('hobo_ledger'));
+  if (el('tab-release')) el('tab-release').addEventListener('click', () => switchTab('release_entry'));
+
+  loadSchedules();
+</script>
+{% endblock %}

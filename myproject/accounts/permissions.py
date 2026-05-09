@@ -12,6 +12,7 @@ MENU_FIELD_MAP = {
     "hobo_ledger": "menu_hobo_ledger",
     "sql_execute": "menu_sql_execute",
     "admin_config": "menu_admin_config",
+    "export_schedule": "menu_export_schedule",
 }
 
 ACTION_FIELD_MAP = {
@@ -32,6 +33,8 @@ ACTION_FIELD_MAP = {
     "hobo_item_edit_others": "action_hobo_item_edit_others",
     "hobo_item_delete_own": "action_hobo_item_delete_own",
     "hobo_ledger_export": "action_hobo_ledger_export",
+    "auto_export_hobo_ledger": "action_auto_export_hobo_ledger",
+    "auto_export_release_entry": "action_auto_export_release_entry",
     "sql_repo_sync": "action_sql_repo_sync",
     "sql_request_apply": "action_sql_request_apply",
     "sql_request_approve": "action_sql_request_approve",

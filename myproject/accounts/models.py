@@ -187,6 +187,7 @@ class RolePermissionPolicy(models.Model):
     menu_sql_execute = models.BooleanField(default=False)
     menu_admin_config = models.BooleanField(default=False)
     menu_notification = models.BooleanField(default=False, verbose_name="通知铃铛可见")
+    menu_export_schedule = models.BooleanField(default=False, verbose_name="定时导出配置")
 
     # 接口/操作权限
     action_release_track_use = models.BooleanField(default=False)
@@ -209,6 +210,12 @@ class RolePermissionPolicy(models.Model):
     action_hobo_item_delete_own = models.BooleanField(default=False)
     action_hobo_ledger_export = models.BooleanField(
         default=False, verbose_name="导出 HOBO 需求登记 Excel"
+    )
+    action_auto_export_hobo_ledger = models.BooleanField(
+        default=False, verbose_name="HOBO需求登记定时导出"
+    )
+    action_auto_export_release_entry = models.BooleanField(
+        default=False, verbose_name="投产征集定时导出"
     )
     action_sql_repo_sync = models.BooleanField(default=False)
     action_sql_request_apply = models.BooleanField(default=False)
@@ -256,6 +263,7 @@ class RolePermissionPolicy(models.Model):
                 "menu_sql_execute": True,
                 "menu_admin_config": False,
                 "menu_notification": True,
+                "menu_export_schedule": True,
                 "action_release_track_use": True,
                 "action_branch_task_preview": True,
                 "action_branch_task_execute_release": True,
@@ -273,6 +281,8 @@ class RolePermissionPolicy(models.Model):
                 "action_hobo_item_edit_others": False,
                 "action_hobo_item_delete_own": False,
                 "action_hobo_ledger_export": True,
+                "action_auto_export_hobo_ledger": True,
+                "action_auto_export_release_entry": True,
                 "action_sql_repo_sync": False,
                 "action_sql_request_apply": False,
                 "action_sql_request_approve": False,
@@ -291,6 +301,7 @@ class RolePermissionPolicy(models.Model):
             "menu_sql_execute": True,
             "menu_admin_config": False,
             "menu_notification": False,
+            "menu_export_schedule": False,
             "action_release_track_use": False,
             "action_branch_task_preview": False,
             "action_branch_task_execute_release": False,
@@ -308,6 +319,8 @@ class RolePermissionPolicy(models.Model):
             "action_hobo_item_edit_others": False,
             "action_hobo_item_delete_own": True,
             "action_hobo_ledger_export": True,
+            "action_auto_export_hobo_ledger": False,
+            "action_auto_export_release_entry": False,
             "action_sql_repo_sync": False,
             "action_sql_request_apply": True,
             "action_sql_request_approve": False,

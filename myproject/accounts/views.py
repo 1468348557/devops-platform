@@ -26,6 +26,7 @@ from .permissions import (
     DATA_SCOPE_FIELD_MAP,
     MENU_FIELD_MAP,
     can_access_menu,
+    can_do_action,
 )
 
 
@@ -162,6 +163,7 @@ def _build_role_policy_view_model(role: RoleDefinition, policy: RolePermissionPo
             "menu_hobo_ledger": policy.menu_hobo_ledger,
             "menu_sql_execute": policy.menu_sql_execute,
             "menu_notification": policy.menu_notification,
+            "menu_export_schedule": policy.menu_export_schedule,
         },
         "action_fields": {
             "action_release_track_use": policy.action_release_track_use,
@@ -175,12 +177,14 @@ def _build_role_policy_view_model(role: RoleDefinition, policy: RolePermissionPo
             "action_release_item_edit_ops_fields": policy.action_release_item_edit_ops_fields,
             "action_release_item_edit_others": policy.action_release_item_edit_others,
             "action_release_entry_export": policy.action_release_entry_export,
+            "action_auto_export_release_entry": policy.action_auto_export_release_entry,
             "action_release_item_delete_own": policy.action_release_item_delete_own,
             "action_hobo_item_create": policy.action_hobo_item_create,
             "action_hobo_item_edit_own": policy.action_hobo_item_edit_own,
             "action_hobo_item_edit_others": policy.action_hobo_item_edit_others,
             "action_hobo_item_delete_own": policy.action_hobo_item_delete_own,
             "action_hobo_ledger_export": policy.action_hobo_ledger_export,
+            "action_auto_export_hobo_ledger": policy.action_auto_export_hobo_ledger,
             "action_sql_repo_sync": policy.action_sql_repo_sync,
             "action_sql_request_apply": policy.action_sql_request_apply,
             "action_sql_request_approve": policy.action_sql_request_approve,
@@ -379,6 +383,7 @@ def dashboard(request):
             "can_menu_hobo_ledger": can_access_menu(request.user, "hobo_ledger"),
             "can_menu_sql_execute": can_access_menu(request.user, "sql_execute"),
             "can_menu_admin_config": can_access_menu(request.user, "admin_config"),
+            "can_menu_export_schedule": can_access_menu(request.user, "export_schedule"),
             "can_manage_role_permissions": request.user.is_superuser,
         },
     )

@@ -46,3 +46,25 @@ offline-deploy/compose/myproject/.env
 offline-deploy/compose/myproject/.runtime/
 offline-deploy/compose/myproject/db.sqlite3
 offline-deploy/compose/myproject/test.sqlite3
+
+.playwright-mcp
+*.xls
+*.pyc
+*.json
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Django / Python runtime
+*.log
+*.sqlite3
+
+# 导出的临时 JSON
+export-schedule-*.json
