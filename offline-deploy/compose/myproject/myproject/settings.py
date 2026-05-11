@@ -151,6 +151,7 @@ if RUNNING_TESTS and env_bool("DJANGO_TEST_USE_SQLITE", default=True):
 if IS_PRODUCTION and not DATABASES["default"]["PASSWORD"]:
     raise RuntimeError("生产环境必须配置 MYSQL_PASSWORD")
 
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
@@ -207,5 +208,4 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Whitenoise - serve static files in production
 if not DEBUG:
-    import whitenoise
     STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
