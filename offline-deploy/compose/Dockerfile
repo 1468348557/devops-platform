@@ -18,7 +18,7 @@ RUN pip install --upgrade pip \
 
 COPY . /app
 
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh /app/scheduler.sh
 
 EXPOSE 8000
 

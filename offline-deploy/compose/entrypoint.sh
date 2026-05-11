@@ -18,6 +18,10 @@ fi
 echo "Collecting static files..."
 python manage.py collectstatic --noinput --verbosity=1
 
+# 启动定时任务后台调度器（每分钟执行一次）
+echo "Starting scheduler..."
+bash /app/scheduler.sh &
+
 # 启动 gunicorn
 echo "Starting gunicorn..."
 exec gunicorn myproject.wsgi:application \
