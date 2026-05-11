@@ -1,48 +1,18 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
 from pathlib import Path
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from branch_create.cron_utils import cron_matches
 from branch_create.models import ExportSchedule, HoboRequirementLedger, ReleaseBatch, ReleaseItem
 from branch_create.hobo_ledger_views import _hobo_ledger_xls_bytes
 from branch_create.release_entry_views import _release_entry_xls_bytes
 
 
-def _cron_matches(expr: str, now: datetime) -> bool:
-    parts = expr.split()
-    if len(parts) != 5:
-        return False
-
-    minute, hour, dom, month, dow = parts
-
-    def match(token: str, value: int) -> bool:
-        if token == "*":
-            return True
-        if token.startswith("*/"):
-            try:
-                step = int(token[2:])
-                return step > 0 and value % step == 0
-            except ValueError:
-                return False
-        if "," in token:
-            return any(match(t.strip(), value) for t in token.split(","))
-        try:
-            return int(token) == value
-        except ValueError:
-            return False
-
-    return (
-        match(minute, now.minute)
-        and match(hour, now.hour)
-        and match(dom, now.day)
-        and match(month, now.month)
-        and match(dow, now.weekday())
-    )
 
 
 class Command(BaseCommand):
@@ -69,7 +39,7 @@ class Command(BaseCommand):
         schedules = ExportSchedule.objects.filter(enabled=True).order_by("id")
         executed = 0
         for schedule in schedules:
-            if due_only and not _cron_matches(schedule.cron_expr.strip(), now):
+            if due_only and not cron_matches(schedule.cron_expr.strip(), now):
                 continue
             self._run_schedule(schedule, now)
             executed += 1
