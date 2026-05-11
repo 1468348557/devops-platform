@@ -543,7 +543,7 @@ def schedule_list_api(request):
             "cron_expr": s.cron_expr,
             "source_type": s.source_type,
             "days_back": s.days_back,
-            "last_run_at": s.last_run_at.isoformat() if s.last_run_at else "",
+            "last_run_at": timezone.localtime(s.last_run_at).isoformat() if s.last_run_at else "",
             "created_by": s.created_by.username,
         }
         for s in schedules

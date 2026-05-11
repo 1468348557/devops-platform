@@ -380,7 +380,7 @@ def _item_to_dict(item: ReleaseItem, user) -> dict:
         "deploy_status": item.deploy_status,
         "rel_test_status": item.rel_test_status,
         "branch_created": item.branch_created,
-        "branch_created_at": item.branch_created_at.isoformat() if item.branch_created_at else "",
+        "branch_created_at": timezone.localtime(item.branch_created_at).isoformat() if item.branch_created_at else "",
         "branch_create_error": item.branch_create_error,
         "developer": item.developer.username,
         "editable": editable,
