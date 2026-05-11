@@ -32,4 +32,10 @@ urlpatterns = [
         views.sql_request_execution_detail_api,
         name="sql_request_execution_detail_api",
     ),
+    path("api/request/delete/", views.sql_request_delete_api, name="sql_request_delete_api"),
+    path(
+        "api/request/batch-delete/",
+        views.sql_request_batch_delete_api,
+        name="sql_request_batch_delete_api",
+    ),
 ]

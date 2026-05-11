@@ -74,6 +74,10 @@
   .sql-link:hover { text-decoration: underline; }
   .btn-text { border: 0; background: transparent; color: #1f75cb; cursor: pointer; padding: 0; font-size: 12px; }
   .btn-text:hover { text-decoration: underline; }
+  .btn-danger { background: #dc2626; color: #fff; border: 1px solid #dc2626; border-radius: 6px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
+  .btn-danger:hover { background: #b91c1c; }
+  .btn-delete-record { background: transparent; color: #dc2626; border: 1px solid #dc2626; border-radius: 4px; padding: 2px 8px; font-size: 12px; cursor: pointer; margin-top: 2px; }
+  .btn-delete-record:hover { background: #fef2f2; }
   .col-id { width: 5%; }
   .col-release-date { width: 8%; }
   .col-selected-sql { width: 28%; }
@@ -468,6 +472,7 @@
     {% if can_repo_sync %}
       <button id="btn-sync-repo" class="btn btn-secondary" type="button">同步最新仓库</button>
     {% endif %}
+    <button id="btn-batch-delete" class="btn btn-danger" type="button">按当前筛选批量删除</button>
     <span id="tip" class="muted">默认展示前后30天申请记录；仓库每10分钟自动同步一次</span>
   </div>
 
@@ -584,27 +589,26 @@
             </div>
           </td>
           <td class="action-cell">
+            <div class="action-stack">
             {% if row.status == "pending" and can_approve %}
-              <div class="action-stack">
-                <button class="btn-op primary btn-approve" data-id="{{ row.id }}" type="button">审批并执行</button>
-                <button class="btn-op btn-reject" data-id="{{ row.id }}" type="button">拒绝</button>
-              </div>
+              <button class="btn-op primary btn-approve" data-id="{{ row.id }}" type="button">审批并执行</button>
+              <button class="btn-op btn-reject" data-id="{{ row.id }}" type="button">拒绝</button>
             {% elif can_apply and row.status == "pending" and row.requested_by_id == current_user_id %}
-              <div class="action-stack">
-                <button class="btn-op warn btn-withdraw" data-id="{{ row.id }}" type="button">撤回申请</button>
-              </div>
+              <button class="btn-op warn btn-withdraw" data-id="{{ row.id }}" type="button">撤回申请</button>
             {% elif can_apply and row.requested_by_id == current_user_id and row.status == "failed" or can_apply and row.requested_by_id == current_user_id and row.status == "success" %}
-              <div class="action-stack">
-                <button class="btn-op primary btn-resubmit"
-                        data-id="{{ row.id }}"
-                        data-release-date="{{ row.release_date }}"
-                        data-folder-relative="{{ row.folder_relative }}"
-                        data-file-names='{{ row.selected_file_basenames_json|safe }}'
-                        type="button">重新提交</button>
-              </div>
+              <button class="btn-op primary btn-resubmit"
+                      data-id="{{ row.id }}"
+                      data-release-date="{{ row.release_date }}"
+                      data-folder-relative="{{ row.folder_relative }}"
+                      data-file-names='{{ row.selected_file_basenames_json|safe }}'
+                      type="button">重新提交</button>
             {% else %}
               <span class="muted">-</span>
             {% endif %}
+            {% if can_delete_any or row.requested_by_id == current_user_id %}
+              <button class="btn-op btn-delete-record" data-id="{{ row.id }}" type="button">删除</button>
+            {% endif %}
+            </div>
           </td>
         </tr>
       {% empty %}
@@ -1467,6 +1471,48 @@
       }
     });
   });
+
+  // ---- 删除记录 ----
+  document.querySelectorAll(".btn-delete-record").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm(`确认删除 SQL 执行记录 #${btn.dataset.id}？此操作不可撤销。`)) return;
+      try {
+        btn.disabled = true;
+        await postForm("/sql-execute/api/request/delete/", { request_id: btn.dataset.id });
+        window.location.reload();
+      } catch (e) {
+        tipEl.textContent = `删除失败：${e.error || "未知错误"}`;
+        btn.disabled = false;
+      }
+    });
+  });
+
+  document.getElementById("btn-batch-delete")?.addEventListener("click", async () => {
+    // 读取当前页面的筛选参数
+    const params = new URLSearchParams(window.location.search);
+    const payload = {};
+    for (const key of ["start_date", "end_date", "release_date", "status", "applicant", "folder"]) {
+      const v = params.get(key);
+      if (v !== null && v !== "") payload[key] = v;
+    }
+    if (Object.keys(payload).length === 0) {
+      if (!confirm("当前无任何筛选条件，将删除全部 SQL 执行记录（受数据范围限制）。确认继续？")) return;
+    } else {
+      if (!confirm(`确认删除当前筛选条件下的所有 SQL 执行记录？此操作不可撤销。`)) return;
+    }
+    try {
+      const btn = document.getElementById("btn-batch-delete");
+      if (btn) btn.disabled = true;
+      const data = await postForm("/sql-execute/api/request/batch-delete/", payload);
+      tipEl.textContent = `已删除 ${data.deleted} 条记录`;
+      window.location.reload();
+    } catch (e) {
+      tipEl.textContent = `批量删除失败：${e.error || "未知错误"}`;
+      const btn = document.getElementById("btn-batch-delete");
+      if (btn) btn.disabled = false;
+    }
+  });
+  // ---- 删除记录 end ----
 
   // ---- 重新提交 ----
   async function handleResubmit(btn) {

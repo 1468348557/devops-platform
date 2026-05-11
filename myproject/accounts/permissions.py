@@ -40,6 +40,7 @@ ACTION_FIELD_MAP = {
     "sql_request_approve": "action_sql_request_approve",
     "sql_request_auto_approve": "action_sql_request_auto_approve",
     "sql_request_edit_others": "action_sql_request_edit_others",
+    "sql_request_delete": "action_sql_request_delete",
 }
 
 DATA_SCOPE_FIELD_MAP = {
