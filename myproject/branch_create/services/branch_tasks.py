@@ -106,6 +106,7 @@ def _release_tasks(filters: TaskQueryFilters):
     )
     if not filters.include_created:
         qs = qs.filter(branch_created=False)
+    qs = qs.exclude(sql_only_release=True)
     if filters.release_flow_name:
         qs = qs.filter(flow_name__icontains=filters.release_flow_name.strip())
     if filters.applicant_name:

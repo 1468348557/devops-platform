@@ -319,7 +319,7 @@ open ──→ closed ──→ executed
 按 `source_type` 分别查询：
 
 - **HOBO**：查询 `HoboRequirementLedger` 中 `applied_date` 在日期范围、`branch_created=False` 的记录
-- **Release**：查询 `ReleaseItem` 中 `batch.status=OPEN`、`batch.release_date` 在日期范围、`branch_created=False` 的记录
+- **Release**：查询 `ReleaseItem` 中 `batch.status=OPEN`、`batch.release_date` 在日期范围、`branch_created=False` 的记录，**排除 `sql_only_release=True`（仅SQL上线无需建分支）**
 - **Both**：合并两者
 
 日期范围算法（`_resolve_date_range`）：
