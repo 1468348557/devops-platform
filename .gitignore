@@ -22,6 +22,7 @@ test.sqlite3
 *.sqlite3
 media/
 staticfiles/
+.runtime/
 
 # Environment files
 .env
@@ -51,3 +52,7 @@ offline-deploy/compose/myproject/test.sqlite3
 # Export files
 *.xls
 export-schedule-*.json
+
+# Session artifacts
+.claude/
+.hermes/
