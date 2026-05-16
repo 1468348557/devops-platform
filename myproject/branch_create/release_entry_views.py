@@ -172,6 +172,8 @@ def _release_entry_xls_bytes(batch: ReleaseBatch, items: list[ReleaseItem]) -> b
         "流程定义名称",
         "实施单元编号",
         "备注",
+        "是否为bug修复",
+        "bug修复汇报人",
         "需要事件平台",
         "需要任务池",
         "需要BPMP",
@@ -226,6 +228,8 @@ def _release_entry_xls_bytes(batch: ReleaseBatch, items: list[ReleaseItem]) -> b
             item.flow_definition_name,
             item.implementation_unit_no,
             item.remark,
+            _tri_state_sheet_bool(item.is_bug_fix),
+            item.bug_reporter,
             _tri_state_sheet_bool(item.need_event_platform),
             _tri_state_sheet_bool(item.need_task_pool),
             _tri_state_sheet_bool(item.need_bpmp),
@@ -367,6 +371,8 @@ def _item_to_dict(item: ReleaseItem, user) -> dict:
         "flow_definition_name": item.flow_definition_name,
         "implementation_unit_no": item.implementation_unit_no,
         "remark": item.remark,
+        "is_bug_fix": item.is_bug_fix,
+        "bug_reporter": item.bug_reporter,
         "need_event_platform": item.need_event_platform,
         "need_task_pool": item.need_task_pool,
         "need_bpmp": item.need_bpmp,
@@ -402,6 +408,8 @@ _QUOTE_LAST_ITEM_KEYS = (
     "flow_definition_name",
     "implementation_unit_no",
     "remark",
+    "is_bug_fix",
+    "bug_reporter",
     "need_param_release",
     "param_confirmed",
     "need_menu",
@@ -456,6 +464,7 @@ def _apply_item_fields(
             "need_trade_tuning",
             "need_release_verify",
             "need_config_release",
+            "is_bug_fix",
         )
         for field in bool_fields:
             if field not in editable_fields:
@@ -475,6 +484,10 @@ def _apply_item_fields(
         remark = request.POST.get("remark")
         if remark is not None and "remark" in editable_fields:
             item.remark = remark.strip()
+
+        bug_reporter = request.POST.get("bug_reporter")
+        if bug_reporter is not None and "bug_reporter" in editable_fields:
+            item.bug_reporter = bug_reporter.strip()
 
         rel_test_status = request.POST.get("rel_test_status")
         if rel_test_status is not None and "rel_test_status" in editable_fields:
@@ -997,5 +1010,55 @@ def release_entry_batch_delete(request):
         {
             "success": True,
             "message": f"已删除批次 {release_date} / {release_branch}",
+        }
+    )
+
+
+_ALLOWED_STATUS_TRANSITIONS = {
+    ReleaseBatch.Status.OPEN: {ReleaseBatch.Status.CLOSED},
+    ReleaseBatch.Status.CLOSED: {ReleaseBatch.Status.OPEN, ReleaseBatch.Status.EXECUTED},
+}
+
+
+@login_required
+@require_http_methods(["POST"])
+def release_entry_batch_update_status(request):
+    admin_check = _admin_required_json(request)
+    if admin_check:
+        return admin_check
+
+    batch_id = (request.POST.get("batch_id") or "").strip()
+    new_status = (request.POST.get("new_status") or "").strip()
+
+    if not batch_id:
+        return JsonResponse({"success": False, "error": "batch_id 必填"}, status=400)
+    valid_statuses = {c.value for c in ReleaseBatch.Status}
+    if new_status not in valid_statuses:
+        return JsonResponse({"success": False, "error": f"new_status 非法，仅支持：{', '.join(sorted(valid_statuses))}"}, status=400)
+
+    try:
+        batch = ReleaseBatch.objects.get(pk=batch_id)
+    except ReleaseBatch.DoesNotExist:
+        return JsonResponse({"success": False, "error": "批次不存在"}, status=404)
+
+    allowed = _ALLOWED_STATUS_TRANSITIONS.get(batch.status, set())
+    if new_status not in allowed:
+        return JsonResponse(
+            {"success": False, "error": f"不允许从 {batch.status} 变更为 {new_status}"},
+            status=400,
+        )
+
+    batch.status = new_status
+    batch.save(update_fields=["status", "updated_at"])
+    return JsonResponse(
+        {
+            "success": True,
+            "batch": {
+                "id": batch.id,
+                "release_date": str(batch.release_date),
+                "release_type": batch.release_type,
+                "release_branch": batch.release_branch,
+                "status": batch.status,
+            },
         }
     )

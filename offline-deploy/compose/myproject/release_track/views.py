@@ -545,7 +545,7 @@ def _run_to_dict(run: ReleaseTrackRun) -> dict:
         "approval_status": run.approval_status,
         "approval_url": run.approval_url,
         "approved_by": run.approved_by.username if run.approved_by_id else "",
-        "approved_at": run.approved_at.isoformat() if run.approved_at else "",
+        "approved_at": timezone.localtime(run.approved_at).isoformat() if run.approved_at else "",
         "batch_id": run.batch_id,
         "tag_name": run.tag_name,
         "merge_message": run.merge_message,
@@ -559,8 +559,8 @@ def _run_to_dict(run: ReleaseTrackRun) -> dict:
         "failed": run.failed_count,
         "tip": run.tip,
         "error": run.error,
-        "started_at": run.started_at.isoformat() if run.started_at else "",
-        "finished_at": run.finished_at.isoformat() if run.finished_at else "",
+        "started_at": timezone.localtime(run.started_at).isoformat() if run.started_at else "",
+        "finished_at": timezone.localtime(run.finished_at).isoformat() if run.finished_at else "",
         "rows": rows,
     }
 

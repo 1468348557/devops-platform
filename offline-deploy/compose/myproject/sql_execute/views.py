@@ -1053,6 +1053,7 @@ def sql_execute_page(request):
             "can_approve": _can_approve(request.user),
             "can_repo_sync": _can_repo_sync(request.user),
             "can_auto_approve": _can_auto_approve(request.user),
+            "can_delete_any": can_do_action(request.user, "sql_request_delete"),
             "current_user_id": request.user.id,
             "release_date_options": release_date_options,
             "apply_default_release_date": apply_default_release_date,
@@ -1431,6 +1432,85 @@ def sql_request_action_api(request):
         lambda: _spawn_detached_command("run_sql_execute_request", str(request_pk))
     )
     return JsonResponse({"success": True, "status": "running", "request_id": request_pk})
+
+
+def _can_delete_request(user, row: SqlExecutionRequest) -> bool:
+    """用户是否可删除单条 SQL 执行记录"""
+    if not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    if row.requested_by_id == user.id:
+        return True
+    return can_do_action(user, "sql_request_delete")
+
+
+@login_required
+@require_http_methods(["POST"])
+def sql_request_delete_api(request):
+    request_id_raw = (request.POST.get("request_id") or "").strip()
+    if not request_id_raw.isdigit():
+        return JsonResponse({"success": False, "error": "request_id 非法"}, status=400)
+
+    row = SqlExecutionRequest.objects.filter(pk=int(request_id_raw)).first()
+    if not row:
+        return JsonResponse({"success": False, "error": "记录不存在"}, status=404)
+    if not _can_delete_request(request.user, row):
+        return JsonResponse({"success": False, "error": "无删除权限"}, status=403)
+
+    row.delete()
+    return JsonResponse({"success": True, "deleted_id": int(request_id_raw)})
+
+
+@login_required
+@require_http_methods(["POST"])
+def sql_request_batch_delete_api(request):
+    """按当前筛选条件批量删除 SQL 执行记录，权限和数据范围与列表页一致"""
+    from datetime import timedelta
+    from django.utils.dateparse import parse_date
+
+    today = timezone.localdate()
+    default_start = today - timedelta(days=30)
+    default_end = today + timedelta(days=30)
+
+    start_date_raw = (request.POST.get("start_date") or str(default_start)).strip()
+    end_date_raw = (request.POST.get("end_date") or str(default_end)).strip()
+    applicant_raw = (request.POST.get("applicant") or "").strip()
+    folder_raw = (request.POST.get("folder") or "").strip()
+    release_date_raw = (request.POST.get("release_date") or "").strip()
+    status_raw = (request.POST.get("status") or "").strip().lower()
+
+    allowed_status_filters = {
+        SqlExecutionRequest.Status.PENDING,
+        SqlExecutionRequest.Status.SUCCESS,
+        SqlExecutionRequest.Status.FAILED,
+    }
+    status_filter = status_raw if status_raw in allowed_status_filters else ""
+    start_date = parse_date(start_date_raw) or default_start
+    end_date = parse_date(end_date_raw) or default_end
+
+    qs = SqlExecutionRequest.objects.all()
+    if not can_do_action(request.user, "sql_request_edit_others"):
+        qs = apply_data_scope(
+            qs, request.user, scope_key="sql_requests", owner_field="requested_by"
+        )
+
+    qs = qs.filter(release_date__gte=start_date, release_date__lte=end_date)
+    if release_date_raw:
+        qs = qs.filter(release_date=release_date_raw)
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    if applicant_raw:
+        qs = qs.filter(requested_by__username__icontains=applicant_raw)
+    if folder_raw:
+        qs = qs.filter(folder_path__icontains=folder_raw)
+
+    count = qs.count()
+    if count == 0:
+        return JsonResponse({"success": True, "deleted": 0, "message": "当前筛选条件下无匹配记录"})
+
+    qs.delete()
+    return JsonResponse({"success": True, "deleted": count})
 
 
 @login_required

@@ -6,6 +6,8 @@ from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 
+from django.utils import timezone
+
 from accounts.permissions import can_access_menu, can_do_action
 from branch_create.models import ExportSchedule
 
@@ -54,7 +56,7 @@ def export_schedule_list_api(request):
             "enabled": s.enabled,
             "cron_expr": s.cron_expr,
             "export_type": s.export_type,
-            "last_run_at": s.last_run_at.isoformat() if s.last_run_at else "",
+            "last_run_at": timezone.localtime(s.last_run_at).isoformat() if s.last_run_at else "",
             "created_by": s.created_by.username,
         }
         for s in schedules

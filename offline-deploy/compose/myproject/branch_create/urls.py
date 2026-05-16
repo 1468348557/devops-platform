@@ -26,6 +26,7 @@ urlpatterns = [
     path("release-entry/api/batches/", release_entry_views.release_entry_batch_list, name="release_entry_batch_list"),
     path("release-entry/api/batches/create/", release_entry_views.release_entry_batch_create, name="release_entry_batch_create"),
     path("release-entry/api/batches/delete/", release_entry_views.release_entry_batch_delete, name="release_entry_batch_delete"),
+    path("release-entry/api/batches/update-status/", release_entry_views.release_entry_batch_update_status, name="release_entry_batch_update_status"),
     path("release-entry/api/items/", release_entry_views.release_entry_item_list, name="release_entry_item_list"),
     path("release-entry/export.xls", release_entry_views.release_entry_export_xls, name="release_entry_export_xls"),
     path("release-entry/api/items/last-by-project/", release_entry_views.release_entry_item_last_by_project, name="release_entry_item_last_by_project"),

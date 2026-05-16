@@ -22,6 +22,7 @@ from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_http_methods
 
 from accounts.permissions import can_access_menu, can_do_action
+from .cron_utils import cron_matches
 from .config_parser import parse_branch_config
 from .models import (
     BranchCreateSchedule,
@@ -40,35 +41,6 @@ from .services.branch_tasks import (
 )
 
 
-def _cron_matches(expr: str, now) -> bool:
-    parts = str(expr or "").split()
-    if len(parts) != 5:
-        return False
-    minute, hour, dom, month, dow = parts
-
-    def match(token: str, value: int) -> bool:
-        if token == "*":
-            return True
-        if token.startswith("*/"):
-            try:
-                step = int(token[2:])
-                return step > 0 and value % step == 0
-            except ValueError:
-                return False
-        if "," in token:
-            return any(match(t.strip(), value) for t in token.split(","))
-        try:
-            return int(token) == value
-        except ValueError:
-            return False
-
-    return (
-        match(minute, now.minute)
-        and match(hour, now.hour)
-        and match(dom, now.day)
-        and match(month, now.month)
-        and match(dow, now.weekday())
-    )
 
 
 def _parse_days_back(raw, *, default=30, max_abs=3660):
@@ -543,7 +515,7 @@ def schedule_list_api(request):
             "cron_expr": s.cron_expr,
             "source_type": s.source_type,
             "days_back": s.days_back,
-            "last_run_at": s.last_run_at.isoformat() if s.last_run_at else "",
+            "last_run_at": timezone.localtime(s.last_run_at).isoformat() if s.last_run_at else "",
             "created_by": s.created_by.username,
         }
         for s in schedules
@@ -635,7 +607,7 @@ def schedule_run_due_api(request):
     schedules = BranchCreateSchedule.objects.filter(enabled=True).order_by("id")
     executed = 0
     for schedule in schedules:
-        if not _cron_matches(schedule.cron_expr.strip(), now):
+        if not cron_matches(schedule.cron_expr.strip(), now):
             continue
         last_run_at = schedule.last_run_at
         if last_run_at:

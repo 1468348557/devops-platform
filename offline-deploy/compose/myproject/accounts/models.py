@@ -222,6 +222,7 @@ class RolePermissionPolicy(models.Model):
     action_sql_request_approve = models.BooleanField(default=False)
     action_sql_request_auto_approve = models.BooleanField(default=False)
     action_sql_request_edit_others = models.BooleanField(default=False)
+    action_sql_request_delete = models.BooleanField(default=False, verbose_name="删除SQL执行记录")
     release_entry_editable_fields = models.JSONField(default=list, blank=True)
 
     # 数据范围（仅本人 / 全部）
@@ -288,6 +289,7 @@ class RolePermissionPolicy(models.Model):
                 "action_sql_request_approve": False,
                 "action_sql_request_auto_approve": True,
                 "action_sql_request_edit_others": False,
+                "action_sql_request_delete": True,
                 "release_entry_editable_fields": DEFAULT_RELEASE_ENTRY_FIELDS_BY_ROLE_KEY.get("ops", []),
                 "data_scope_release_entry": cls.DataScope.ALL,
                 "data_scope_hobo_ledger": cls.DataScope.ALL,
@@ -326,6 +328,7 @@ class RolePermissionPolicy(models.Model):
             "action_sql_request_approve": False,
             "action_sql_request_auto_approve": False,
             "action_sql_request_edit_others": False,
+            "action_sql_request_delete": False,
             "release_entry_editable_fields": DEFAULT_RELEASE_ENTRY_FIELDS_BY_ROLE_KEY.get(
                 "developer", []
             ),

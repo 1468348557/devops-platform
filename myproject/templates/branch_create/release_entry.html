@@ -454,6 +454,10 @@
       <button id="btn-refresh" type="button" class="btn btn-secondary">刷新</button>
       {% if can_manage_batch %}
       <button id="btn-delete-batch" type="button" class="btn btn-secondary">删除当前批次</button>
+      <button id="btn-close-batch" type="button" class="btn btn-secondary" style="display:none;">关闭填写</button>
+      <button id="btn-reopen-batch" type="button" class="btn btn-secondary" style="display:none;">重新开放</button>
+      <button id="btn-execute-batch" type="button" class="btn btn-secondary" style="display:none;">标记已执行</button>
+      <span id="executed-label" style="display:none; color:#6b7280; font-size:13px;">当前批次已执行</span>
       {% endif %}
       <span id="tip" class="muted"></span>
     </div>
@@ -511,6 +515,16 @@
           </label>
           <label class="field">备注（非必填）
             <input id="remark" class="form-input" placeholder="选填，最多 255 字">
+          </label>
+          <label class="field">是否为bug修复
+            <select id="is-bug-fix" class="form-input">
+              <option value="">未填写</option>
+              <option value="1">是</option>
+              <option value="0">否</option>
+            </select>
+          </label>
+          <label class="field">bug修复汇报人
+            <input id="bug-reporter" class="form-input" maxlength="64" placeholder="选填，若为bug修复则必填">
           </label>
         </div>
       </div>
@@ -705,7 +719,7 @@
   const currentUsername = "{{ request.user.username|escapejs }}";
   const fields = [
     "project-id","requirement-branch","release-branch","flow-name","biz-category","tech-owner","biz-owner","common-component-branch","flow-definition-name",
-    "implementation-unit-no","remark",
+    "implementation-unit-no","remark","is-bug-fix","bug-reporter",
     "need-param-release","param-confirmed","need-menu","menu-added","need-difs","need-flowchart","flowchart-checked",
     "need-event-platform","need-task-pool","need-bpmp","need-image","need-esf","need-trade-tuning","need-release-verify",
     "need-config-release",
@@ -721,6 +735,7 @@
     need_release_verify: "是否涉及投产验证",
     need_config_release: "是否涉及配置文件投产",
     requirement_branch: "需求分支",
+    is_bug_fix: "是否为bug修复", bug_reporter: "bug修复汇报人",
     rel_test_status: "REL测试状态"
   };
 
@@ -785,6 +800,8 @@
     { id: "flow_definition_name", label: "流程定义名称", render: (item) => escapeHtml(item.flow_definition_name || "-") },
     { id: "implementation_unit_no", label: "实施单元编号", render: (item) => escapeHtml(item.implementation_unit_no || "-") },
     { id: "remark", label: "备注", render: (item) => escapeHtml(item.remark || "-") },
+    { id: "is_bug_fix", label: "是否bug修复", render: (item) => escapeHtml(normalizeBool(item.is_bug_fix) || "-") },
+    { id: "bug_reporter", label: "bug修复汇报人", render: (item) => escapeHtml(item.bug_reporter || "-") },
     { id: "need_param_release", label: "参数投产", render: (item) => escapeHtml(normalizeBool(item.need_param_release) || "-") },
     { id: "param_confirmed", label: "业务参数确认", render: (item) => escapeHtml(normalizeBool(item.param_confirmed) || "-") },
     { id: "need_menu", label: "涉及菜单", render: (item) => escapeHtml(normalizeBool(item.need_menu) || "-") },
@@ -1124,6 +1141,8 @@
     el("flow-definition-name").value = item.flow_definition_name || "";
     el("implementation-unit-no").value = item.implementation_unit_no || "";
     el("remark").value = item.remark || "";
+    el("is-bug-fix").value = normalizeBool(item.is_bug_fix);
+    el("bug-reporter").value = item.bug_reporter || "";
     el("need-param-release").value = normalizeBool(item.need_param_release);
     el("param-confirmed").value = normalizeBool(item.param_confirmed);
     el("need-menu").value = normalizeBool(item.need_menu);
@@ -1172,6 +1191,8 @@
     setValue("flow-definition-name", item.flow_definition_name || "");
     setValue("implementation-unit-no", item.implementation_unit_no || "");
     setValue("remark", item.remark || "");
+    setValue("is-bug-fix", normalizeBool(item.is_bug_fix));
+    setValue("bug-reporter", item.bug_reporter || "");
     setValue("need-param-release", normalizeBool(item.need_param_release));
     setValue("param-confirmed", normalizeBool(item.param_confirmed));
     setValue("need-menu", normalizeBool(item.need_menu));
@@ -1197,7 +1218,7 @@
 
     const devIds = [
       "project-id","requirement-branch","flow-name","biz-category","tech-owner","biz-owner",
-      "common-component-branch","flow-definition-name","remark","need-param-release","param-confirmed",
+      "common-component-branch","flow-definition-name","remark","is-bug-fix","bug-reporter","need-param-release","param-confirmed",
       "implementation-unit-no",
       "need-menu","menu-added","need-difs","need-flowchart","flowchart-checked","need-event-platform",
       "need-task-pool","need-bpmp","need-image","need-esf","need-trade-tuning","need-release-verify",
@@ -1350,6 +1371,8 @@
       ["流程定义名称", item.flow_definition_name],
       ["实施单元编号", item.implementation_unit_no],
       ["备注", item.remark],
+      ["是否为bug修复", normalizeBool(item.is_bug_fix)],
+      ["bug修复汇报人", item.bug_reporter],
       ["参数投产", normalizeBool(item.need_param_release)],
       ["业务参数确认", normalizeBool(item.param_confirmed)],
       ["涉及菜单", normalizeBool(item.need_menu)],
@@ -1467,6 +1490,7 @@
       fillProjectOptions();
       clearForm();
       restoreDraftFromLocal();
+      updateBatchStatusActions(currentBatch);
       await loadItems();
       if (futureOrTodayBatches.length > 0) {
         setTip("已默认选中今天及其之后最近批次");
@@ -1488,6 +1512,7 @@
     clearForm();
     restoreDraftFromLocal();
     await loadItems();
+    updateBatchStatusActions(currentBatch);
   });
 
   el("btn-refresh").addEventListener("click", loadBatches);
@@ -1614,6 +1639,53 @@
     } catch (e) {
       setTip(`删除失败：${e.error || "未知错误"}`, true);
     }
+  });
+  {% endif %}
+  function updateBatchStatusActions(batch) {
+    const closeBtn = el("btn-close-batch");
+    const reopenBtn = el("btn-reopen-batch");
+    const executeBtn = el("btn-execute-batch");
+    const executedLabel = el("executed-label");
+    if (!closeBtn || !reopenBtn || !executeBtn || !executedLabel) return;
+    closeBtn.style.display = "none";
+    reopenBtn.style.display = "none";
+    executeBtn.style.display = "none";
+    executedLabel.style.display = "none";
+    if (!batch) return;
+    if (batch.status === "open") {
+      closeBtn.style.display = "inline-flex";
+    } else if (batch.status === "closed") {
+      reopenBtn.style.display = "inline-flex";
+      executeBtn.style.display = "inline-flex";
+    } else if (batch.status === "executed") {
+      executedLabel.style.display = "inline";
+    }
+  }
+  async function doSetBatchStatus(newStatus, label) {
+    if (!currentBatch) return;
+    try {
+      await request("/branch-create/release-entry/api/batches/update-status/", "POST", {
+        batch_id: currentBatch.id,
+        new_status: newStatus,
+      });
+      setTip(`${label}成功`);
+      await loadBatches();
+    } catch (e) {
+      setTip(`${label}失败：${e.error || "未知错误"}`, true);
+    }
+  }
+  {% if can_manage_batch %}
+  el("btn-close-batch").addEventListener("click", () => {
+    if (!confirm(`确定关闭批次 ${currentBatch.release_date} / ${currentBatch.release_branch} 吗？关闭后研发将无法继续填写。`)) return;
+    doSetBatchStatus("closed", "关闭填写");
+  });
+  el("btn-reopen-batch").addEventListener("click", () => {
+    if (!confirm(`确定重新开放批次 ${currentBatch.release_date} / ${currentBatch.release_branch} 吗？`)) return;
+    doSetBatchStatus("open", "重新开放");
+  });
+  el("btn-execute-batch").addEventListener("click", () => {
+    if (!confirm(`确定将批次 ${currentBatch.release_date} / ${currentBatch.release_branch} 标记为已执行吗？`)) return;
+    doSetBatchStatus("executed", "标记已执行");
   });
   {% endif %}
   el("btn-open-form").addEventListener("click", () => {
@@ -1745,6 +1817,8 @@
       flow_definition_name: el("flow-definition-name").value,
       implementation_unit_no: el("implementation-unit-no").value,
       remark: el("remark").value,
+              is_bug_fix: denormalizeBool(el("is-bug-fix").value),
+              bug_reporter: el("bug-reporter").value,
       need_param_release: denormalizeBool(el("need-param-release").value),
       param_confirmed: denormalizeBool(el("param-confirmed").value),
       need_menu: denormalizeBool(el("need-menu").value),
