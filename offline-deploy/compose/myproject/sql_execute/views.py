@@ -1506,6 +1506,11 @@ def sql_request_batch_delete_api(request):
     start_date = parse_date(start_date_raw) or default_start
     end_date = parse_date(end_date_raw) or default_end
 
+    if not can_do_action(request.user, "sql_request_delete"):
+        return JsonResponse(
+            {"success": False, "message": "你没有批量删除的权限"}, status=403
+        )
+
     qs = SqlExecutionRequest.objects.all()
     if not can_do_action(request.user, "sql_request_edit_others"):
         qs = apply_data_scope(

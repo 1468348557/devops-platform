@@ -471,7 +471,9 @@
     {% if can_repo_sync %}
       <button id="btn-sync-repo" class="btn btn-secondary" type="button">同步最新仓库</button>
     {% endif %}
+    {% if can_delete_any %}
     <button id="btn-batch-delete" class="btn btn-danger" type="button">按当前筛选批量删除</button>
+    {% endif %}
     <span id="tip" class="muted">默认展示当前投产日期申请记录；仓库每10分钟自动同步一次</span>
   </div>
 
