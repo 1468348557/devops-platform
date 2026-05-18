@@ -1009,11 +1009,15 @@ def sql_execute_page(request):
     release_date_options = [str(value) for value in release_dates]
     apply_default_release_date = _nearest_future_release_date_str(release_dates, today)
 
-    start_date_raw = (request.GET.get("start_date") or str(default_start)).strip()
-    end_date_raw = (request.GET.get("end_date") or str(default_end)).strip()
+    start_date_raw = request.GET.get("start_date", "").strip()
+    end_date_raw = request.GET.get("end_date", "").strip()
     applicant_raw = (request.GET.get("applicant") or "").strip()
     folder_raw = (request.GET.get("folder") or "").strip()
-    release_date_raw = (request.GET.get("release_date") or "").strip()
+
+    if "release_date" in request.GET:
+        release_date_raw = request.GET.get("release_date", "").strip()
+    else:
+        release_date_raw = apply_default_release_date
     apply_selected_release_date = release_date_raw if release_date_raw else apply_default_release_date
     status_raw = (request.GET.get("status") or "").strip().lower()
     allowed_status_filters = {
@@ -1034,9 +1038,12 @@ def sql_execute_page(request):
             owner_field="requested_by",
         )
 
-    requests_qs = requests_qs.filter(release_date__gte=start_date, release_date__lte=end_date)
-    if release_date_raw:
+    if start_date_raw and end_date_raw:
+        requests_qs = requests_qs.filter(release_date__gte=start_date, release_date__lte=end_date)
+    elif release_date_raw:
         requests_qs = requests_qs.filter(release_date=release_date_raw)
+    else:
+        requests_qs = requests_qs.filter(release_date__gte=default_start, release_date__lte=default_end)
     if status_filter:
         requests_qs = requests_qs.filter(status=status_filter)
     if applicant_raw:
@@ -1044,7 +1051,13 @@ def sql_execute_page(request):
     if folder_raw:
         requests_qs = requests_qs.filter(folder_path__icontains=folder_raw)
 
-    rows = [_serialize_request(row) for row in requests_qs[:300]]
+    page = max(1, int(request.GET.get("page") or 1))
+    page_size = max(1, min(100, int(request.GET.get("page_size") or 20)))
+    total_count = requests_qs.count()
+    total_pages = max(1, (total_count + page_size - 1) // page_size)
+    page = min(page, total_pages)
+    offset = (page - 1) * page_size
+    rows = [_serialize_request(row) for row in requests_qs[offset:offset + page_size]]
     return render(
         request,
         "sql_execute/index.html",
@@ -1059,9 +1072,13 @@ def sql_execute_page(request):
             "apply_default_release_date": apply_default_release_date,
             "apply_selected_release_date": apply_selected_release_date,
             "rows": rows,
+            "total_count": total_count,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
             "filters": {
-                "start_date": str(start_date),
-                "end_date": str(end_date),
+                "start_date": start_date_raw,
+                "end_date": end_date_raw,
                 "release_date": release_date_raw,
                 "status": status_filter,
                 "applicant": applicant_raw,

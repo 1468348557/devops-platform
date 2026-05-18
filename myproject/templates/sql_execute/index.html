@@ -193,31 +193,30 @@
   .sql-g-v.is-error, .sql-g-line.is-error .sql-g-v { color: #b91c1c; }
   .sql-g-note { color: #6b7280; font-size: 11px; margin-top: 4px; }
   .status-cell, .status-header { white-space: nowrap; }
-  .sql-file-toolbar {
-    margin-top: 8px;
+  .records-pager {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
-    flex-wrap: wrap;
-    font-size: 12px;
-    color: #6b7280;
+    margin-top: 12px;
+    font-size: 13px;
+    color: #374151;
   }
-  .sql-file-toolbar-right {
+  .records-pager-left { color: #6b7280; }
+  .records-pager-right {
     display: inline-flex;
     align-items: center;
     gap: 8px;
   }
-  .sql-file-pager-btn {
+  .records-pager-btn {
     border: 1px solid #d1d5db;
     border-radius: 6px;
     background: #fff;
-    padding: 4px 8px;
+    padding: 4px 10px;
     color: #1f2937;
     cursor: pointer;
     font-size: 12px;
   }
-  .sql-file-pager-btn:disabled {
+  .records-pager-btn:disabled {
     color: #9ca3af;
     border-color: #e5e7eb;
     cursor: not-allowed;
@@ -473,7 +472,7 @@
       <button id="btn-sync-repo" class="btn btn-secondary" type="button">同步最新仓库</button>
     {% endif %}
     <button id="btn-batch-delete" class="btn btn-danger" type="button">按当前筛选批量删除</button>
-    <span id="tip" class="muted">默认展示前后30天申请记录；仓库每10分钟自动同步一次</span>
+    <span id="tip" class="muted">默认展示当前投产日期申请记录；仓库每10分钟自动同步一次</span>
   </div>
 
   {% if can_apply %}
@@ -500,21 +499,6 @@
       </label>
     </div>
     <div id="sql-file-list" class="sql-file-grid" style="margin-top:8px;"></div>
-    <div class="sql-file-toolbar">
-      <span id="sql-file-page-info">共 0 条</span>
-      <div class="sql-file-toolbar-right">
-        <label>
-          每页
-          <select id="sql-file-page-size" class="form-input" style="width:90px; display:inline-block;">
-            <option value="20" selected>20 条</option>
-            <option value="30">30 条</option>
-            <option value="50">50 条</option>
-          </select>
-        </label>
-        <button id="sql-file-prev-page" class="sql-file-pager-btn" type="button">上一页</button>
-        <button id="sql-file-next-page" class="sql-file-pager-btn" type="button">下一页</button>
-      </div>
-    </div>
     <div class="actions">
       <button id="btn-create-request" class="btn btn-primary" type="button">提交执行申请</button>
     </div>
@@ -618,6 +602,23 @@
     </table>
   </div>
 
+  <div class="records-pager">
+    <span class="records-pager-left">共 {{ total_count }} 条</span>
+    <div class="records-pager-right">
+      <label>
+        每页
+        <select id="records-page-size" class="form-input" style="width:80px; display:inline-block;">
+          <option value="20" {% if page_size == 20 %}selected{% endif %}>20 条</option>
+          <option value="50" {% if page_size == 50 %}selected{% endif %}>50 条</option>
+          <option value="100" {% if page_size == 100 %}selected{% endif %}>100 条</option>
+        </select>
+      </label>
+      <button id="records-prev-page" class="records-pager-btn" type="button" {% if page <= 1 %}disabled{% endif %}>上一页</button>
+      <span>第 {{ page }}/{{ total_pages }} 页</span>
+      <button id="records-next-page" class="records-pager-btn" type="button" {% if page >= total_pages %}disabled{% endif %}>下一页</button>
+    </div>
+  </div>
+
   <div id="exec-progress-panel" style="display:none; margin-top:14px; padding:12px; border:1px solid #e5e7eb; border-radius:8px; background:#fafafa;">
     <strong>执行进度（轮询中）</strong>
     <p id="exec-progress-tip" class="muted" style="margin:8px 0;"></p>
@@ -696,32 +697,19 @@
   const submitOrderConfirmBtn = document.getElementById("btn-submit-order-confirm");
   const orderConfirmAddSelectEl = document.getElementById("order-confirm-add-select");
   const orderConfirmAddBtn = document.getElementById("order-confirm-add-btn");
-  const sqlFilePageSizeEl = document.getElementById("sql-file-page-size");
-  const sqlFilePageInfoEl = document.getElementById("sql-file-page-info");
-  const sqlFilePrevPageBtn = document.getElementById("sql-file-prev-page");
-  const sqlFileNextPageBtn = document.getElementById("sql-file-next-page");
   const filterReleaseDateEl = document.querySelector("form.grid select[name='release_date']");
   let pendingSubmitPayload = null;
   let dragItemEl = null;
   const sqlFileState = {
     allFiles: [],
     checkedFiles: new Set(),
-    page: 1,
-    pageSize: 20,
   };
-  function renderSqlFilePage() {
+  function renderSqlFileList() {
     if (!fileListEl) return;
-    const total = sqlFileState.allFiles.length;
-    const pageSize = sqlFileState.pageSize;
-    const totalPages = Math.max(1, Math.ceil(total / pageSize));
-    if (sqlFileState.page > totalPages) sqlFileState.page = totalPages;
-    if (sqlFileState.page < 1) sqlFileState.page = 1;
-    const startIdx = (sqlFileState.page - 1) * pageSize;
-    const endIdx = Math.min(total, startIdx + pageSize);
-    const currentFiles = sqlFileState.allFiles.slice(startIdx, endIdx);
+    const allFiles = sqlFileState.allFiles;
 
     fileListEl.innerHTML = "";
-    currentFiles.forEach((name) => {
+    allFiles.forEach((name) => {
       const row = document.createElement("div");
       row.className = "sql-file-row";
       const isChecked = sqlFileState.checkedFiles.has(name);
@@ -736,15 +724,9 @@
       fileListEl.appendChild(row);
     });
 
-    if (total === 0) {
+    if (allFiles.length === 0) {
       fileListEl.innerHTML = "<span class='muted'>目录下暂无 .sql 文件</span>";
     }
-
-    if (sqlFilePageInfoEl) {
-      sqlFilePageInfoEl.textContent = `共 ${total} 条，当前第 ${sqlFileState.page}/${totalPages} 页`;
-    }
-    if (sqlFilePrevPageBtn) sqlFilePrevPageBtn.disabled = sqlFileState.page <= 1;
-    if (sqlFileNextPageBtn) sqlFileNextPageBtn.disabled = sqlFileState.page >= totalPages;
   }
 
 
@@ -820,8 +802,7 @@
       folderSelect.appendChild(opt);
       sqlFileState.allFiles = [];
       sqlFileState.checkedFiles = new Set();
-      sqlFileState.page = 1;
-      renderSqlFilePage();
+renderSqlFileList();
       if (fileListEl) fileListEl.innerHTML = "<span class='muted'>请先选择申请日期</span>";
       return;
     }
@@ -839,8 +820,7 @@
       folderSelect.appendChild(opt);
       sqlFileState.allFiles = [];
       sqlFileState.checkedFiles = new Set();
-      sqlFileState.page = 1;
-      renderSqlFilePage();
+renderSqlFileList();
       if (fileListEl) fileListEl.innerHTML = "<span class='muted'>当前申请日期无可用目录</span>";
       return;
     }
@@ -866,8 +846,7 @@
     if (!resp.ok || !data.success) throw data;
     sqlFileState.allFiles = data.files || [];
     sqlFileState.checkedFiles = new Set(sqlFileState.allFiles);
-    sqlFileState.page = 1;
-    renderSqlFilePage();
+    renderSqlFileList();
   }
 
   function escapeHtml(str) {
@@ -1383,24 +1362,29 @@
     }
   });
 
-  sqlFilePageSizeEl?.addEventListener("change", () => {
-    const nextSize = Number(sqlFilePageSizeEl.value) || 20;
-    sqlFileState.pageSize = nextSize;
-    sqlFileState.page = 1;
-    renderSqlFilePage();
-  });
+  /* --- records table pagination --- */
+  const recordsPageSizeEl = document.getElementById("records-page-size");
+  const recordsPrevBtn = document.getElementById("records-prev-page");
+  const recordsNextBtn = document.getElementById("records-next-page");
+  const currentPage = {{ page }};
 
-  sqlFilePrevPageBtn?.addEventListener("click", () => {
-    if (sqlFileState.page <= 1) return;
-    sqlFileState.page -= 1;
-    renderSqlFilePage();
-  });
+  function goToPage(p, size) {
+    const params = new URLSearchParams(window.location.search);
+    params.set("page", p);
+    params.set("page_size", size);
+    window.location.search = params.toString();
+  }
 
-  sqlFileNextPageBtn?.addEventListener("click", () => {
-    const totalPages = Math.max(1, Math.ceil(sqlFileState.allFiles.length / sqlFileState.pageSize));
-    if (sqlFileState.page >= totalPages) return;
-    sqlFileState.page += 1;
-    renderSqlFilePage();
+  recordsPageSizeEl?.addEventListener("change", () => {
+    goToPage(1, Number(recordsPageSizeEl.value) || 20);
+  });
+  recordsPrevBtn?.addEventListener("click", () => {
+    if (currentPage <= 1) return;
+    goToPage(currentPage - 1, Number(recordsPageSizeEl?.value) || 20);
+  });
+  recordsNextBtn?.addEventListener("click", () => {
+    if (currentPage >= {{ total_pages }}) return;
+    goToPage(currentPage + 1, Number(recordsPageSizeEl?.value) || 20);
   });
 
   fileListEl?.addEventListener("click", async (evt) => {

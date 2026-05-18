@@ -42,7 +42,7 @@ class SqlExecutionRequest(models.Model):
 
     class Meta:
         db_table = "sql_execution_request"
-        ordering = ["-created_at", "-id"]
+        ordering = ["-release_date", "-id"]
 
     def __str__(self) -> str:
         return f"{self.folder_path} / {self.get_status_display()}"
