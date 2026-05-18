@@ -438,7 +438,7 @@ class ExportSchedule(models.Model):
         HOBO_LEDGER = "hobo_ledger", "HOBO需求登记台账"
         RELEASE_ENTRY = "release_entry", "投产征集"
 
-    name = models.CharField(max_length=64, unique=True)
+    name = models.CharField(max_length=64)
     enabled = models.BooleanField(default=True)
     cron_expr = models.CharField(max_length=64)
     export_type = models.CharField(
@@ -458,6 +458,9 @@ class ExportSchedule(models.Model):
     class Meta:
         db_table = "export_schedule"
         ordering = ["-updated_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(fields=["name", "export_type"], name="unique_name_per_export_type"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.name} ({self.get_export_type_display()})"

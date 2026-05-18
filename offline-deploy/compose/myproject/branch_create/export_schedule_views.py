@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.contrib.auth.decorators import login_required
 from django.core.management import call_command
+from django.db import IntegrityError
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
@@ -91,7 +92,10 @@ def export_schedule_save_api(request):
     schedule.cron_expr = cron_expr
     schedule.export_type = export_type
     schedule.enabled = enabled
-    schedule.save()
+    try:
+        schedule.save()
+    except IntegrityError:
+        return JsonResponse({"success": False, "error": "该导出类型下已存在同名任务，请修改名称"}, status=409)
     return JsonResponse({"success": True, "id": schedule.id})
 
 

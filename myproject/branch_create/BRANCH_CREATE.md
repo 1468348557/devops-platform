@@ -454,7 +454,7 @@ plan → precheck → (确认) → mr → approval → verify_mr → (确认) �
 
 38 列，包括：批次信息、工程信息、分支信息、所有布尔检查项（是/否/未填写）、行状态、分支创建状态、填写人等。
 
-导出文件名：`release_entry_{date}_{branch}.xls`
+导出文件名：`release_entry_{date}_{branch}.xlsx`
 
 ### HOBO 台账导出
 
@@ -462,7 +462,7 @@ plan → precheck → (确认) → mr → approval → verify_mr → (确认) �
 
 19 列，包括：需求类型、分支名称、工程、描述、申请人、日期、依赖分支、投产日期、建分支状态等。
 
-导出文件名：`hobo_requirement_ledger_{date}.xls`
+导出文件名：`hobo_requirement_ledger_{date}.xlsx`
 
 ---
 
