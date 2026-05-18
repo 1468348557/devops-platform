@@ -541,16 +541,6 @@
           <label class="field">备注（非必填）
             <input id="remark" class="form-input" placeholder="选填，最多 255 字">
           </label>
-          <label class="field">是否为bug修复
-            <select id="is-bug-fix" class="form-input">
-              <option value="">未填写</option>
-              <option value="1">是</option>
-              <option value="0">否</option>
-            </select>
-          </label>
-          <label class="field">bug修复汇报人
-            <input id="bug-reporter" class="form-input" maxlength="64" placeholder="选填，若为bug修复则必填">
-          </label>
         </div>
       </div>
 
@@ -601,6 +591,16 @@
           </label>
           <label class="field">涉及配置文件投产
             <select id="need-config-release" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
+          </label>
+          <label class="field">是否为bug修复
+            <select id="is-bug-fix" class="form-input">
+              <option value="">未填写</option>
+              <option value="是">是</option>
+              <option value="否">否</option>
+            </select>
+          </label>
+          <label class="field">bug修复汇报人
+            <input id="bug-reporter" class="form-input" maxlength="64" placeholder="若为bug修复则必填">
           </label>
           <label class="field">REL 测试状态
             <select id="rel-test-status" class="form-input">
