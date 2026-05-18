@@ -106,8 +106,8 @@ def _parse_optional_date(raw: Optional[str]):
     return parse_date(s)
 
 
-def _hobo_ledger_xls_bytes(items: list[HoboRequirementLedger]) -> bytes:
-    import xlwt
+def _hobo_ledger_xlsx_bytes(items: list[HoboRequirementLedger]) -> bytes:
+    from openpyxl import Workbook
 
     headers = [
         "需求类型",
@@ -131,18 +131,17 @@ def _hobo_ledger_xls_bytes(items: list[HoboRequirementLedger]) -> bytes:
         "登记人账号",
     ]
 
-    book = xlwt.Workbook(encoding="utf-8")
-    sheet = book.add_sheet("HOBO需求登记")
+    wb = Workbook()
+    sheet = wb.active
+    sheet.title = "HOBO需求登记"
+    sheet.append(headers)
 
-    for col, title in enumerate(headers):
-        sheet.write(0, col, title)
-
-    for row_idx, entry in enumerate(items, start=1):
+    for entry in items:
         proj_name = entry.project.project_name or entry.project.project_code
         branch_by = ""
         if entry.branch_created_by_id:
             branch_by = entry.branch_created_by.username
-        values = [
+        sheet.append([
             entry.requirement_type,
             entry.requirement_branch,
             entry.project.project_code,
@@ -162,12 +161,10 @@ def _hobo_ledger_xls_bytes(items: list[HoboRequirementLedger]) -> bytes:
             branch_by,
             entry.branch_create_error or "",
             entry.created_by.username,
-        ]
-        for col_idx, cell in enumerate(values):
-            sheet.write(row_idx, col_idx, cell)
+        ])
 
     buf = io.BytesIO()
-    book.save(buf)
+    wb.save(buf)
     return buf.getvalue()
 
 
@@ -268,7 +265,7 @@ def hobo_ledger_item_list(request):
 
 @login_required
 @require_http_methods(["GET"])
-def hobo_ledger_export_xls(request):
+def hobo_ledger_export_xlsx(request):
     if not _can_use_ledger(request.user):
         return HttpResponse("无权限访问", status=403, content_type="text/plain; charset=utf-8")
     if not can_do_action(request.user, "hobo_ledger_export"):
@@ -287,13 +284,16 @@ def hobo_ledger_export_xls(request):
     )
     items = list(items_qs)
 
-    raw_name = f"hobo_requirement_ledger_{timezone.localdate().isoformat()}.xls"
+    raw_name = f"hobo_requirement_ledger_{timezone.localdate().isoformat()}.xlsx"
     safe_name = re.sub(r"[^\w.\-]+", "_", raw_name)
-    if not safe_name.lower().endswith(".xls"):
-        safe_name = f"{safe_name}.xls"
+    if not safe_name.lower().endswith(".xlsx"):
+        safe_name = f"{safe_name}.xlsx"
 
-    payload = _hobo_ledger_xls_bytes(items)
-    response = HttpResponse(payload, content_type="application/vnd.ms-excel")
+    payload = _hobo_ledger_xlsx_bytes(items)
+    response = HttpResponse(
+        payload,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
     response["Content-Disposition"] = f'attachment; filename="{safe_name}"'
     return response
 

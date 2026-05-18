@@ -9,8 +9,8 @@ from django.utils import timezone
 
 from branch_create.cron_utils import cron_matches
 from branch_create.models import ExportSchedule, HoboRequirementLedger, ReleaseBatch, ReleaseItem
-from branch_create.hobo_ledger_views import _hobo_ledger_xls_bytes
-from branch_create.release_entry_views import _release_entry_xls_bytes
+from branch_create.hobo_ledger_views import _hobo_ledger_xlsx_bytes
+from branch_create.release_entry_views import _release_entry_xlsx_bytes
 
 
 
@@ -77,9 +77,9 @@ class Command(BaseCommand):
             ).order_by("-applied_date", "-id")
         )
 
-        payload = _hobo_ledger_xls_bytes(items)
+        payload = _hobo_ledger_xlsx_bytes(items)
         timestamp = timezone.localtime().strftime("%Y%m%d-%H%M%S")
-        filename = f"HOBO需求登记台账-{timestamp}.xls"
+        filename = f"HOBO需求登记台账-{timestamp}.xlsx"
         filepath = os.path.join(output_dir, filename)
 
         with open(filepath, "wb") as f:
@@ -107,9 +107,9 @@ class Command(BaseCommand):
             if not items:
                 continue
 
-            payload = _release_entry_xls_bytes(batch, items)
+            payload = _release_entry_xlsx_bytes(batch, items)
             batch_date = batch.release_date.isoformat()
-            filename = f"{batch_date}-投产征集.xls"
+            filename = f"{batch_date}-投产征集.xlsx"
             filepath = os.path.join(output_dir, filename)
 
             with open(filepath, "wb") as f:

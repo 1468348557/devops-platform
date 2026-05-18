@@ -145,8 +145,8 @@ def _release_entry_list_queryset(request):
     return None, items, filters_meta
 
 
-def _release_entry_xls_bytes(batch: ReleaseBatch, items: list[ReleaseItem]) -> bytes:
-    import xlwt
+def _release_entry_xlsx_bytes(batch: ReleaseBatch, items: list[ReleaseItem]) -> bytes:
+    from openpyxl import Workbook
 
     headers = [
         "批次投产日期",
@@ -191,20 +191,19 @@ def _release_entry_xls_bytes(batch: ReleaseBatch, items: list[ReleaseItem]) -> b
         "填写人",
     ]
 
-    book = xlwt.Workbook(encoding="utf-8")
-    sheet = book.add_sheet("投产征集")
+    wb = Workbook()
+    sheet = wb.active
+    sheet.title = "投产征集"
+    sheet.append(headers)
 
-    for col, title in enumerate(headers):
-        sheet.write(0, col, title)
-
-    for row_idx, item in enumerate(items, start=1):
+    for item in items:
         req_branch = ""
         if item.sql_only_release:
             req_branch = "仅SQL上线（无需需求分支）"
         elif item.requirement_branch:
             req_branch = item.requirement_branch
 
-        values = [
+        sheet.append([
             str(batch.release_date),
             batch.release_branch,
             item.project.project_code,
@@ -249,12 +248,10 @@ def _release_entry_xls_bytes(batch: ReleaseBatch, items: list[ReleaseItem]) -> b
             "已创建" if item.branch_created else "未创建",
             item.branch_create_error or "",
             item.developer.username,
-        ]
-        for col_idx, cell in enumerate(values):
-            sheet.write(row_idx, col_idx, cell)
+        ])
 
     buf = io.BytesIO()
-    book.save(buf)
+    wb.save(buf)
     return buf.getvalue()
 
 
@@ -636,17 +633,40 @@ def release_entry_item_create(request):
 @login_required
 @require_http_methods(["GET"])
 def release_entry_item_list(request):
-    err, items, filters_meta = _release_entry_list_queryset(request)
+    err, items_qs, filters_meta = _release_entry_list_queryset(request)
     if err:
         return JsonResponse({"success": False, "error": err}, status=400)
 
-    data = [_item_to_dict(item, request.user) for item in items]
+    page_str = (request.GET.get("page") or "").strip()
+    if page_str and page_str.isdigit():
+        page = int(page_str)
+        page_size_str = (request.GET.get("page_size") or "50").strip()
+        page_size = int(page_size_str) if page_size_str.isdigit() else 50
+        page_size = min(page_size, 200)
+
+        total = items_qs.count()
+        total_pages = max(1, (total + page_size - 1) // page_size)
+        page = max(1, min(page, total_pages))
+        start = (page - 1) * page_size
+        items = items_qs[start : start + page_size]
+        data = [_item_to_dict(item, request.user) for item in items]
+        return JsonResponse({
+            "success": True,
+            "items": data,
+            "filters": filters_meta,
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+            "total_pages": total_pages,
+        })
+
+    data = [_item_to_dict(item, request.user) for item in items_qs]
     return JsonResponse({"success": True, "items": data, "filters": filters_meta})
 
 
 @login_required
 @require_http_methods(["GET"])
-def release_entry_export_xls(request):
+def release_entry_export_xlsx(request):
     if not can_do_action(request.user, "release_entry_export"):
         return HttpResponse("无导出权限", status=403, content_type="text/plain; charset=utf-8")
 
@@ -661,13 +681,16 @@ def release_entry_export_xls(request):
     except (ValueError, ReleaseBatch.DoesNotExist):
         return HttpResponse("批次不存在", status=404, content_type="text/plain; charset=utf-8")
 
-    raw_name = f"release_entry_{batch.release_date}_{batch.release_branch}.xls"
+    raw_name = f"release_entry_{batch.release_date}_{batch.release_branch}.xlsx"
     safe_name = re.sub(r"[^\w.\-]+", "_", raw_name)
-    if not safe_name.lower().endswith(".xls"):
-        safe_name = f"{safe_name}.xls"
+    if not safe_name.lower().endswith(".xlsx"):
+        safe_name = f"{safe_name}.xlsx"
 
-    payload = _release_entry_xls_bytes(batch, items)
-    response = HttpResponse(payload, content_type="application/vnd.ms-excel")
+    payload = _release_entry_xlsx_bytes(batch, items)
+    response = HttpResponse(
+        payload,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
     response["Content-Disposition"] = f'attachment; filename="{safe_name}"'
     return response
 
@@ -821,6 +844,70 @@ def release_entry_item_submit(request):
 
 @login_required
 @require_http_methods(["POST"])
+def release_entry_item_confirm(request):
+    """运维/管理员确认行项，submitted → confirmed"""
+    item_id = request.POST.get("item_id")
+    if not item_id:
+        return JsonResponse({"success": False, "error": "item_id 必填"}, status=400)
+
+    try:
+        item = ReleaseItem.objects.select_related("batch").get(pk=item_id)
+    except ReleaseItem.DoesNotExist:
+        return JsonResponse({"success": False, "error": "记录不存在"}, status=404)
+
+    is_superuser = request.user.is_superuser
+    can_edit_others = can_do_action(request.user, "release_item_edit_others")
+    if not is_superuser and not can_edit_others:
+        return JsonResponse({"success": False, "error": "仅运维或管理员可确认"}, status=403)
+
+    if item.line_status != ReleaseItem.LineStatus.SUBMITTED:
+        return JsonResponse({"success": False, "error": f"当前状态为 {item.get_line_status_display()}，仅已提交的记录可确认"}, status=400)
+
+    if item.batch.status != ReleaseBatch.Status.OPEN:
+        return JsonResponse({"success": False, "error": "当前批次未开放"}, status=400)
+
+    item.line_status = ReleaseItem.LineStatus.CONFIRMED
+    item.save(update_fields=["line_status", "updated_at"])
+    return JsonResponse({"success": True, "item": _item_to_dict(item, request.user)})
+
+
+@login_required
+@require_http_methods(["POST"])
+def release_entry_item_reject(request):
+    """运维/管理员驳回行项，submitted → rejected"""
+    item_id = request.POST.get("item_id")
+    reject_reason = (request.POST.get("reject_reason") or "").strip()
+
+    if not item_id:
+        return JsonResponse({"success": False, "error": "item_id 必填"}, status=400)
+    if not reject_reason:
+        return JsonResponse({"success": False, "error": "请填写驳回原因"}, status=400)
+
+    try:
+        item = ReleaseItem.objects.select_related("batch").get(pk=item_id)
+    except ReleaseItem.DoesNotExist:
+        return JsonResponse({"success": False, "error": "记录不存在"}, status=404)
+
+    is_superuser = request.user.is_superuser
+    can_edit_others = can_do_action(request.user, "release_item_edit_others")
+    if not is_superuser and not can_edit_others:
+        return JsonResponse({"success": False, "error": "仅运维或管理员可驳回"}, status=403)
+
+    if item.line_status != ReleaseItem.LineStatus.SUBMITTED:
+        return JsonResponse({"success": False, "error": f"当前状态为 {item.get_line_status_display()}，仅已提交的记录可驳回"}, status=400)
+
+    if item.batch.status != ReleaseBatch.Status.OPEN:
+        return JsonResponse({"success": False, "error": "当前批次未开放"}, status=400)
+
+    item.line_status = ReleaseItem.LineStatus.REJECTED
+    # 驳回原因写入备注，便于研发查看
+    item.remark = f"[驳回原因] {reject_reason}" + (f"\n{item.remark}" if item.remark else "")
+    item.save(update_fields=["line_status", "remark", "updated_at"])
+    return JsonResponse({"success": True, "item": _item_to_dict(item, request.user)})
+
+
+@login_required
+@require_http_methods(["POST"])
 def release_entry_item_delete(request):
     item_id = request.POST.get("item_id")
     if not item_id:
@@ -900,7 +987,15 @@ def release_entry_item_bulk_update(request):
             item.rel_deployed = parsed
 
     ReleaseItem.objects.bulk_update(items, [field_name, "updated_at"])
-    return JsonResponse({"success": True, "updated_count": len(items)})
+    # bulk_update 不触发 save()，需显式刷新每条记录的行状态
+    line_status_changed = 0
+    for item in items:
+        old_status = item.line_status
+        item.refresh_line_status()
+        if item.line_status != old_status:
+            item.save(update_fields=["line_status", "updated_at"])
+            line_status_changed += 1
+    return JsonResponse({"success": True, "updated_count": len(items), "line_status_changed": line_status_changed})
 
 
 @login_required
@@ -1020,6 +1115,32 @@ _ALLOWED_STATUS_TRANSITIONS = {
 }
 
 
+def _check_batch_close_readiness(batch: ReleaseBatch) -> dict:
+    """关闭批次前的完整性校验，返回各状态行项计数。"""
+    from django.db.models import Count, Q
+    stats = (
+        ReleaseItem.objects.filter(batch=batch)
+        .aggregate(
+            total=Count("id"),
+            incomplete=Count("id", filter=Q(line_status=ReleaseItem.LineStatus.INCOMPLETE)),
+            draft=Count("id", filter=Q(line_status=ReleaseItem.LineStatus.DRAFT)),
+            submitted=Count("id", filter=Q(line_status=ReleaseItem.LineStatus.SUBMITTED)),
+            confirmed=Count("id", filter=Q(line_status=ReleaseItem.LineStatus.CONFIRMED)),
+            rejected=Count("id", filter=Q(line_status=ReleaseItem.LineStatus.REJECTED)),
+        )
+    )
+    has_issues = (stats["incomplete"] or 0) > 0 or (stats["draft"] or 0) > 0
+    return {
+        "total": stats["total"] or 0,
+        "incomplete": stats["incomplete"] or 0,
+        "draft": stats["draft"] or 0,
+        "submitted": stats["submitted"] or 0,
+        "confirmed": stats["confirmed"] or 0,
+        "rejected": stats["rejected"] or 0,
+        "has_issues": has_issues,
+    }
+
+
 @login_required
 @require_http_methods(["POST"])
 def release_entry_batch_update_status(request):
@@ -1047,6 +1168,33 @@ def release_entry_batch_update_status(request):
             {"success": False, "error": f"不允许从 {batch.status} 变更为 {new_status}"},
             status=400,
         )
+
+    # 关闭批次前检查行项完整性
+    if new_status == ReleaseBatch.Status.CLOSED:
+        stats = _check_batch_close_readiness(batch)
+        force = (request.POST.get("force") or "").strip() == "1"
+        if stats["has_issues"] and not force:
+            return JsonResponse({
+                "success": False,
+                "error": f"当前批次存在 {stats['incomplete']} 条未填写完整、{stats['draft']} 条草稿记录，确认关闭后将无法再编辑。请先处理或强制关闭。",
+                "stats": stats,
+                "require_force": True,
+            }, status=409)
+        if force:
+            batch.status = new_status
+            batch.save(update_fields=["status", "updated_at"])
+            return JsonResponse({
+                "success": True,
+                "batch": {
+                    "id": batch.id,
+                    "release_date": str(batch.release_date),
+                    "release_type": batch.release_type,
+                    "release_branch": batch.release_branch,
+                    "status": batch.status,
+                },
+                "stats": stats,
+                "forced": True,
+            })
 
     batch.status = new_status
     batch.save(update_fields=["status", "updated_at"])

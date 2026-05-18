@@ -410,6 +410,31 @@
       grid-template-columns: 1fr;
     }
   }
+  .pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    margin-top: 8px;
+    border-top: 1px solid #e2e8f0;
+  }
+  .pagination-info { font-size: 13px; color: #64748b; }
+  .pagination-controls { display: flex; align-items: center; gap: 4px; }
+  .pagination-controls button {
+    border: 1px solid #d1d5db;
+    background: #fff;
+    color: #374151;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    min-width: 36px;
+  }
+  .pagination-controls button:hover:not(:disabled) { background: #f3f4f6; }
+  .pagination-controls button:disabled { color: #d1d5db; cursor: default; }
+  .pagination-controls button.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+  .pagination-controls .page-size-select { border: 1px solid #d1d5db; border-radius: 6px; padding: 5px 8px; font-size: 13px; }
+}
 </style>
 
 <section class="card layout">
@@ -688,6 +713,10 @@
           <tbody id="item-body"></tbody>
         </table>
       </div>
+      <div id="pagination-bar" class="pagination-bar">
+        <div class="pagination-info" id="pagination-info"></div>
+        <div class="pagination-controls" id="pagination-controls"></div>
+      </div>
     </div>
   </div>
 
@@ -746,6 +775,10 @@
   let editingItemId = null;
   let viewOnlyMode = false;
   let submitAction = "submit";
+  let currentPage = 1;
+  let currentPageSize = 50;
+  let currentTotal = 0;
+  let currentTotalPages = 1;
   const columnPrefKey = `release_entry_columns:${currentUsername}`;
   const defaultColumnIds = [
     "flow_name","biz_category","project_name","release_branch","branch_status","rel_test_status",
@@ -821,11 +854,17 @@
       id: "actions",
       label: "操作",
       fixed: true,
-      render: (item) => `
-        ${item.editable ? `<button class="btn btn-secondary btn-edit" data-id="${item.id}">编辑</button>` : ``}
-        <button class="btn btn-secondary btn-view" data-id="${item.id}">查看</button>
-        ${item.can_delete ? `<button class="btn btn-secondary btn-delete" data-id="${item.id}">删除</button>` : ``}
-      `,
+      render: (item) => {
+        let btns = "";
+        if (item.editable) btns += `<button class="btn btn-secondary btn-edit" data-id="${item.id}">编辑</button>`;
+        btns += `<button class="btn btn-secondary btn-view" data-id="${item.id}">查看</button>`;
+        if (item.line_status === "submitted" && canEditOpsFields) {
+          btns += `<button class="btn btn-secondary btn-confirm" data-id="${item.id}">确认</button>`;
+          btns += `<button class="btn btn-secondary btn-reject" data-id="${item.id}">驳回</button>`;
+        }
+        if (item.can_delete) btns += `<button class="btn btn-secondary btn-delete" data-id="${item.id}">删除</button>`;
+        return btns;
+      },
     },
   ];
   let visibleColumnIds = [...defaultColumnIds];
@@ -1343,7 +1382,92 @@
         }
       });
     });
+
+    body.querySelectorAll(".btn-confirm").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("确认该行项已审核通过？")) return;
+        try {
+          await request("/branch-create/release-entry/api/items/confirm/", "POST", { item_id: btn.dataset.id });
+          setTip("已确认");
+          await loadItems();
+        } catch (e) {
+          setTip(`确认失败：${e.error || "未知错误"}`, true);
+        }
+      });
+    });
+
+    body.querySelectorAll(".btn-reject").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const reason = prompt("请输入驳回原因：");
+        if (!reason || !reason.trim()) return;
+        try {
+          await request("/branch-create/release-entry/api/items/reject/", "POST", { item_id: btn.dataset.id, reject_reason: reason.trim() });
+          setTip("已驳回");
+          await loadItems();
+        } catch (e) {
+          setTip(`驳回失败：${e.error || "未知错误"}`, true);
+        }
+      });
+    });
     updateTableScrollButtons();
+  }
+
+  function renderPagination() {
+    const bar = el("pagination-bar");
+    const info = el("pagination-info");
+    const controls = el("pagination-controls");
+    if (currentTotal <= currentPageSize) {
+      bar.style.display = "none";
+      return;
+    }
+    bar.style.display = "";
+    const start = (currentPage - 1) * currentPageSize + 1;
+    const end = Math.min(currentPage * currentPageSize, currentTotal);
+    info.textContent = `共 ${currentTotal} 条，显示 ${start}-${end}`;
+
+    let html = "";
+    const maxButtons = 7;
+    let pages = [];
+    if (currentTotalPages <= maxButtons) {
+      for (let i = 1; i <= currentTotalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      const left = Math.max(2, currentPage - 1);
+      const right = Math.min(currentTotalPages - 1, currentPage + 1);
+      if (left > 2) pages.push("...");
+      for (let i = left; i <= right; i++) pages.push(i);
+      if (right < currentTotalPages - 1) pages.push("...");
+      pages.push(currentTotalPages);
+    }
+
+    html += `<button ${currentPage === 1 ? "disabled" : ""} data-page="${currentPage - 1}">上一页</button>`;
+    pages.forEach((p) => {
+      if (p === "...") {
+        html += `<button disabled>...</button>`;
+      } else {
+        html += `<button class="${p === currentPage ? "active" : ""}" data-page="${p}">${p}</button>`;
+      }
+    });
+    html += `<button ${currentPage === currentTotalPages ? "disabled" : ""} data-page="${currentPage + 1}">下一页</button>`;
+    html += `<select class="page-size-select" id="page-size-select">
+      ${[20, 50, 100, 200].map((s) => `<option value="${s}" ${s === currentPageSize ? "selected" : ""}>${s}条/页</option>`).join("")}
+    </select>`;
+    controls.innerHTML = html;
+
+    controls.querySelectorAll("button[data-page]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const p = Number(btn.dataset.page);
+        if (p !== currentPage && p >= 1 && p <= currentTotalPages) {
+          currentPage = p;
+          loadItems();
+        }
+      });
+    });
+    el("page-size-select").addEventListener("change", (e) => {
+      currentPageSize = Number(e.target.value);
+      currentPage = 1;
+      loadItems();
+    });
   }
 
   function getItemsTableWrap() { return el("item-table-wrap"); }
@@ -1414,11 +1538,17 @@
         flow_name: el("search-flow-name").value || "",
         project_id: el("search-project-id").value || "",
         applicant_name: el("search-applicant-name").value || "",
+        page: String(currentPage),
+        page_size: String(currentPageSize),
       });
       const resp = await fetch(`/branch-create/release-entry/api/items/?${query.toString()}`);
       const data = await resp.json();
       if (!data.success) throw data;
+      currentTotal = data.total || data.items.length;
+      currentTotalPages = data.total_pages || 1;
+      currentPage = data.page || 1;
       renderItems(data.items);
+      renderPagination();
     } catch (e) {
       setTip(`加载记录失败：${e.error || "未知错误"}`, true);
     }
@@ -1511,6 +1641,7 @@
     fillProjectOptions();
     clearForm();
     restoreDraftFromLocal();
+    currentPage = 1;
     await loadItems();
     updateBatchStatusActions(currentBatch);
   });
@@ -1553,7 +1684,7 @@
     if (panel.contains(event.target) || trigger.contains(event.target) || (backdrop && backdrop.contains(event.target))) return;
     closeColumnPanel();
   });
-  el("btn-search-items").addEventListener("click", loadItems);
+  el("btn-search-items").addEventListener("click", () => { currentPage = 1; loadItems(); });
   if (canExportReleaseEntry) {
     el("btn-export-xls").addEventListener("click", () => {
       if (!currentBatch) {
@@ -1566,7 +1697,7 @@
         project_id: el("search-project-id").value || "",
         applicant_name: el("search-applicant-name").value || "",
       });
-      window.location.href = `/branch-create/release-entry/export.xls?${query.toString()}`;
+      window.location.href = `/branch-create/release-entry/export.xlsx?${query.toString()}`;
     });
   }
   el("btn-reset-search").addEventListener("click", async () => {
@@ -1661,16 +1792,36 @@
       executedLabel.style.display = "inline";
     }
   }
-  async function doSetBatchStatus(newStatus, label) {
+  async function doSetBatchStatus(newStatus, label, force) {
     if (!currentBatch) return;
     try {
-      await request("/branch-create/release-entry/api/batches/update-status/", "POST", {
-        batch_id: currentBatch.id,
-        new_status: newStatus,
-      });
-      setTip(`${label}成功`);
+      const payload = { batch_id: currentBatch.id, new_status: newStatus };
+      if (force) payload.force = "1";
+      const resp = await request("/branch-create/release-entry/api/batches/update-status/", "POST", payload);
+      if (resp.stats) {
+        setTip(`${label}成功（强制关闭，跳过 ${resp.stats.incomplete + resp.stats.draft} 条未完成记录）`);
+      } else {
+        setTip(`${label}成功`);
+      }
       await loadBatches();
     } catch (e) {
+      if (e.require_force) {
+        const stats = e.stats || {};
+        const msg = [
+          `批次 ${currentBatch.release_date} / ${currentBatch.release_branch}`,
+          `共 ${stats.total} 条记录：`,
+          stats.incomplete ? `  - ${stats.incomplete} 条未填写完整` : "",
+          stats.draft ? `  - ${stats.draft} 条草稿` : "",
+          stats.submitted ? `  - ${stats.submitted} 条已提交` : "",
+          "",
+          "强制关闭后，研发将无法再编辑这些记录。",
+          "确定强制关闭吗？",
+        ].filter(Boolean).join("\n");
+        if (confirm(msg)) {
+          doSetBatchStatus(newStatus, label, true);
+        }
+        return;
+      }
       setTip(`${label}失败：${e.error || "未知错误"}`, true);
     }
   }

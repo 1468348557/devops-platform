@@ -271,13 +271,13 @@ open ──→ closed ──→ executed
 - `POST /release-entry/api/items/create/` / `update/` / `submit/` / `delete/` — CRUD
 - `GET /release-entry/api/items/last-by-project/` — 引用上次填写
 - `POST /release-entry/api/items/bulk-update/` — 批量修改运维字段
-- `GET /release-entry/export.xls` — 导出 Excel
+- `GET /release-entry/export.xlsx` — 导出 Excel
 
 **HOBO 台账**：
 - `GET /hobo-ledger/api/projects/` — 工程列表
 - `GET /hobo-ledger/api/items/` — 登记项列表
 - `POST /hobo-ledger/api/items/create/` / `update/` / `delete/` — CRUD
-- `GET /hobo-ledger/export.xls` — 导出 Excel
+- `GET /hobo-ledger/export.xlsx` — 导出 Excel
 
 **导出计划**：
 - `GET /api/export-schedules/` — 列表
@@ -450,7 +450,7 @@ plan → precheck → (确认) → mr → approval → verify_mr → (确认) �
 
 ### 投产征集导出
 
-文件：`release_entry_views.py::_release_entry_xls_bytes`
+文件：`release_entry_views.py::_release_entry_xlsx_bytes`
 
 38 列，包括：批次信息、工程信息、分支信息、所有布尔检查项（是/否/未填写）、行状态、分支创建状态、填写人等。
 
@@ -458,7 +458,7 @@ plan → precheck → (确认) → mr → approval → verify_mr → (确认) �
 
 ### HOBO 台账导出
 
-文件：`hobo_ledger_views.py::_hobo_ledger_xls_bytes`
+文件：`hobo_ledger_views.py::_hobo_ledger_xlsx_bytes`
 
 19 列，包括：需求类型、分支名称、工程、描述、申请人、日期、依赖分支、投产日期、建分支状态等。
 

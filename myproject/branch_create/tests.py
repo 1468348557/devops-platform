@@ -476,7 +476,7 @@ class ApplicantSearchTests(TestCase):
         self.assertEqual(list_resp.status_code, 200)
         self.assertEqual(len(list_resp.json()["items"]), 1)
 
-        export_resp = self.client.get("/branch-create/hobo-ledger/export.xls")
+        export_resp = self.client.get("/branch-create/hobo-ledger/export.xlsx")
         self.assertEqual(export_resp.status_code, 200)
         self.assertEqual(export_resp["Content-Type"], "application/vnd.ms-excel")
         body = export_resp.content
@@ -515,7 +515,7 @@ class ApplicantSearchTests(TestCase):
         )
 
         self.client.force_login(user)
-        resp = self.client.get("/branch-create/hobo-ledger/export.xls")
+        resp = self.client.get("/branch-create/hobo-ledger/export.xlsx")
         self.assertEqual(resp.status_code, 403)
         self.assertIn("无导出权限", resp.content.decode())
 
