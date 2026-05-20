@@ -121,6 +121,7 @@ open ──→ closed ──→ executed
 - 条件依赖：`need_param_release=True` 时 `param_confirmed` 必填；`need_menu=True` 时 `menu_added` 必填；`need_flowchart=True` 时 `flowchart_checked` 和 `flow_definition_name` 必填；`is_bug_fix=True` 时 `bug_reporter` 和 `bug_discovery_time` 必填
 - `save()` 自动调用 `refresh_line_status()`：缺失必填 → `incomplete`，完整 → `draft`
 - 提交时再次检查，全部完整才允许变为 `submitted`
+- **创建/更新时**：`need_release_verify`（涉及投产验证）为必填项，未选择是/否时直接拒绝保存，返回 400 错误
 
 ### 2.6 HoboRequirementLedger — HOBO 需求登记台账
 
@@ -354,7 +355,53 @@ open ──→ closed ──→ executed
 3. 尝试加 `hobo-` 前缀匹配
 4. 尝试去掉前缀后匹配
 
-### 5.7 Cron 匹配（cron_utils.py）
+### 5.7 引用上次填写
+
+API：`GET /release-entry/api/items/last-by-project/`
+
+用户在新建行项时点击"引用上次填写"，系统根据当前工程查询历史最近一次填写的行项，将其部分字段值填入当前表单。
+
+**引用字段白名单**（`_QUOTE_LAST_ITEM_KEYS`）：
+- 基础信息：`biz_category`, `tech_owner`, `biz_owner`, `common_component_branch`, `flow_definition_name`, `implementation_unit_no`
+- 检查项：`need_param_release`, `param_confirmed`, `need_menu`, `menu_added`, `need_difs`, `need_flowchart`, `flowchart_checked`, `need_event_platform`, `need_task_pool`, `need_bpmp`, `need_image`, `need_esf`, `need_trade_tuning`, `need_release_verify`
+
+**排除字段**（不会被引用）：
+- `flow_name`（流程/功能名称）— 每条记录的核心标识，不应重复
+- `remark`（备注）— 每条记录独立填写
+- `requirement_branch`（需求分支）— 系统自动生成
+- `is_bug_fix`（是否为bug修复）— 已有默认值"否"，不需引用
+- `bug_reporter`（bug修复汇报人）— 每条独立填写
+- `bug_discovery_time`（bug发现时间）— 每条独立填写
+- `rel_test_status`（REL测试状态）— 已有默认值"否"，不需引用
+- `need_config_release`（涉及配置文件投产）— 每条独立确认
+
+查询逻辑：优先引用上一个批次（排除当前批次），回退到所有历史最新记录。
+
+实现位置：
+- 后端：`release_entry_views.py` → `release_entry_item_last_by_project()` 视图 + `_QUOTE_LAST_ITEM_KEYS` 常量
+- 前端：`release_entry.html` → `applyLastItemToForm()` 函数，通过 `el("btn-quote-last")` 按钮触发
+
+### 5.8 表单默认值
+
+新建行项或切换工程清空表单时，以下字段自动填充默认值，减少填写负担：
+
+| 字段 | 默认值 | 设置位置 |
+|------|--------|----------|
+| `is_bug_fix`（是否为bug修复） | 否 | HTML `selected` 属性 + `clearForm()` + `clearFormForProjectSwitch()` |
+| `rel_test_status`（REL测试状态） | 否 | HTML `selected` 属性 + `clearForm()` + `clearFormForProjectSwitch()` |
+
+**三层保障**：
+1. **HTML 层**：`<option value="否" selected>` 确保页面首次加载时下拉框默认选中"否"
+2. **`clearForm()`**：新建记录时清空所有字段后，显式设置这两个字段为"否"
+3. **`clearFormForProjectSwitch()`**：切换工程触发表单清空时，同样设置这两个字段为"否"
+
+> **注意**：引用上次填写（5.7）不会覆盖这些默认值，因为 `is_bug_fix` 和 `rel_test_status` 均在引用排除列表中。
+
+实现位置：
+- 前端：`release_entry.html` → `clearForm()` / `clearFormForProjectSwitch()` 函数
+- HTML：`<select id="is-bug-fix">` 和 `<select id="rel-test-status">` 的 `selected` 属性
+
+### 5.9 Cron 匹配（cron_utils.py）
 
 标准 5 字段 cron 表达式匹配：`minute hour dom month dow`。
 支持：`*`、`*/N`（每 N）、`,`（枚举）、精确数字。

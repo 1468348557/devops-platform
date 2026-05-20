@@ -400,16 +400,12 @@ def _item_to_dict(item: ReleaseItem, user) -> dict:
 
 # 「引用上次填写」API 返回字段：与 _item_to_dict 对齐，避免与列表接口漂移或遗漏键。
 _QUOTE_LAST_ITEM_KEYS = (
-    "flow_name",
     "biz_category",
     "tech_owner",
     "biz_owner",
     "common_component_branch",
     "flow_definition_name",
     "implementation_unit_no",
-    "remark",
-    "is_bug_fix",
-    "bug_reporter",
     "need_param_release",
     "param_confirmed",
     "need_menu",
@@ -424,8 +420,6 @@ _QUOTE_LAST_ITEM_KEYS = (
     "need_esf",
     "need_trade_tuning",
     "need_release_verify",
-    "need_config_release",
-    "rel_test_status",
 )
 
 
@@ -486,17 +480,21 @@ def _apply_item_fields(
             item.remark = remark.strip()
 
         bug_reporter = request.POST.get("bug_reporter")
-        if bug_reporter is not None and "bug_reporter" in editable_fields:
+        if bug_reporter is not None and "is_bug_fix" in editable_fields:
             item.bug_reporter = bug_reporter.strip()
 
         bug_discovery_time = request.POST.get("bug_discovery_time")
-        if bug_discovery_time is not None and "bug_discovery_time" in editable_fields:
+        if bug_discovery_time is not None and "is_bug_fix" in editable_fields:
             bug_discovery_time = bug_discovery_time.strip()
             if bug_discovery_time:
-                try:
-                    item.bug_discovery_time = timezone.make_aware(datetime.fromisoformat(bug_discovery_time))
-                except (ValueError, TypeError):
-                    pass
+                # datetime-local 输入框发送格式为 "YYYY-MM-DDTHH:MM" 或 "YYYY-MM-DDTHH:MM:SS"
+                # 不使用 fromisoformat()，因为 Python 3.10 不支持解析不带秒的格式
+                for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S"):
+                    try:
+                        item.bug_discovery_time = timezone.make_aware(datetime.strptime(bug_discovery_time, fmt))
+                        break
+                    except ValueError:
+                        continue
             else:
                 item.bug_discovery_time = None
 
@@ -638,6 +636,8 @@ def release_entry_item_create(request):
         allow_dev_scope=True,
         allow_ops_scope=request.user.is_superuser,
     )
+    if "need_release_verify" in editable_fields and item.need_release_verify is None:
+        return JsonResponse({"success": False, "error": "涉及投产验证为必填项，请选择是或否"}, status=400)
     save_error = _save_item_or_error(item)
     if save_error is not None:
         return save_error
@@ -820,6 +820,8 @@ def release_entry_item_update(request):
         allow_dev_scope=can_edit_dev_scope,
         allow_ops_scope=can_edit_ops_scope,
     )
+    if "need_release_verify" in editable_fields and item.need_release_verify is None:
+        return JsonResponse({"success": False, "error": "涉及投产验证为必填项，请选择是或否"}, status=400)
     save_error = _save_item_or_error(item)
     if save_error is not None:
         return save_error

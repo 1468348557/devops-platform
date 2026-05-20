@@ -551,7 +551,7 @@
             <select id="is-bug-fix" class="form-input">
               <option value="">未填写</option>
               <option value="是">是</option>
-              <option value="否">否</option>
+              <option value="否" selected>否</option>
             </select>
           </label>
           <label class="field">bug修复汇报人
@@ -619,7 +619,7 @@
             <select id="rel-test-status" class="form-input">
               <option value="">未填写</option>
               <option value="是">是</option>
-              <option value="否">否</option>
+              <option value="否" selected>否</option>
             </select>
           </label>
           {% if can_edit_ops_fields %}
@@ -1165,6 +1165,8 @@
       const node = el(id);
       if (node) node.value = "";
     });
+    el("is-bug-fix").value = "否";
+    el("rel-test-status").value = "否";
     if (currentBatchProjects.length > 0) {
       el("project-id").value = String(currentBatchProjects[0].id);
     }
@@ -1186,6 +1188,8 @@
       const node = el(id);
       if (node) node.value = "";
     });
+    el("is-bug-fix").value = "否";
+    el("rel-test-status").value = "否";
     syncBugReporterCheckboxes();
     if (selectedProjectId) {
       el("project-id").value = String(selectedProjectId);
@@ -1254,18 +1258,12 @@
       }
     };
 
-    setValue("flow-name", item.flow_name || "");
     setValue("biz-category", item.biz_category || "");
     setValue("tech-owner", item.tech_owner || "");
     setValue("biz-owner", item.biz_owner || "");
     setValue("common-component-branch", item.common_component_branch || "");
     setValue("flow-definition-name", item.flow_definition_name || "");
     setValue("implementation-unit-no", item.implementation_unit_no || "");
-    setValue("remark", item.remark || "");
-    setValue("is-bug-fix", normalizeBool(item.is_bug_fix));
-    setValue("bug-reporter", item.bug_reporter || "");
-    syncBugReporterCheckboxes();
-    setValue("bug-discovery-time", item.bug_discovery_time || "");
     setValue("need-param-release", normalizeBool(item.need_param_release));
     setValue("param-confirmed", normalizeBool(item.param_confirmed));
     setValue("need-menu", normalizeBool(item.need_menu));
@@ -1280,8 +1278,6 @@
     setValue("need-esf", normalizeBool(item.need_esf));
     setValue("need-trade-tuning", normalizeBool(item.need_trade_tuning));
     setValue("need-release-verify", normalizeBool(item.need_release_verify));
-    setValue("need-config-release", normalizeBool(item.need_config_release));
-    setValue("rel-test-status", normalizeYesNoChoice(item.rel_test_status));
     saveDraftToLocal();
   }
 
@@ -1531,6 +1527,7 @@
       ["备注", item.remark],
       ["是否为bug修复", normalizeBool(item.is_bug_fix)],
       ["bug修复汇报人", item.bug_reporter],
+      ["bug发现时间", item.bug_discovery_time ? item.bug_discovery_time.slice(0, 16).replace("T", " ") : ""],
       ["参数投产", normalizeBool(item.need_param_release)],
       ["业务参数确认", normalizeBool(item.param_confirmed)],
       ["涉及菜单", normalizeBool(item.need_menu)],
