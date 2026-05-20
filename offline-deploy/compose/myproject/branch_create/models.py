@@ -134,6 +134,7 @@ class ReleaseItem(models.Model):
     remark = models.CharField(max_length=255, blank=True, default="")
     is_bug_fix = models.BooleanField(null=True, blank=True)
     bug_reporter = models.CharField(max_length=64, blank=True, default="")
+    bug_discovery_time = models.DateTimeField(null=True, blank=True)
     need_event_platform = models.BooleanField(null=True, blank=True)
     need_task_pool = models.BooleanField(null=True, blank=True)
     need_bpmp = models.BooleanField(null=True, blank=True)
@@ -220,8 +221,11 @@ class ReleaseItem(models.Model):
             missing.append("flowchart_checked")
         if self.need_flowchart is True and not self.flow_definition_name:
             missing.append("flow_definition_name")
-        if self.is_bug_fix is True and not self.bug_reporter:
-            missing.append("bug_reporter")
+        if self.is_bug_fix is True:
+            if not self.bug_reporter:
+                missing.append("bug_reporter")
+            if self.bug_discovery_time is None:
+                missing.append("bug_discovery_time")
         return missing
 
     def refresh_line_status(self) -> None:
