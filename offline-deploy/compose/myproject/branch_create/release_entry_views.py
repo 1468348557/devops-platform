@@ -116,7 +116,7 @@ def _release_entry_list_queryset(request):
         ReleaseItem.objects.select_related("project", "developer", "batch")
         .filter(batch_id=batch_id)
         .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
-        .order_by("-updated_at", "-id")
+        .order_by("id")
     )
     items = apply_data_scope(
         items,
@@ -636,8 +636,10 @@ def release_entry_item_create(request):
         allow_dev_scope=True,
         allow_ops_scope=request.user.is_superuser,
     )
-    if "need_release_verify" in editable_fields and item.need_release_verify is None:
-        return JsonResponse({"success": False, "error": "涉及投产验证为必填项，请选择是或否"}, status=400)
+    missing = item.get_missing_fields()
+    if missing:
+        labels = [ReleaseItem.get_field_label(f) for f in missing]
+        return JsonResponse({"success": False, "error": f"以下字段未填写：{', '.join(labels)}"}, status=400)
     save_error = _save_item_or_error(item)
     if save_error is not None:
         return save_error
@@ -820,8 +822,10 @@ def release_entry_item_update(request):
         allow_dev_scope=can_edit_dev_scope,
         allow_ops_scope=can_edit_ops_scope,
     )
-    if "need_release_verify" in editable_fields and item.need_release_verify is None:
-        return JsonResponse({"success": False, "error": "涉及投产验证为必填项，请选择是或否"}, status=400)
+    missing = item.get_missing_fields()
+    if missing:
+        labels = [ReleaseItem.get_field_label(f) for f in missing]
+        return JsonResponse({"success": False, "error": f"以下字段未填写：{', '.join(labels)}"}, status=400)
     save_error = _save_item_or_error(item)
     if save_error is not None:
         return save_error

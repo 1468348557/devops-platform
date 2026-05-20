@@ -535,8 +535,8 @@
           <label class="field">流程定义名称
             <input id="flow-definition-name" class="form-input">
           </label>
-          <label class="field">实施单元编号（非必填）
-            <input id="implementation-unit-no" class="form-input" placeholder="选填，例如：UNIT-001">
+          <label class="field">实施单元编号
+            <input id="implementation-unit-no" class="form-input" placeholder="例如：UNIT-001">
           </label>
           <label class="field">备注（非必填）
             <input id="remark" class="form-input" placeholder="选填，最多 255 字">
@@ -551,7 +551,7 @@
             <select id="is-bug-fix" class="form-input">
               <option value="">未填写</option>
               <option value="是">是</option>
-              <option value="否" selected>否</option>
+              <option value="否">否</option>
             </select>
           </label>
           <label class="field">bug修复汇报人
@@ -1165,7 +1165,6 @@
       const node = el(id);
       if (node) node.value = "";
     });
-    el("is-bug-fix").value = "否";
     el("rel-test-status").value = "否";
     if (currentBatchProjects.length > 0) {
       el("project-id").value = String(currentBatchProjects[0].id);
@@ -1188,7 +1187,6 @@
       const node = el(id);
       if (node) node.value = "";
     });
-    el("is-bug-fix").value = "否";
     el("rel-test-status").value = "否";
     syncBugReporterCheckboxes();
     if (selectedProjectId) {
@@ -1341,7 +1339,7 @@
       const tr = document.createElement("tr");
       const rowCols = getActiveColumns();
       tr.innerHTML = rowCols.map((col) => {
-        if (col.id === "row_no") return `<td class="col-row_no">${index + 1}</td>`;
+        if (col.id === "row_no") return `<td class="col-row_no">${item.id}</td>`;
         if (col.id === "select_row") return `<td class="col-select_row">${col.render(item)}</td>`;
         return `<td class="col-${col.id}">${col.render(item)}</td>`;
       }).join("");

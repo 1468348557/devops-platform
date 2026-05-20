@@ -194,6 +194,9 @@ class ReleaseItem(models.Model):
             "project": self.project_id,
             "tech_owner": self.tech_owner,
             "biz_owner": self.biz_owner,
+            "common_component_branch": self.common_component_branch,
+            "flow_definition_name": self.flow_definition_name,
+            "implementation_unit_no": self.implementation_unit_no,
             "need_param_release": self.need_param_release,
             "need_menu": self.need_menu,
             "need_difs": self.need_difs,
@@ -203,11 +206,11 @@ class ReleaseItem(models.Model):
             "need_bpmp": self.need_bpmp,
             "need_image": self.need_image,
             "need_esf": self.need_esf,
-        "need_trade_tuning": self.need_trade_tuning,
-        "need_release_verify": self.need_release_verify,
-        "need_config_release": self.need_config_release,
-        "is_bug_fix": self.is_bug_fix,
-        "rel_test_status": self.rel_test_status,
+            "need_trade_tuning": self.need_trade_tuning,
+            "need_release_verify": self.need_release_verify,
+            "need_config_release": self.need_config_release,
+            "is_bug_fix": self.is_bug_fix,
+            "rel_test_status": self.rel_test_status,
         }
         for name, value in required_values.items():
             if value in ("", None):
@@ -219,14 +222,47 @@ class ReleaseItem(models.Model):
             missing.append("menu_added")
         if self.need_flowchart is True and self.flowchart_checked is None:
             missing.append("flowchart_checked")
-        if self.need_flowchart is True and not self.flow_definition_name:
-            missing.append("flow_definition_name")
         if self.is_bug_fix is True:
             if not self.bug_reporter:
                 missing.append("bug_reporter")
             if self.bug_discovery_time is None:
                 missing.append("bug_discovery_time")
         return missing
+
+    @staticmethod
+    def get_field_label(field_name: str) -> str:
+        _LABELS = {
+            "flow_name": "流程/功能名称",
+            "biz_category": "业务种类",
+            "project": "工程",
+            "tech_owner": "科技联系人",
+            "biz_owner": "业务联系人",
+            "requirement_branch": "需求分支",
+            "common_component_branch": "公共组件配合分支",
+            "flow_definition_name": "流程定义名称",
+            "implementation_unit_no": "实施单元编号",
+            "need_param_release": "参数投产",
+            "need_menu": "涉及菜单",
+            "need_difs": "涉及DIFS",
+            "need_flowchart": "涉及流程图",
+            "need_event_platform": "涉及事件平台",
+            "need_task_pool": "涉及统一任务池",
+            "need_bpmp": "涉及BPMP",
+            "need_image": "涉及影像",
+            "need_esf": "涉及ESF",
+            "need_trade_tuning": "涉及交易申调",
+            "need_release_verify": "涉及投产验证",
+            "need_config_release": "涉及配置文件投产",
+            "is_bug_fix": "是否为bug修复",
+            "rel_test_status": "REL测试状态",
+            "param_confirmed": "业务参数确认",
+            "menu_added": "菜单已添加",
+            "flowchart_checked": "流程图已检查",
+            "flow_definition_name": "流程定义名称",
+            "bug_reporter": "bug修复汇报人",
+            "bug_discovery_time": "bug发现时间",
+        }
+        return _LABELS.get(field_name, field_name)
 
     def refresh_line_status(self) -> None:
         missing = self.get_missing_fields()

@@ -120,8 +120,8 @@ open ──→ closed ──→ executed
 - `get_missing_fields()` 检查必填字段（18个核心字段 + 4个条件依赖字段）
 - 条件依赖：`need_param_release=True` 时 `param_confirmed` 必填；`need_menu=True` 时 `menu_added` 必填；`need_flowchart=True` 时 `flowchart_checked` 和 `flow_definition_name` 必填；`is_bug_fix=True` 时 `bug_reporter` 和 `bug_discovery_time` 必填
 - `save()` 自动调用 `refresh_line_status()`：缺失必填 → `incomplete`，完整 → `draft`
+- **创建/更新时**调用 `get_missing_fields()` 校验必填字段，有缺失时返回 400 列出中文字段名，拒绝保存
 - 提交时再次检查，全部完整才允许变为 `submitted`
-- **创建/更新时**：`need_release_verify`（涉及投产验证）为必填项，未选择是/否时直接拒绝保存，返回 400 错误
 
 ### 2.6 HoboRequirementLedger — HOBO 需求登记台账
 
@@ -369,7 +369,7 @@ API：`GET /release-entry/api/items/last-by-project/`
 - `flow_name`（流程/功能名称）— 每条记录的核心标识，不应重复
 - `remark`（备注）— 每条记录独立填写
 - `requirement_branch`（需求分支）— 系统自动生成
-- `is_bug_fix`（是否为bug修复）— 已有默认值"否"，不需引用
+- `is_bug_fix`（是否为bug修复）— 每条独立填写，不需引用
 - `bug_reporter`（bug修复汇报人）— 每条独立填写
 - `bug_discovery_time`（bug发现时间）— 每条独立填写
 - `rel_test_status`（REL测试状态）— 已有默认值"否"，不需引用
@@ -383,19 +383,18 @@ API：`GET /release-entry/api/items/last-by-project/`
 
 ### 5.8 表单默认值
 
-新建行项或切换工程清空表单时，以下字段自动填充默认值，减少填写负担：
+新建行项或切换工程清空表单时，以下字段自动填充默认值：
 
 | 字段 | 默认值 | 设置位置 |
 |------|--------|----------|
-| `is_bug_fix`（是否为bug修复） | 否 | HTML `selected` 属性 + `clearForm()` + `clearFormForProjectSwitch()` |
 | `rel_test_status`（REL测试状态） | 否 | HTML `selected` 属性 + `clearForm()` + `clearFormForProjectSwitch()` |
 
-**三层保障**：
+**设置机制**：
 1. **HTML 层**：`<option value="否" selected>` 确保页面首次加载时下拉框默认选中"否"
-2. **`clearForm()`**：新建记录时清空所有字段后，显式设置这两个字段为"否"
-3. **`clearFormForProjectSwitch()`**：切换工程触发表单清空时，同样设置这两个字段为"否"
+2. **`clearForm()`**：新建记录时清空所有字段后，显式设置该字段为"否"
+3. **`clearFormForProjectSwitch()`**：切换工程触发表单清空时，同样设置该字段为"否"
 
-> **注意**：引用上次填写（5.7）不会覆盖这些默认值，因为 `is_bug_fix` 和 `rel_test_status` 均在引用排除列表中。
+> **注意**：引用上次填写（5.7）不会覆盖此默认值，因为 `rel_test_status` 在引用排除列表中。
 
 实现位置：
 - 前端：`release_entry.html` → `clearForm()` / `clearFormForProjectSwitch()` 函数
