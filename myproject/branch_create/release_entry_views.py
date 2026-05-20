@@ -1,6 +1,6 @@
 import io
 import re
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError
@@ -174,6 +174,7 @@ def _release_entry_xlsx_bytes(batch: ReleaseBatch, items: list[ReleaseItem]) -> 
         "备注",
         "是否为bug修复",
         "bug修复汇报人",
+        "bug发现时间",
         "需要事件平台",
         "需要任务池",
         "需要BPMP",
@@ -229,6 +230,7 @@ def _release_entry_xlsx_bytes(batch: ReleaseBatch, items: list[ReleaseItem]) -> 
             item.remark,
             _tri_state_sheet_bool(item.is_bug_fix),
             item.bug_reporter,
+            timezone.localtime(item.bug_discovery_time).strftime("%Y-%m-%d %H:%M") if (item.bug_discovery_time and timezone.is_aware(item.bug_discovery_time)) else (item.bug_discovery_time.strftime("%Y-%m-%d %H:%M") if item.bug_discovery_time else ""),
             _tri_state_sheet_bool(item.need_event_platform),
             _tri_state_sheet_bool(item.need_task_pool),
             _tri_state_sheet_bool(item.need_bpmp),
@@ -370,6 +372,7 @@ def _item_to_dict(item: ReleaseItem, user) -> dict:
         "remark": item.remark,
         "is_bug_fix": item.is_bug_fix,
         "bug_reporter": item.bug_reporter,
+        "bug_discovery_time": timezone.localtime(item.bug_discovery_time).strftime("%Y-%m-%dT%H:%M") if (item.bug_discovery_time and timezone.is_aware(item.bug_discovery_time)) else (item.bug_discovery_time.strftime("%Y-%m-%dT%H:%M") if item.bug_discovery_time else ""),
         "need_event_platform": item.need_event_platform,
         "need_task_pool": item.need_task_pool,
         "need_bpmp": item.need_bpmp,
@@ -485,6 +488,17 @@ def _apply_item_fields(
         bug_reporter = request.POST.get("bug_reporter")
         if bug_reporter is not None and "bug_reporter" in editable_fields:
             item.bug_reporter = bug_reporter.strip()
+
+        bug_discovery_time = request.POST.get("bug_discovery_time")
+        if bug_discovery_time is not None and "bug_discovery_time" in editable_fields:
+            bug_discovery_time = bug_discovery_time.strip()
+            if bug_discovery_time:
+                try:
+                    item.bug_discovery_time = timezone.make_aware(datetime.fromisoformat(bug_discovery_time))
+                except (ValueError, TypeError):
+                    pass
+            else:
+                item.bug_discovery_time = None
 
         rel_test_status = request.POST.get("rel_test_status")
         if rel_test_status is not None and "rel_test_status" in editable_fields:

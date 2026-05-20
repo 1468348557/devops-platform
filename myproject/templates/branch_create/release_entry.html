@@ -545,6 +545,29 @@
       </div>
 
       <div class="form-section">
+        <h4 class="form-section-title">bug修复信息</h4>
+        <div class="grid-3 entry-form-grid">
+          <label class="field">是否为bug修复
+            <select id="is-bug-fix" class="form-input">
+              <option value="">未填写</option>
+              <option value="是">是</option>
+              <option value="否">否</option>
+            </select>
+          </label>
+          <label class="field">bug修复汇报人
+            <input type="hidden" id="bug-reporter">
+            <div class="checkbox-group" id="bug-reporter-group">
+              <label class="checkbox-label"><input type="checkbox" value="周子健" class="bug-reporter-check"> 周子健</label>
+              <label class="checkbox-label"><input type="checkbox" value="高翔" class="bug-reporter-check"> 高翔</label>
+            </div>
+          </label>
+          <label class="field">bug发现时间
+            <input type="datetime-local" id="bug-discovery-time" class="form-input" step="3600">
+          </label>
+        </div>
+      </div>
+
+      <div class="form-section">
         <h4 class="form-section-title">检查项</h4>
         <div class="grid-3 entry-form-grid">
           <label class="field">参数投产
@@ -591,16 +614,6 @@
           </label>
           <label class="field">涉及配置文件投产
             <select id="need-config-release" class="form-input"><option value="">未填写</option><option value="是">是</option><option value="否">否</option></select>
-          </label>
-          <label class="field">是否为bug修复
-            <select id="is-bug-fix" class="form-input">
-              <option value="">未填写</option>
-              <option value="是">是</option>
-              <option value="否">否</option>
-            </select>
-          </label>
-          <label class="field">bug修复汇报人
-            <input id="bug-reporter" class="form-input" maxlength="64" placeholder="若为bug修复则必填">
           </label>
           <label class="field">REL 测试状态
             <select id="rel-test-status" class="form-input">
@@ -748,7 +761,7 @@
   const currentUsername = "{{ request.user.username|escapejs }}";
   const fields = [
     "project-id","requirement-branch","release-branch","flow-name","biz-category","tech-owner","biz-owner","common-component-branch","flow-definition-name",
-    "implementation-unit-no","remark","is-bug-fix","bug-reporter",
+    "implementation-unit-no","remark","is-bug-fix","bug-reporter","bug-discovery-time",
     "need-param-release","param-confirmed","need-menu","menu-added","need-difs","need-flowchart","flowchart-checked",
     "need-event-platform","need-task-pool","need-bpmp","need-image","need-esf","need-trade-tuning","need-release-verify",
     "need-config-release",
@@ -764,7 +777,7 @@
     need_release_verify: "是否涉及投产验证",
     need_config_release: "是否涉及配置文件投产",
     requirement_branch: "需求分支",
-    is_bug_fix: "是否为bug修复", bug_reporter: "bug修复汇报人",
+    is_bug_fix: "是否为bug修复", bug_reporter: "bug修复汇报人", bug_discovery_time: "bug发现时间",
     rel_test_status: "REL测试状态"
   };
 
@@ -790,6 +803,7 @@
     "flowchart_checked","need_event_platform","need_task_pool","need_bpmp","need_image","need_esf",
     "need_trade_tuning","need_release_verify","need_config_release","rel_test_status",
   ]);
+  const bugFixColumnIds = new Set(["is_bug_fix", "bug_reporter", "bug_discovery_time"]);
   const columnDefs = [
     { id: "flow_name", label: "流程/功能", render: (item) => escapeHtml(item.flow_name || "-") },
     { id: "biz_category", label: "业务种类", render: (item) => escapeHtml(item.biz_category || "-") },
@@ -835,6 +849,7 @@
     { id: "remark", label: "备注", render: (item) => escapeHtml(item.remark || "-") },
     { id: "is_bug_fix", label: "是否bug修复", render: (item) => escapeHtml(normalizeBool(item.is_bug_fix) || "-") },
     { id: "bug_reporter", label: "bug修复汇报人", render: (item) => escapeHtml(item.bug_reporter || "-") },
+    { id: "bug_discovery_time", label: "bug发现时间", render: (item) => escapeHtml(item.bug_discovery_time ? item.bug_discovery_time.slice(0, 16).replace("T", " ") : "-") },
     { id: "need_param_release", label: "参数投产", render: (item) => escapeHtml(normalizeBool(item.need_param_release) || "-") },
     { id: "param_confirmed", label: "业务参数确认", render: (item) => escapeHtml(normalizeBool(item.param_confirmed) || "-") },
     { id: "need_menu", label: "涉及菜单", render: (item) => escapeHtml(normalizeBool(item.need_menu) || "-") },
@@ -919,7 +934,8 @@
   function renderColumnConfigPanel() {
     const grid = el("column-config-grid");
     const defs = columnDefs.filter((c) => !c.fixed && c.id !== "actions");
-    const basicDefs = defs.filter((col) => !checkItemColumnIds.has(col.id));
+    const basicDefs = defs.filter((col) => !checkItemColumnIds.has(col.id) && !bugFixColumnIds.has(col.id));
+    const bugFixDefs = defs.filter((col) => bugFixColumnIds.has(col.id));
     const checkDefs = defs.filter((col) => checkItemColumnIds.has(col.id));
     const renderGroup = (title, groupDefs) => `
       <div class="column-group">
@@ -936,6 +952,7 @@
     `;
     grid.innerHTML = `
       ${renderGroup("基础信息相关列", basicDefs)}
+      ${renderGroup("bug修复信息相关列", bugFixDefs)}
       ${renderGroup("检查项相关列", checkDefs)}
     `;
     grid.querySelectorAll(".column-choice").forEach((node) => {
@@ -960,6 +977,17 @@
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#39;");
+  }
+  function getBugReporterValue() {
+    const checks = document.querySelectorAll(".bug-reporter-check:checked");
+    return Array.from(checks).map((c) => c.value).join(",");
+  }
+  function syncBugReporterCheckboxes() {
+    const val = el("bug-reporter").value;
+    const selected = val ? val.split(",").map((s) => s.trim()).filter(Boolean) : [];
+    document.querySelectorAll(".bug-reporter-check").forEach((cb) => {
+      cb.checked = selected.includes(cb.value);
+    });
   }
   function getDraftKey() {
     if (!currentBatch) return null;
@@ -1144,6 +1172,7 @@
     const submitBtn = el("btn-submit-modal");
     if (submitBtn) submitBtn.textContent = "提交";
     setFormTip("");
+    syncBugReporterCheckboxes();
     clearDraftFromLocal();
   }
 
@@ -1157,6 +1186,7 @@
       const node = el(id);
       if (node) node.value = "";
     });
+    syncBugReporterCheckboxes();
     if (selectedProjectId) {
       el("project-id").value = String(selectedProjectId);
     }
@@ -1182,6 +1212,8 @@
     el("remark").value = item.remark || "";
     el("is-bug-fix").value = normalizeBool(item.is_bug_fix);
     el("bug-reporter").value = item.bug_reporter || "";
+    syncBugReporterCheckboxes();
+    el("bug-discovery-time").value = item.bug_discovery_time || "";
     el("need-param-release").value = normalizeBool(item.need_param_release);
     el("param-confirmed").value = normalizeBool(item.param_confirmed);
     el("need-menu").value = normalizeBool(item.need_menu);
@@ -1232,6 +1264,8 @@
     setValue("remark", item.remark || "");
     setValue("is-bug-fix", normalizeBool(item.is_bug_fix));
     setValue("bug-reporter", item.bug_reporter || "");
+    syncBugReporterCheckboxes();
+    setValue("bug-discovery-time", item.bug_discovery_time || "");
     setValue("need-param-release", normalizeBool(item.need_param_release));
     setValue("param-confirmed", normalizeBool(item.param_confirmed));
     setValue("need-menu", normalizeBool(item.need_menu));
@@ -1257,7 +1291,7 @@
 
     const devIds = [
       "project-id","requirement-branch","flow-name","biz-category","tech-owner","biz-owner",
-      "common-component-branch","flow-definition-name","remark","is-bug-fix","bug-reporter","need-param-release","param-confirmed",
+      "common-component-branch","flow-definition-name","remark","is-bug-fix","bug-reporter","bug-discovery-time","need-param-release","param-confirmed",
       "implementation-unit-no",
       "need-menu","menu-added","need-difs","need-flowchart","flowchart-checked","need-event-platform",
       "need-task-pool","need-bpmp","need-image","need-esf","need-trade-tuning","need-release-verify",
@@ -1945,6 +1979,13 @@
     node.addEventListener("change", saveDraftToLocal);
   });
 
+  document.querySelectorAll(".bug-reporter-check").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      el("bug-reporter").value = getBugReporterValue();
+      el("bug-reporter").dispatchEvent(new Event("change"));
+    });
+  });
+
   async function saveCurrentRecord(closeAfterSave = true) {
     if (!currentBatch) {
       setFormTip("请先选择批次");
@@ -1968,7 +2009,8 @@
       implementation_unit_no: el("implementation-unit-no").value,
       remark: el("remark").value,
               is_bug_fix: denormalizeBool(el("is-bug-fix").value),
-              bug_reporter: el("bug-reporter").value,
+              bug_reporter: getBugReporterValue(),
+              bug_discovery_time: el("bug-discovery-time").value,
       need_param_release: denormalizeBool(el("need-param-release").value),
       param_confirmed: denormalizeBool(el("param-confirmed").value),
       need_menu: denormalizeBool(el("need-menu").value),

@@ -90,8 +90,9 @@ open ──→ closed ──→ executed
 | | common_component_branch | 公共组件分支 |
 | | implementation_unit_no | 实施单元编号 |
 | | remark | 备注 |
-| | is_bug_fix | 是否为 bug 修复（三态：null=未填写/true=是/false=否） |
-| | bug_reporter | bug 修复汇报人 |
+| bug修复信息 | is_bug_fix | 是否为 bug 修复（三态：null=未填写/true=是/false=否） |
+| | bug_reporter | bug 修复汇报人（多选：周子健/高翔，逗号分隔） |
+| | bug_discovery_time | bug 发现时间（datetime，精确到小时） |
 | 研发字段 | need_param_release / param_confirmed | 是否需要参数投产 / 参数是否已确认 |
 | | need_menu / menu_added | 是否需要菜单 / 菜单是否已新增 |
 | | need_difs | 是否需要 DIFS |
@@ -116,8 +117,8 @@ open ──→ closed ──→ executed
 | | branch_create_log | 执行日志 |
 
 **行状态自动刷新机制**：
-- `get_missing_fields()` 检查必填字段（18个核心字段 + 3个条件依赖字段）
-- 条件依赖：`need_param_release=True` 时 `param_confirmed` 必填；`need_menu=True` 时 `menu_added` 必填；`need_flowchart=True` 时 `flowchart_checked` 和 `flow_definition_name` 必填
+- `get_missing_fields()` 检查必填字段（18个核心字段 + 4个条件依赖字段）
+- 条件依赖：`need_param_release=True` 时 `param_confirmed` 必填；`need_menu=True` 时 `menu_added` 必填；`need_flowchart=True` 时 `flowchart_checked` 和 `flow_definition_name` 必填；`is_bug_fix=True` 时 `bug_reporter` 和 `bug_discovery_time` 必填
 - `save()` 自动调用 `refresh_line_status()`：缺失必填 → `incomplete`，完整 → `draft`
 - 提交时再次检查，全部完整才允许变为 `submitted`
 
@@ -198,7 +199,7 @@ open ──→ closed ──→ executed
 
 通过 `accounts/role_meta.py` 定义：
 
-**研发字段（RELEASE_ENTRY_DEV_FIELD_KEYS）**：29 个字段，包括基本信息、所有布尔检查项、rel_test_status
+**研发字段（RELEASE_ENTRY_DEV_FIELD_KEYS）**：30 个字段，包括基本信息、所有布尔检查项、bug修复信息、rel_test_status
 
 **运维字段（RELEASE_ENTRY_OPS_FIELD_KEYS）**：仅 `rel_deployed`、`deploy_status`
 
@@ -452,7 +453,7 @@ plan → precheck → (确认) → mr → approval → verify_mr → (确认) �
 
 文件：`release_entry_views.py::_release_entry_xlsx_bytes`
 
-38 列，包括：批次信息、工程信息、分支信息、所有布尔检查项（是/否/未填写）、行状态、分支创建状态、填写人等。
+39 列，包括：批次信息、工程信息、分支信息、所有布尔检查项（是/否/未填写）、bug修复信息、行状态、分支创建状态、填写人等。
 
 导出文件名：`release_entry_{date}_{branch}.xlsx`
 
