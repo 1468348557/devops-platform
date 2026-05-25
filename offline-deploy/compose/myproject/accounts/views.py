@@ -459,8 +459,11 @@ def approval_action(request, profile_id):
         return redirect("/")
 
     target_profile = get_object_or_404(UserProfile.objects.select_related("user"), pk=profile_id)
-    if target_profile.approval_status != UserProfile.ApprovalStatus.PENDING:
-        messages.error(request, "该账号不是待审核状态。")
+    if target_profile.approval_status not in {
+        UserProfile.ApprovalStatus.PENDING,
+        UserProfile.ApprovalStatus.REJECTED,
+    }:
+        messages.error(request, "该账号不是待审核或已拒绝状态。")
         return redirect("/approval/")
     if not _can_review_target(request.user, target_profile):
         messages.error(request, "你无权审核该账号。")
@@ -779,17 +782,20 @@ def admin_config(request):
                     selected_role = RoleDefinition.objects.filter(
                         id=int(new_role_id), enabled=True
                     ).first()
-                    if selected_role:
+                    if selected_role and selected_role != profile.role:
                         profile.role = selected_role
                         if profile.approval_status == UserProfile.ApprovalStatus.APPROVED:
                             profile.approved_by = request.user
                             profile.approved_at = timezone.now()
-                    profile.save(update_fields=["role", "approved_by", "approved_at"])
-                target_user.is_staff = (
+                        profile.save(update_fields=["role", "approved_by", "approved_at"])
+
+                is_staff = (
                     profile.role.is_staff_role
                     and profile.approval_status == UserProfile.ApprovalStatus.APPROVED
                 )
-                updated_fields.append("is_staff")
+                if target_user.is_staff != is_staff:
+                    target_user.is_staff = is_staff
+                    updated_fields.append("is_staff")
 
             if updated_fields:
                 target_user.save(update_fields=list(set(updated_fields)))
@@ -821,6 +827,13 @@ def admin_config(request):
         pending_profiles = pending_profiles.filter(role__is_staff_role=False)
     pending_profiles = pending_profiles.order_by("user__date_joined")
 
+    rejected_profiles = UserProfile.objects.select_related("user").filter(
+        approval_status=UserProfile.ApprovalStatus.REJECTED
+    )
+    if not request.user.is_superuser:
+        rejected_profiles = rejected_profiles.filter(role__is_staff_role=False)
+    rejected_profiles = rejected_profiles.order_by("-approved_at")
+
     projects = ProjectCatalog.objects.order_by("project_name", "id")
     git_config = GitPlatformConfig.get_solo_safe()
     if not getattr(git_config, "_db_ready", True):
@@ -828,6 +841,9 @@ def admin_config(request):
     managed_users = (
         User.objects.exclude(id=request.user.id)
         .select_related("profile")
+        .exclude(
+            profile__approval_status=UserProfile.ApprovalStatus.REJECTED,
+        )
         .order_by("username", "id")
     )
     return render(
@@ -836,6 +852,7 @@ def admin_config(request):
         {
             "password_form": password_form,
             "pending_profiles": pending_profiles,
+            "rejected_profiles": rejected_profiles,
             "projects": projects,
             "git_config": git_config,
             "git_password_masked": GitPlatformConfig.mask_secret(git_config.git_password),
@@ -914,12 +931,18 @@ def list_managed_users(request):
         return JsonResponse({"success": False, "error": "无权限"}, status=403)
 
     keyword = request.GET.get("keyword", "").strip()
+    reverse = request.GET.get("reverse", "").strip() in ("1", "true", "yes")
     page = max(1, int(request.GET.get("page", 1)))
     page_size = min(500, max(10, int(request.GET.get("page_size", 20))))
 
-    queryset = User.objects.exclude(id=request.user.id).select_related("profile")
+    queryset = User.objects.exclude(id=request.user.id).select_related("profile").exclude(
+        profile__approval_status=UserProfile.ApprovalStatus.REJECTED,
+    )
     if keyword:
-        queryset = queryset.filter(username__icontains=keyword)
+        if reverse:
+            queryset = queryset.exclude(username__icontains=keyword)
+        else:
+            queryset = queryset.filter(username__icontains=keyword)
     queryset = queryset.order_by("username", "id")
 
     total = queryset.count()
@@ -985,7 +1008,11 @@ def approval_bulk_action(request):
         return redirect("/approval/")
 
     targets = UserProfile.objects.select_related("user").filter(
-        id__in=profile_ids, approval_status=UserProfile.ApprovalStatus.PENDING
+        id__in=profile_ids,
+        approval_status__in=[
+            UserProfile.ApprovalStatus.PENDING,
+            UserProfile.ApprovalStatus.REJECTED,
+        ],
     )
     approved_count = 0
     rejected_count = 0

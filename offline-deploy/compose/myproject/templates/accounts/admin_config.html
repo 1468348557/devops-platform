@@ -301,6 +301,42 @@
         </table>
       </div>
 
+      <h3 class="table-title">已拒绝账号</h3>
+      <div class="table-wrap" style="margin-bottom:14px;">
+        <table>
+          <thead>
+          <tr>
+            <th>用户名</th>
+            <th>邮箱</th>
+            <th>申请角色</th>
+            <th>拒绝时间</th>
+            <th>拒绝原因</th>
+            <th>操作</th>
+          </tr>
+          </thead>
+          <tbody>
+          {% for profile in rejected_profiles %}
+            <tr>
+              <td>{{ profile.user.username }}</td>
+              <td>{{ profile.user.email|default:"-" }}</td>
+              <td>{% if profile.role %}{{ profile.role.name }}{% else %}-{% endif %}</td>
+              <td>{{ profile.approved_at|date:"Y-m-d H:i" }}</td>
+              <td>{{ profile.rejection_reason|default:"-" }}</td>
+              <td>
+                <form method="post" action="{% url 'approval_action' profile.id %}" style="display:inline-block; margin-right:6px;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="approve">
+                  <button class="btn btn-primary" type="submit">重新通过</button>
+                </form>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" style="color:#6b7280;">暂无已拒绝账号</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
       <h3 class="table-title">已注册账号</h3>
       <div class="search-toolbar">
         <label class="field">
@@ -309,8 +345,18 @@
         </label>
         <button id="btn-search-user" class="btn btn-secondary" type="button">搜索</button>
         <button id="btn-reset-user-search" class="btn btn-secondary" type="button">重置</button>
+        <label class="check-row" style="margin-bottom:0; white-space:nowrap;">
+          <input id="user-reverse-toggle" type="checkbox">
+          <span>反向排除</span>
+        </label>
         <span id="user-search-tip" class="muted"></span>
       </div>
+      <form id="user-account-form" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_user_account">
+        <input type="hidden" id="hidden-target-user-id" name="target_user_id" value="">
+        <input type="hidden" id="hidden-new-role-id" name="new_role_id" value="">
+        <input type="hidden" id="hidden-new-password" name="new_password" value="">
       <div class="user-table-wrap">
         <table>
           <thead>
@@ -326,10 +372,6 @@
           <tbody id="user-list-body">
           {% for u in managed_users %}
             <tr data-user-id="{{ u.id }}">
-              <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="update_user_account">
-                <input type="hidden" name="target_user_id" value="{{ u.id }}">
                 <td>{{ u.username }}</td>
                 <td>{{ u.email|default:"-" }}</td>
                 <td>
@@ -345,16 +387,15 @@
                   {% if u.is_superuser %}
                     <span class="muted">超管角色不可修改</span>
                   {% else %}
-                    <select class="form-input" name="new_role_id" style="min-width:140px;">
+                    <select class="form-input js-role-select" style="min-width:140px;">
                       {% for role in available_roles %}
                         <option value="{{ role.id }}" {% if u.profile and u.profile.role_id == role.id %}selected{% endif %}>{{ role.name }}</option>
                       {% endfor %}
                     </select>
                   {% endif %}
                 </td>
-                <td><input class="form-input" type="password" name="new_password" placeholder="不填则不修改"></td>
-                <td><button class="btn btn-secondary" type="submit">保存</button></td>
-              </form>
+                <td><input class="form-input js-password-input" type="password" placeholder="不填则不修改"></td>
+                <td><button class="btn btn-secondary js-save-user-btn" type="button" data-user-id="{{ u.id }}">保存</button></td>
             </tr>
           {% empty %}
             <tr><td colspan="6" style="color:#6b7280;">暂无其他账号</td></tr>
@@ -362,6 +403,7 @@
           </tbody>
         </table>
       </div>
+      </form>
       <div class="user-pager" id="user-pager" style="display:none;">
         <div class="user-pager-left">
           <span class="pager-info" id="user-pager-info">共 0 条</span>
@@ -619,6 +661,7 @@
   let userCurrentPage = 1;
   let userPageSize = 20;
   let userCurrentKeyword = "";
+  let userReverseSearch = false;
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -636,21 +679,16 @@
     const roleDisplay = u.current_role ? escapeHtml(u.current_role.name) : '未设置';
     const roleSelectHtml = u.is_superuser
       ? '<span class="muted">超管角色不可修改</span>'
-      : `<select class="form-input" name="new_role_id" style="min-width:140px;">${roleOptions}</select>`;
+      : `<select class="form-input js-role-select" style="min-width:140px;">${roleOptions}</select>`;
     const tr = document.createElement('tr');
     tr.dataset.userId = u.id;
     tr.innerHTML = `
-      <form method="post">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="update_user_account">
-        <input type="hidden" name="target_user_id" value="${u.id}">
         <td>${escapeHtml(u.username)}</td>
         <td>${escapeHtml(u.email || '-')}</td>
         <td>${roleDisplay}</td>
         <td>${roleSelectHtml}</td>
-        <td><input class="form-input" type="password" name="new_password" placeholder="不填则不修改"></td>
-        <td><button class="btn btn-secondary" type="submit">保存</button></td>
-      </form>
+        <td><input class="form-input js-password-input" type="password" placeholder="不填则不修改"></td>
+        <td><button class="btn btn-secondary js-save-user-btn" type="button" data-user-id="${u.id}">保存</button></td>
     `;
     return tr;
   }
@@ -684,7 +722,9 @@
   function applyUserFilter() {
     const kw = userCurrentKeyword.toLowerCase();
     userFilteredData = kw
-      ? userAllData.filter(u => u.username.toLowerCase().includes(kw))
+      ? (userReverseSearch
+          ? userAllData.filter(u => !u.username.toLowerCase().includes(kw))
+          : userAllData.filter(u => u.username.toLowerCase().includes(kw)))
       : [...userAllData];
     userCurrentPage = 1;
     renderUserPage();
@@ -710,17 +750,21 @@
 
   document.getElementById('btn-search-user').addEventListener('click', () => {
     userCurrentKeyword = document.getElementById('user-search-input').value.trim();
+    userReverseSearch = document.getElementById('user-reverse-toggle').checked;
     applyUserFilter();
   });
   document.getElementById('user-search-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       userCurrentKeyword = e.target.value.trim();
+      userReverseSearch = document.getElementById('user-reverse-toggle').checked;
       applyUserFilter();
     }
   });
   document.getElementById('btn-reset-user-search').addEventListener('click', () => {
     document.getElementById('user-search-input').value = '';
+    document.getElementById('user-reverse-toggle').checked = false;
     userCurrentKeyword = '';
+    userReverseSearch = false;
     applyUserFilter();
   });
   document.getElementById('user-page-size').addEventListener('change', (e) => {
@@ -745,6 +789,23 @@
       if (userAllData.length === 0) loadUsers();
     });
   }
+
+  // 通过事件委托处理账号行保存按钮（兼容服务端渲染和 JS 动态渲染的行）
+  document.getElementById('user-list-body')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.js-save-user-btn');
+    if (!btn) return;
+    e.preventDefault();
+    const row = btn.closest('tr');
+    const form = document.getElementById('user-account-form');
+    if (!row || !form) return;
+    const userId = btn.dataset.userId || row.dataset.userId || '';
+    const roleSelect = row.querySelector('.js-role-select');
+    const pwdInput = row.querySelector('.js-password-input');
+    document.getElementById('hidden-target-user-id').value = userId;
+    document.getElementById('hidden-new-role-id').value = roleSelect ? roleSelect.value : '';
+    document.getElementById('hidden-new-password').value = pwdInput ? pwdInput.value : '';
+    form.submit();
+  });
 
   // ========== 其他原有代码 ==========
   function validateGitConfigAccordions() {
