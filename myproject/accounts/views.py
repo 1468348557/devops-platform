@@ -779,17 +779,20 @@ def admin_config(request):
                     selected_role = RoleDefinition.objects.filter(
                         id=int(new_role_id), enabled=True
                     ).first()
-                    if selected_role:
+                    if selected_role and selected_role != profile.role:
                         profile.role = selected_role
                         if profile.approval_status == UserProfile.ApprovalStatus.APPROVED:
                             profile.approved_by = request.user
                             profile.approved_at = timezone.now()
-                    profile.save(update_fields=["role", "approved_by", "approved_at"])
-                target_user.is_staff = (
+                        profile.save(update_fields=["role", "approved_by", "approved_at"])
+
+                is_staff = (
                     profile.role.is_staff_role
                     and profile.approval_status == UserProfile.ApprovalStatus.APPROVED
                 )
-                updated_fields.append("is_staff")
+                if target_user.is_staff != is_staff:
+                    target_user.is_staff = is_staff
+                    updated_fields.append("is_staff")
 
             if updated_fields:
                 target_user.save(update_fields=list(set(updated_fields)))
@@ -914,12 +917,16 @@ def list_managed_users(request):
         return JsonResponse({"success": False, "error": "无权限"}, status=403)
 
     keyword = request.GET.get("keyword", "").strip()
+    reverse = request.GET.get("reverse", "").strip() in ("1", "true", "yes")
     page = max(1, int(request.GET.get("page", 1)))
     page_size = min(500, max(10, int(request.GET.get("page_size", 20))))
 
     queryset = User.objects.exclude(id=request.user.id).select_related("profile")
     if keyword:
-        queryset = queryset.filter(username__icontains=keyword)
+        if reverse:
+            queryset = queryset.exclude(username__icontains=keyword)
+        else:
+            queryset = queryset.filter(username__icontains=keyword)
     queryset = queryset.order_by("username", "id")
 
     total = queryset.count()
