@@ -4,6 +4,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from django.utils import timezone
+
 from accounts.services.git_settings import get_runtime_git_settings, scrub_sensitive_text
 from branch_create.config_parser import _map_project
 
@@ -63,7 +65,8 @@ class BranchExecutor:
         logs: list[str] = []
 
         def add_log(msg: str) -> None:
-            logs.append(scrub_sensitive_text(msg))
+            ts = timezone.localtime(timezone.now()).strftime("%Y-%m-%d %H:%M:%S")
+            logs.append(f"[{ts}] {scrub_sensitive_text(msg)}")
 
         def add_process_output(result: subprocess.CompletedProcess) -> None:
             out = scrub_sensitive_text((result.stdout or "").strip())
