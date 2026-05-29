@@ -361,7 +361,7 @@ class ReleaseTrackService:
             if str(code).strip()
         }
         items = (
-            ReleaseItem.objects.select_related("project")
+            ReleaseItem.objects.active().select_related("project")
             .filter(batch=batch, rel_deployed=True)
             .order_by("project__project_code", "-updated_at", "-id")
         )

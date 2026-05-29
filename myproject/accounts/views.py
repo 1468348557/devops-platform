@@ -7,6 +7,7 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.models import User
 from django.contrib.auth.views import LoginView, LogoutView
 from django.db import IntegrityError
+from django.db.models.deletion import ProtectedError
 from django.db.utils import OperationalError, ProgrammingError
 from django.db import transaction
 from django.http import JsonResponse
@@ -743,7 +744,14 @@ def admin_config(request):
                 return redirect("/admin-config/")
             project = get_object_or_404(ProjectCatalog, pk=project_id)
             project_name = project.project_name
-            project.delete()
+            try:
+                project.delete()
+            except ProtectedError:
+                messages.error(
+                    request,
+                    f"工程 {project_name} 存在关联数据（HOBO 需求记录等），无法删除。请先清理相关数据后再操作。",
+                )
+                return redirect("/admin-config/")
             messages.success(request, f"工程 {project_name} 已删除。")
             return redirect("/admin-config/")
         elif action == "update_user_account":
@@ -897,8 +905,8 @@ def notification_counts(request):
         from sql_execute.models import SqlExecutionRequest
 
         # 未建分支数（Hobo + Release）
-        hobo_count = HoboRequirementLedger.objects.filter(branch_created=False).count()
-        release_count = ReleaseItem.objects.filter(
+        hobo_count = HoboRequirementLedger.objects.active().filter(branch_created=False).count()
+        release_count = ReleaseItem.objects.active().filter(
             branch_created=False,
         ).count()
         uncreated_branch_count = hobo_count + release_count

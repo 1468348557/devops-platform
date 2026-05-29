@@ -34,9 +34,10 @@ class ReleaseItemAdmin(admin.ModelAdmin):
         "project",
         "developer",
         "line_status",
+        "is_deleted",
         "updated_at",
     )
-    list_filter = ("line_status", "branch_type", "batch__release_date")
+    list_filter = ("line_status", "branch_type", "batch__release_date", "is_deleted")
     search_fields = (
         "requirement_branch",
         "flow_name",
@@ -69,9 +70,10 @@ class HoboRequirementLedgerAdmin(admin.ModelAdmin):
         "applied_date",
         "base_branch",
         "created_by",
+        "is_deleted",
         "updated_at",
     )
-    list_filter = ("applied_date", "requirement_type")
+    list_filter = ("applied_date", "requirement_type", "is_deleted")
     search_fields = (
         "requirement_branch",
         "requirement_type",

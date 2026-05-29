@@ -227,7 +227,7 @@ def hobo_ledger_item_list(request):
     project_id = (request.GET.get("project_id") or "").strip()
 
     items = (
-        HoboRequirementLedger.objects.select_related("project", "created_by")
+        HoboRequirementLedger.objects.active().select_related("project", "created_by")
         .filter(applied_date__gte=start_date, applied_date__lte=end_date)
         .order_by("-applied_date", "-id")
     )
@@ -272,7 +272,7 @@ def hobo_ledger_export_xlsx(request):
         return HttpResponse("无导出权限", status=403, content_type="text/plain; charset=utf-8")
 
     items_qs = (
-        HoboRequirementLedger.objects.select_related(
+        HoboRequirementLedger.objects.active().select_related(
             "project", "created_by", "branch_created_by"
         ).order_by("-applied_date", "-id")
     )
@@ -370,7 +370,7 @@ def hobo_ledger_item_update(request):
         return JsonResponse({"success": False, "error": "无权限访问"}, status=403)
 
     try:
-        entry = HoboRequirementLedger.objects.select_related("project", "created_by").get(pk=item_id)
+        entry = HoboRequirementLedger.objects.active().select_related("project", "created_by").get(pk=item_id)
     except HoboRequirementLedger.DoesNotExist:
         return JsonResponse({"success": False, "error": "记录不存在"}, status=404)
 
@@ -437,7 +437,7 @@ def hobo_ledger_item_delete(request):
         return JsonResponse({"success": False, "error": "无权限访问"}, status=403)
 
     try:
-        entry = HoboRequirementLedger.objects.get(pk=item_id)
+        entry = HoboRequirementLedger.objects.active().get(pk=item_id)
     except HoboRequirementLedger.DoesNotExist:
         return JsonResponse({"success": False, "error": "记录不存在"}, status=404)
 
@@ -446,5 +446,6 @@ def hobo_ledger_item_delete(request):
     if not request.user.is_superuser and entry.created_by_id != request.user.id:
         return JsonResponse({"success": False, "error": "仅本人或超管可删除"}, status=403)
 
-    entry.delete()
+    entry.is_deleted = True
+    entry.save(update_fields=["is_deleted", "updated_at"])
     return JsonResponse({"success": True})

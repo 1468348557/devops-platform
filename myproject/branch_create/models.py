@@ -6,6 +6,31 @@ from django.utils import timezone
 HOBO_BRANCH_REGEX = r"^(FIX|REQ|PUB)-[0-9]{8}-[0-9]{4}(-[\w-]{1,50})?$"
 
 
+class SoftDeleteQuerySet(models.QuerySet):
+    def active(self):
+        return self.filter(is_deleted=False)
+
+    def deleted(self):
+        return self.filter(is_deleted=True)
+
+    def with_deleted(self):
+        return self.all()
+
+
+class SoftDeleteManager(models.Manager):
+    def get_queryset(self):
+        return SoftDeleteQuerySet(self.model, using=self._db)
+
+    def active(self):
+        return self.get_queryset().active()
+
+    def deleted(self):
+        return self.get_queryset().deleted()
+
+    def with_deleted(self):
+        return self.get_queryset().with_deleted()
+
+
 class ProjectCatalog(models.Model):
     project_code = models.CharField(max_length=64, unique=True, verbose_name="工程编码")
     project_name = models.CharField(
@@ -114,7 +139,7 @@ class ReleaseItem(models.Model):
     sql_only_release = models.BooleanField(default=False)
     batch = models.ForeignKey(ReleaseBatch, on_delete=models.CASCADE, related_name="items")
     project = models.ForeignKey(
-        ReleaseBatchProject, on_delete=models.PROTECT, related_name="release_items"
+        ReleaseBatchProject, on_delete=models.CASCADE, related_name="release_items"
     )
     flow_name = models.CharField(max_length=128)
     biz_category = models.CharField(max_length=64, blank=True, default="")
@@ -168,6 +193,10 @@ class ReleaseItem(models.Model):
     line_status = models.CharField(
         max_length=16, choices=LineStatus.choices, default=LineStatus.DRAFT
     )
+    is_deleted = models.BooleanField(default=False)
+
+    objects = SoftDeleteManager()
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -288,7 +317,6 @@ class HoboRequirementLedger(models.Model):
     )
     requirement_branch = models.CharField(
         max_length=68,
-        unique=True,
         validators=[RegexValidator(regex=HOBO_BRANCH_REGEX, message="分支名称格式不正确")],
         verbose_name="分支名称",
     )
@@ -344,6 +372,10 @@ class HoboRequirementLedger(models.Model):
         on_delete=models.PROTECT,
         related_name="hobo_requirement_entries",
     )
+    is_deleted = models.BooleanField(default=False)
+
+    objects = SoftDeleteManager()
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -113,7 +113,7 @@ def _release_entry_list_queryset(request):
     project_id = (request.GET.get("project_id") or "").strip()
 
     items = (
-        ReleaseItem.objects.select_related("project", "developer", "batch")
+        ReleaseItem.objects.active().select_related("project", "developer", "batch")
         .filter(batch_id=batch_id)
         .filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
         .order_by("id")
@@ -725,7 +725,7 @@ def release_entry_item_last_by_project(request):
         return JsonResponse({"success": False, "error": "工程不存在"}, status=404)
 
     exclude_item_id = (request.GET.get("exclude_item_id") or "").strip()
-    items = ReleaseItem.objects.select_related("project", "batch").filter(
+    items = ReleaseItem.objects.active().select_related("project", "batch").filter(
         project__project_code=project.project_code
     )
     if exclude_item_id.isdigit():
@@ -773,7 +773,7 @@ def release_entry_item_update(request):
         return JsonResponse({"success": False, "error": "item_id 必填"}, status=400)
 
     try:
-        item = ReleaseItem.objects.select_related("developer", "batch").get(pk=item_id)
+        item = ReleaseItem.objects.active().select_related("developer", "batch").get(pk=item_id)
     except ReleaseItem.DoesNotExist:
         return JsonResponse({"success": False, "error": "记录不存在"}, status=404)
 
@@ -840,7 +840,7 @@ def release_entry_item_submit(request):
         return JsonResponse({"success": False, "error": "item_id 必填"}, status=400)
 
     try:
-        item = ReleaseItem.objects.select_related("batch").get(pk=item_id)
+        item = ReleaseItem.objects.active().select_related("batch").get(pk=item_id)
     except ReleaseItem.DoesNotExist:
         return JsonResponse({"success": False, "error": "记录不存在"}, status=404)
 
@@ -871,7 +871,7 @@ def release_entry_item_confirm(request):
         return JsonResponse({"success": False, "error": "item_id 必填"}, status=400)
 
     try:
-        item = ReleaseItem.objects.select_related("batch").get(pk=item_id)
+        item = ReleaseItem.objects.active().select_related("batch").get(pk=item_id)
     except ReleaseItem.DoesNotExist:
         return JsonResponse({"success": False, "error": "记录不存在"}, status=404)
 
@@ -904,7 +904,7 @@ def release_entry_item_reject(request):
         return JsonResponse({"success": False, "error": "请填写驳回原因"}, status=400)
 
     try:
-        item = ReleaseItem.objects.select_related("batch").get(pk=item_id)
+        item = ReleaseItem.objects.active().select_related("batch").get(pk=item_id)
     except ReleaseItem.DoesNotExist:
         return JsonResponse({"success": False, "error": "记录不存在"}, status=404)
 
@@ -934,7 +934,7 @@ def release_entry_item_delete(request):
         return JsonResponse({"success": False, "error": "item_id 必填"}, status=400)
 
     try:
-        item = ReleaseItem.objects.select_related("batch").get(pk=item_id)
+        item = ReleaseItem.objects.active().select_related("batch").get(pk=item_id)
     except ReleaseItem.DoesNotExist:
         return JsonResponse({"success": False, "error": "记录不存在"}, status=404)
 
@@ -945,7 +945,8 @@ def release_entry_item_delete(request):
     if item.batch.status != ReleaseBatch.Status.OPEN:
         return JsonResponse({"success": False, "error": "当前批次未开放，不能删除"}, status=400)
 
-    item.delete()
+    item.is_deleted = True
+    item.save(update_fields=["is_deleted", "updated_at"])
     return JsonResponse({"success": True})
 
 
@@ -981,7 +982,7 @@ def release_entry_item_bulk_update(request):
     if (not request.user.is_superuser) and (field_name not in editable_fields):
         return JsonResponse({"success": False, "error": "当前角色无该字段批量修改权限"}, status=403)
 
-    items = list(ReleaseItem.objects.filter(batch_id=int(batch_id), id__in=item_ids).select_related("batch"))
+    items = list(ReleaseItem.objects.active().filter(batch_id=int(batch_id), id__in=item_ids).select_related("batch"))
     if not items:
         return JsonResponse({"success": False, "error": "未找到可更新记录"}, status=404)
 
@@ -1139,7 +1140,7 @@ def _check_batch_close_readiness(batch: ReleaseBatch) -> dict:
     """关闭批次前的完整性校验，返回各状态行项计数。"""
     from django.db.models import Count, Q
     stats = (
-        ReleaseItem.objects.filter(batch=batch)
+        ReleaseItem.objects.active().filter(batch=batch)
         .aggregate(
             total=Count("id"),
             incomplete=Count("id", filter=Q(line_status=ReleaseItem.LineStatus.INCOMPLETE)),

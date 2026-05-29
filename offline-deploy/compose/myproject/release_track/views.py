@@ -707,7 +707,7 @@ def release_track_api_batches(request):
     batches = ReleaseBatch.objects.filter(status=ReleaseBatch.Status.OPEN).order_by("-release_date", "-id")
     data = []
     for batch in batches:
-        marked_count = ReleaseItem.objects.filter(batch=batch, rel_deployed=True).count()
+        marked_count = ReleaseItem.objects.active().filter(batch=batch, rel_deployed=True).count()
         data.append(
             {
                 "id": batch.id,
@@ -745,7 +745,7 @@ def release_track_api_batch_detail(request):
 
     # 仅展示投产征集里已登记（有 ReleaseItem）的工程，不展示未登记工程。
     items = (
-        ReleaseItem.objects.select_related("project")
+        ReleaseItem.objects.active().select_related("project")
         .filter(batch=batch)
         .values(
             "project_id",

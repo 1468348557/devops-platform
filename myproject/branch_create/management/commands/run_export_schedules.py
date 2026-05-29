@@ -72,7 +72,7 @@ class Command(BaseCommand):
         os.makedirs(output_dir, exist_ok=True)
 
         items = list(
-            HoboRequirementLedger.objects.select_related(
+            HoboRequirementLedger.objects.active().select_related(
                 "project", "created_by", "branch_created_by"
             ).order_by("-applied_date", "-id")
         )
@@ -100,7 +100,7 @@ class Command(BaseCommand):
         exported = 0
         for batch in batches:
             items = list(
-                ReleaseItem.objects.select_related(
+                ReleaseItem.objects.active().select_related(
                     "project", "developer", "batch"
                 ).filter(batch=batch).order_by("-updated_at", "-id")
             )
