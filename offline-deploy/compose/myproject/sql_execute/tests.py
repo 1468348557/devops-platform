@@ -393,6 +393,25 @@ class SqlMachineReviewTests(TestCase):
         self.assertTrue(ok)
         self.assertEqual(message, "")
 
+    def test_reject_when_file_not_utf8_encoding(self):
+        with TemporaryDirectory() as tmpdir:
+            folder = Path(tmpdir)
+            execute = folder / "03_执行.sql"
+            rollback = folder / "04_回滚.sql"
+            # GBK 编码中文在严格 UTF-8 解码时会报错
+            execute.write_bytes("use demo;\nupdate t set name = '中文';".encode("gbk"))
+            rollback.write_text("use demo;\ndrop table if exists t;", encoding="utf-8")
+            ok, message = _machine_review_sql_files(
+                [execute, rollback],
+                "demo",
+                ["ddl"],
+                ["backup", "bak", "备份"],
+                ["execute", "执行"],
+                ["rollback", "回滚"],
+            )
+        self.assertFalse(ok)
+        self.assertIn("不是 UTF-8 编码", message)
+
     def test_accept_when_sql_db_name_not_configured(self):
         with TemporaryDirectory() as tmpdir:
             folder = Path(tmpdir)
@@ -504,6 +523,80 @@ class SqlMachineReviewTests(TestCase):
             )
         self.assertFalse(ok)
         self.assertIn("create table if not exists", message)
+
+    def test_reject_when_last_statement_missing_semicolon(self):
+        with TemporaryDirectory() as tmpdir:
+            folder = Path(tmpdir)
+            execute = folder / "03_执行.sql"
+            rollback = folder / "04_回滚.sql"
+            execute.write_text("use demo;\nupdate demo_table set id = 1", encoding="utf-8")
+            rollback.write_text("use demo;\ndrop table if exists demo_table;", encoding="utf-8")
+            ok, message = _machine_review_sql_files(
+                [execute, rollback],
+                "demo",
+                ["ddl"],
+                ["backup", "bak", "备份"],
+                ["execute", "执行"],
+                ["rollback", "回滚"],
+            )
+        self.assertFalse(ok)
+        self.assertIn("缺少分号", message)
+
+    def test_accept_when_last_statement_ends_with_semicolon_and_trailing_comment(self):
+        with TemporaryDirectory() as tmpdir:
+            folder = Path(tmpdir)
+            execute = folder / "03_执行.sql"
+            rollback = folder / "04_回滚.sql"
+            execute.write_text("use demo;\nupdate demo_table set id = 1;\n-- trailing comment", encoding="utf-8")
+            rollback.write_text("use demo;\ndrop table if exists demo_table;\n-- trailing", encoding="utf-8")
+            ok, message = _machine_review_sql_files(
+                [execute, rollback],
+                "demo",
+                ["ddl"],
+                ["backup", "bak", "备份"],
+                ["execute", "执行"],
+                ["rollback", "回滚"],
+            )
+        self.assertTrue(ok, msg=message)
+
+    def test_reject_when_last_statement_missing_semicolon_with_trailing_comment(self):
+        with TemporaryDirectory() as tmpdir:
+            folder = Path(tmpdir)
+            execute = folder / "03_执行.sql"
+            rollback = folder / "04_回滚.sql"
+            execute.write_text(
+                "use demo;\nupdate demo_table set id = 1\n-- trailing comment", encoding="utf-8"
+            )
+            rollback.write_text("use demo;\ndrop table if exists demo_table;\n-- trailing", encoding="utf-8")
+            ok, message = _machine_review_sql_files(
+                [execute, rollback],
+                "demo",
+                ["ddl"],
+                ["backup", "bak", "备份"],
+                ["execute", "执行"],
+                ["rollback", "回滚"],
+            )
+        self.assertFalse(ok)
+        self.assertIn("缺少分号", message)
+
+    def test_accept_when_last_statement_ends_with_semicolon_and_block_comment(self):
+        with TemporaryDirectory() as tmpdir:
+            folder = Path(tmpdir)
+            execute = folder / "03_执行.sql"
+            rollback = folder / "04_回滚.sql"
+            execute.write_text(
+                "use demo;\nupdate demo_table set id = 1;\n/* trailing block */", encoding="utf-8"
+            )
+            rollback.write_text("use demo;\ndrop table if exists demo_table;\n/* trailing */", encoding="utf-8")
+            ok, message = _machine_review_sql_files(
+                [execute, rollback],
+                "demo",
+                ["ddl"],
+                ["backup", "bak", "备份"],
+                ["execute", "执行"],
+                ["rollback", "回滚"],
+            )
+        self.assertTrue(ok, msg=message)
 
     def test_reject_rollback_when_any_drop_table_not_if_exists(self):
         with TemporaryDirectory() as tmpdir:

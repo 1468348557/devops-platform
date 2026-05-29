@@ -683,6 +683,54 @@ def _safe_read_sql_file_from_repo(repo_path: Path, folder: str, file_name: str) 
     return True, content
 
 
+def _last_sql_ends_with_semicolon(content: str) -> bool:
+    """检查 SQL 内容中最后一个语句是否以 ; 结尾。忽略行尾空白和尾部注释。"""
+    text = content.rstrip()
+    if not text:
+        return True
+
+    # 去掉尾部块注释 /* ... */
+    while True:
+        idx = text.rfind("*/")
+        if idx == -1:
+            break
+        after = text[idx + 2 :]
+        after_stripped = after.strip()
+        if not after_stripped or all(
+            line.lstrip().startswith(("--", "#")) or not line.strip()
+            for line in after_stripped.split("\n")
+        ):
+            open_idx = text.rfind("/*", 0, idx)
+            if open_idx != -1:
+                text = text[:open_idx].rstrip()
+                continue
+        break
+
+    # 去掉尾部空白行和纯注释行，然后处理最后一行的行内注释
+    if "\n" in text:
+        lines = text.split("\n")
+        while lines and (not lines[-1].strip() or lines[-1].lstrip().startswith(("--", "#"))):
+            lines.pop()
+        if not lines:
+            return True
+        last_line = lines[-1]
+        for marker in ("--", "#"):
+            idx = last_line.find(marker)
+            if idx != -1:
+                last_line = last_line[:idx].rstrip()
+                break
+        lines[-1] = last_line
+        text = "\n".join(lines).rstrip()
+    else:
+        for marker in ("--", "#"):
+            idx = text.find(marker)
+            if idx != -1:
+                text = text[:idx].rstrip()
+                break
+
+    return text.endswith(";")
+
+
 def _first_non_empty_sql_line(content: str) -> str:
     normalized = content.lstrip("\ufeff")
     in_block_comment = False
@@ -800,8 +848,9 @@ def _machine_review_sql_files(
     1) 文件必须是 UTF-8 且非空；
     2) 文件名必须仅能匹配一种脚本类型（DDL/备份/执行/回滚，来自管理员关键字）；
     3) 执行与回滚类型至少各 1 个（DDL/备份可选）；
-    4) 若配置了数据库名，则首条有效 SQL 必须为 `use <db>;`（允许中文分号与行尾注释）；
-    5) 若 DDL 脚本中出现建表语句（create [temporary] table），则每一处均须为
+    4) 每个文件中最后一个 SQL 语句必须以分号 ; 结尾；
+    5) 若配置了数据库名，则首条有效 SQL 必须为 `use <db>;`（允许中文分号与行尾注释）；
+    6) 若 DDL 脚本中出现建表语句（create [temporary] table），则每一处均须为
        create table if not exists（无建表语句则不校验此项）；
        若回滚脚本中出现删表语句（drop [temporary] table），则每一处均须为
        drop table if exists（无删表语句则不校验此项）。
@@ -863,6 +912,9 @@ def _machine_review_sql_files(
 
         if not content.strip():
             return False, f"机器审批不通过：{file_name} 内容为空"
+
+        if not _last_sql_ends_with_semicolon(content):
+            return False, f"机器审批不通过：{file_name} 最后一个 SQL 语句结尾缺少分号 (;)"
 
         if use_db_re:
             first_line = _first_non_empty_sql_line(content)
