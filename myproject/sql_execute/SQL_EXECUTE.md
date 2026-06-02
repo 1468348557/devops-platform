@@ -124,6 +124,7 @@
    - 支持多行注释在 USE 之前
 6. **DDL 规范**：建表语句必须使用 `IF NOT EXISTS`
 7. **回滚规范**：删表语句必须使用 `IF EXISTS`
+8. **非 DDL 文件 DDL 检查**：备份/执行类型文件不得包含 DDL 语句（CREATE/ALTER/DROP TABLE 等），违者拒绝
 
 ### 4.3 日志解析（_parse_sql_execution_log）
 

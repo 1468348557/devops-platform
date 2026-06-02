@@ -485,7 +485,8 @@
       若已配置数据库名，首行需为 <code>use &lt;后台配置数据库名&gt;;</code>；
       每个文件只能命中一种脚本类型，执行与回滚脚本必须至少各有 1 个，DDL/备份可选；
       若 DDL / 回滚脚本中<strong>实际出现</strong>建表 / 删表语句，则须分别为
-      <code>create table if not exists</code> / <code>drop table if exists</code>（未出现此类语句则不校验）。
+      <code>create table if not exists</code> / <code>drop table if exists</code>（未出现此类语句则不校验）；
+      备份/执行类型文件内容不得包含 DDL 语句（CREATE/ALTER/DROP TABLE 等），违者拒绝。
     </p>
     <div class="grid">
       <label class="field">投产日期

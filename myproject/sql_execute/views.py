@@ -844,16 +844,18 @@ def _machine_review_sql_files(
     rollback_keywords: list[str],
 ) -> tuple[bool, str]:
     """
-    重写后的机器审批规则：
+    机器审批规则：
     1) 文件必须是 UTF-8 且非空；
     2) 文件名必须仅能匹配一种脚本类型（DDL/备份/执行/回滚，来自管理员关键字）；
     3) 执行与回滚类型至少各 1 个（DDL/备份可选）；
     4) 每个文件中最后一个 SQL 语句必须以分号 ; 结尾；
     5) 若配置了数据库名，则首条有效 SQL 必须为 `use <db>;`（允许中文分号与行尾注释）；
-    6) 若 DDL 脚本中出现建表语句（create [temporary] table），则每一处均须为
+    6) 若 DDL 脚本中出现建表语句（create table），则每一处均须为
        create table if not exists（无建表语句则不校验此项）；
-       若回滚脚本中出现删表语句（drop [temporary] table），则每一处均须为
-       drop table if exists（无删表语句则不校验此项）。
+       若回滚脚本中出现删表语句（drop table），则每一处均须为
+       drop table if exists（无删表语句则不校验此项）；
+    7) 备份/执行分组中的 SQL 文件不得包含 DDL 语句（CREATE/ALTER/DROP TABLE 等），
+       违者拒绝并提示移入 DDL 脚本文件。
     """
     normalized_db_name = (expected_db_name or "").strip()
     phase_hits = {"ddl": 0, "backup": 0, "execute": 0, "rollback": 0}
