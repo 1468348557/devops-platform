@@ -484,8 +484,7 @@ class ReleaseTrackService:
                 self.git.local_trial_merge(repo_dir, state.release_branch)
                 self.git.cleanup_trial_merge(repo_dir, state.target_branch)
 
-                title_prefix = self.summary.tag_name or self.summary.merge_message or state.release_branch
-                title = f"{title_prefix}-{repo}"
+                title = self.summary.merge_message
                 desc = (
                     f"repo={repo}; source={state.release_branch}; target={state.target_branch}; "
                     f"tag={self.summary.tag_name}; merge={self.summary.merge_message}; "
