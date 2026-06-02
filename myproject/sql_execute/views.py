@@ -881,6 +881,16 @@ def _machine_review_sql_files(
         if normalized_db_name
         else None
     )
+    ddl_stmt_re = re.compile(
+        r'\bcreate\s+(?:or\s+replace\s+)?(?:temporary\s+)?'
+        r'(?:table|index|view|function|procedure|trigger|event)\b'
+        r'|\balter\s+(?:table|view|function|procedure|event)\b'
+        r'|\bdrop\s+(?:temporary\s+)?'
+        r'(?:table|index|view|function|procedure|trigger|event)\b'
+        r'|\btruncate\s+(?:table\s+)?\b'
+        r'|\brename\s+table\b',
+        re.IGNORECASE,
+    )
 
     for sql_path in selected_paths:
         file_name = sql_path.name
@@ -932,6 +942,23 @@ def _machine_review_sql_files(
                 return False, (
                     f"机器审批不通过：回滚脚本 {file_name} "
                     "中含删表语句时须全部使用 drop table if exists（或可带 temporary）"
+                )
+
+        if matched_phase in ("backup", "execute"):
+            cleaned = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)
+            cleaned = re.sub(r'--[^\n]*', '', cleaned)
+            cleaned = re.sub(r'#[^\n]*', '', cleaned)
+            cleaned = re.sub(r'\s+', ' ', cleaned)
+            match = ddl_stmt_re.search(cleaned)
+            if match:
+                phase_cn = {"backup": "备份", "execute": "执行", "rollback": "回滚"}.get(
+                    matched_phase, matched_phase
+                )
+                return (
+                    False,
+                    f"机器审批不通过：{file_name} 属于{phase_cn}类型脚本，"
+                    f"但内容包含 DDL 语句「{match.group().strip()}…」，"
+                    "请将 DDL 语句移入 DDL 脚本文件后重新提交",
                 )
 
     if phase_hits["execute"] == 0:
