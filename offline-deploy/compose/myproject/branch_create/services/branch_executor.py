@@ -69,12 +69,15 @@ class BranchExecutor:
             logs.append(f"[{ts}] {scrub_sensitive_text(msg)}")
 
         def add_process_output(result: subprocess.CompletedProcess) -> None:
+            ts = timezone.localtime(timezone.now()).strftime("%Y-%m-%d %H:%M:%S")
             out = scrub_sensitive_text((result.stdout or "").strip())
             err = scrub_sensitive_text((result.stderr or "").strip())
             if out:
-                logs.append(out)
+                for line in out.splitlines():
+                    logs.append(f"[{ts}] {line}")
             if err:
-                logs.append(err)
+                for line in err.splitlines():
+                    logs.append(f"[{ts}] {line}")
 
         def done(status: str, message: str) -> BranchTaskResult:
             return BranchTaskResult(
